@@ -1,0 +1,45 @@
+version: '3.8'
+
+services:
+  offchat-admin:
+    build: .
+    ports:
+      - "8080:80"
+    environment:
+      - NODE_ENV=production
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Future API service (commented out for now)
+  # api:
+  #   image: node:18-alpine
+  #   working_dir: /app
+  #   volumes:
+  #     - ./api:/app
+  #   ports:
+  #     - "3000:3000"
+  #   command: npm start
+  #   environment:
+  #     - NODE_ENV=production
+  #   depends_on:
+  #     - db
+
+  # Future database service (commented out for now)
+  # db:
+  #   image: postgres:15-alpine
+  #   environment:
+  #     POSTGRES_DB: offchat
+  #     POSTGRES_USER: admin
+  #     POSTGRES_PASSWORD: password
+  #   volumes:
+  #     - postgres_data:/var/lib/postgresql/data
+  #   ports:
+  #     - "5432:5432"
+
+volumes:
+  postgres_data:
