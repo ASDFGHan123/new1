@@ -276,7 +276,9 @@ const AdminDashboard = ({ users: propUsers, roles: propRoles, conversations: pro
   const [twoFactorAuth, setTwoFactorAuth] = React.useState<"disabled" | "optional" | "required">("optional");
   const [sessionTimeout, setSessionTimeout] = React.useState(30);
   const [maxFileSize, setMaxFileSize] = React.useState(10);
-  const [backupFrequency, setBackupFrequency] = React.useState<"daily" | "weekly" | "monthly">("daily");
+  const [backupFrequency, setBackupFrequency] = React.useState<"daily" | "weekly" | "monthly" | "custom">("daily");
+  const [customBackupStartDate, setCustomBackupStartDate] = React.useState<string>("");
+  const [customBackupEndDate, setCustomBackupEndDate] = React.useState<string>("");
 
   // Trash related state
   const [trashedUsers, setTrashedUsers] = React.useState<User[]>([]);
@@ -357,6 +359,8 @@ const AdminDashboard = ({ users: propUsers, roles: propRoles, conversations: pro
         setSessionTimeout(settings.sessionTimeout ?? 30);
         setMaxFileSize(settings.maxFileSize ?? 10);
         setBackupFrequency(settings.backupFrequency ?? "daily");
+        setCustomBackupStartDate(settings.customBackupStartDate ?? "");
+        setCustomBackupEndDate(settings.customBackupEndDate ?? "");
       } catch (error) {
         console.error('Failed to parse stored settings:', error);
       }
@@ -864,7 +868,9 @@ const AdminDashboard = ({ users: propUsers, roles: propRoles, conversations: pro
       twoFactorAuth,
       sessionTimeout,
       maxFileSize,
-      backupFrequency
+      backupFrequency,
+      customBackupStartDate,
+      customBackupEndDate
     };
     localStorage.setItem('offchat-admin-settings', JSON.stringify(settings));
     alert('Settings saved successfully!');
@@ -1306,76 +1312,9 @@ The OffChat Security Team`;
                   </CardContent>
                 </Card>
 
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                  <Card className="bg-gradient-card border-border/50">
-                    <CardHeader>
-                      <CardTitle>Message Templates</CardTitle>
-                      <CardDescription>Manage reusable message templates</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="space-y-3">
-                        {messageTemplates.map((template) => (
-                          <div key={template.id} className="flex items-center justify-between p-3 border rounded-lg">
-                            <div>
-                              <h5 className="font-medium">{template.name}</h5>
-                              <p className="text-sm text-muted-foreground">{template.category}</p>
-                            </div>
-                            <div className="flex gap-2">
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => handleUseTemplate(template)}
-                              >
-                                Use
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                onClick={() => handleEditTemplate(template)}
-                              >
-                                Edit
-                              </Button>
-                              <AlertDialog>
-                                <AlertDialogTrigger asChild>
-                                  <Button size="sm" variant="ghost" className="text-red-600 hover:text-red-700">
-                                    Delete
-                                  </Button>
-                                </AlertDialogTrigger>
-                                <AlertDialogContent>
-                                  <AlertDialogHeader>
-                                    <AlertDialogTitle>Delete Template</AlertDialogTitle>
-                                    <AlertDialogDescription>
-                                      Are you sure you want to delete the template "{template.name}"? This action cannot be undone.
-                                    </AlertDialogDescription>
-                                  </AlertDialogHeader>
-                                  <AlertDialogFooter>
-                                    <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                    <AlertDialogAction
-                                      onClick={() => handleDeleteTemplate(template.id)}
-                                      className="bg-red-600 hover:bg-red-700"
-                                    >
-                                      Delete
-                                    </AlertDialogAction>
-                                  </AlertDialogFooter>
-                                </AlertDialogContent>
-                              </AlertDialog>
-                            </div>
-                          </div>
-                        ))}
-                        <Button variant="outline" className="w-full" onClick={handleAddTemplate}>
-                          <UserPlus className="w-4 h-4 mr-2" />
-                          Add Template
-                        </Button>
-                      </div>
-                    </CardContent>
-                  </Card>
-
-                  <MessageAnalytics detailed />
-                </div>
+                <MessageAnalytics detailed />
 
                 <MessageHistory onMessageSent={onMessageSent} onTrashMessage={handleTrashMessage} />
-
-                <MessageModeration />
               </div>
             </TabsContent>
 
@@ -1603,43 +1542,6 @@ The OffChat Security Team`;
 
                       <Separator />
 
-                      {/* Security Settings */}
-                      <div>
-                        <h4 className="font-medium mb-4 flex items-center space-x-2">
-                          <Shield className="w-4 h-4" />
-                          <span>Security Settings</span>
-                        </h4>
-                        <div className="space-y-4">
-                          <div className="space-y-2">
-                            <Label className="text-sm font-medium">Two-Factor Authentication</Label>
-                            <Select value={twoFactorAuth} onValueChange={(value: any) => setTwoFactorAuth(value)}>
-                              <SelectTrigger>
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="disabled">Disabled</SelectItem>
-                                <SelectItem value="optional">Optional</SelectItem>
-                                <SelectItem value="required">Required</SelectItem>
-                              </SelectContent>
-                            </Select>
-                          </div>
-                          <div className="space-y-2">
-                            <Label className="text-sm font-medium">Session Timeout (minutes)</Label>
-                            <Select value={sessionTimeout.toString()} onValueChange={(value) => setSessionTimeout(parseInt(value))}>
-                              <SelectTrigger>
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="15">15 minutes</SelectItem>
-                                <SelectItem value="30">30 minutes</SelectItem>
-                                <SelectItem value="60">1 hour</SelectItem>
-                                <SelectItem value="120">2 hours</SelectItem>
-                                <SelectItem value="480">8 hours</SelectItem>
-                              </SelectContent>
-                            </Select>
-                          </div>
-                        </div>
-                      </div>
 
                       <Separator />
 
@@ -1662,6 +1564,8 @@ The OffChat Security Team`;
                                 <SelectItem value="25">25 MB</SelectItem>
                                 <SelectItem value="50">50 MB</SelectItem>
                                 <SelectItem value="100">100 MB</SelectItem>
+                                <SelectItem value="512">512 MB</SelectItem>
+                                <SelectItem value="1024">1 GB</SelectItem>
                               </SelectContent>
                             </Select>
                           </div>
@@ -1675,37 +1579,33 @@ The OffChat Security Team`;
                                 <SelectItem value="daily">Daily</SelectItem>
                                 <SelectItem value="weekly">Weekly</SelectItem>
                                 <SelectItem value="monthly">Monthly</SelectItem>
+                                <SelectItem value="custom">Custom Range</SelectItem>
                               </SelectContent>
                             </Select>
+                            {backupFrequency === "custom" && (
+                              <div className="grid grid-cols-2 gap-2 mt-2">
+                                <div>
+                                  <Label className="text-xs">Start Date</Label>
+                                  <Input
+                                    type="date"
+                                    value={customBackupStartDate}
+                                    onChange={(e) => setCustomBackupStartDate(e.target.value)}
+                                    className="text-xs"
+                                  />
+                                </div>
+                                <div>
+                                  <Label className="text-xs">End Date</Label>
+                                  <Input
+                                    type="date"
+                                    value={customBackupEndDate}
+                                    onChange={(e) => setCustomBackupEndDate(e.target.value)}
+                                    className="text-xs"
+                                  />
+                                </div>
+                              </div>
+                            )}
                           </div>
                         </div>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-
-                {/* System Status */}
-                <Card className="bg-gradient-card border-border/50">
-                  <CardHeader>
-                    <CardTitle className="flex items-center space-x-2">
-                      <Activity className="w-5 h-5" />
-                      <span>System Status</span>
-                    </CardTitle>
-                    <CardDescription>Current system health and statistics</CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                      <div className="text-center">
-                        <div className="text-2xl font-bold text-admin-success">99.9%</div>
-                        <p className="text-sm text-muted-foreground">Uptime</p>
-                      </div>
-                      <div className="text-center">
-                        <div className="text-2xl font-bold text-admin-primary">{users.length}</div>
-                        <p className="text-sm text-muted-foreground">Active Users</p>
-                      </div>
-                      <div className="text-center">
-                        <div className="text-2xl font-bold text-admin-secondary">{conversations.length}</div>
-                        <p className="text-sm text-muted-foreground">Active Conversations</p>
                       </div>
                     </div>
                   </CardContent>

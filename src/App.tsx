@@ -467,7 +467,7 @@ const App = () => {
           <BrowserRouter>
             <Suspense fallback={<LoadingPage message="Loading page..." />}>
               <Routes>
-              <Route path="/" element={<AdminDemo />} />
+              <Route path="/" element={<AdminLogin onLogin={handleAdminLogin} />} />
               <Route path="/admin-login" element={<AdminLogin onLogin={handleAdminLogin} />} />
               <Route 
                 path="/admin" 

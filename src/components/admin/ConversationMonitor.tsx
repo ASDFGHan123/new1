@@ -1,10 +1,11 @@
-import { Search, Filter, Users, Clock, MessageCircle, ChevronUp, ChevronDown, Eye, MoreHorizontal, Download, Archive, Trash2, VolumeX, AlertTriangle } from "lucide-react";
+import { Search, Filter, Users, Clock, MessageCircle, ChevronUp, ChevronDown, Eye, MoreHorizontal, Download, Archive, Trash2, VolumeX, AlertTriangle, Printer } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Table,
   TableBody,
@@ -57,6 +58,11 @@ const initialConversations = [
     lastActivity: "2 minutes ago",
     messageCount: 142,
     isActive: true,
+    messages: [
+      { id: "1", content: "Hi Alice, how are you?", sender: "John Doe", senderId: "john_doe", timestamp: "2024-10-22T08:00:00Z", type: "text" },
+      { id: "2", content: "I'm good, thanks! How about you?", sender: "Alice Smith", senderId: "alice_smith", timestamp: "2024-10-22T08:05:00Z", type: "text" },
+      { id: "3", content: "Pretty good. Hey, are you available for the meeting?", sender: "John Doe", senderId: "john_doe", timestamp: "2024-10-22T08:10:00Z", type: "text" },
+    ],
   },
   {
     id: 2,
@@ -200,6 +206,15 @@ const initialConversations = [
   },
 ];
 
+interface Message {
+  id: string;
+  content: string;
+  sender: string;
+  senderId: string;
+  timestamp: string;
+  type: "text" | "image" | "file";
+}
+
 interface ConversationMonitorProps {
   onTrashConversation?: (conversationId: string) => void;
 }
@@ -216,6 +231,12 @@ export const ConversationMonitor = ({ onTrashConversation }: ConversationMonitor
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [showModerationModal, setShowModerationModal] = useState(false);
   const [conversationToModerate, setConversationToModerate] = useState<typeof initialConversations[0] | null>(null);
+  const [showWarningDialog, setShowWarningDialog] = useState(false);
+  const [warningMessage, setWarningMessage] = useState("⚠️ Warning: This conversation is under moderation. Please follow community guidelines to avoid further action.");
+  const [showPrintDialog, setShowPrintDialog] = useState(false);
+  const [printContent, setPrintContent] = useState("");
+  const [showMessageHistory, setShowMessageHistory] = useState(false);
+  const [conversationMessages, setConversationMessages] = useState<Message[]>([]);
   const itemsPerPage = 10;
 
   useEffect(() => {
@@ -323,12 +344,89 @@ export const ConversationMonitor = ({ onTrashConversation }: ConversationMonitor
     setShowDetailsModal(true);
   };
 
+  const handleViewMessageHistory = (conversation: typeof initialConversations[0]) => {
+    // In a real implementation, this would fetch all messages from the API
+    // For demo purposes, we'll use the messages from the conversation object
+    setConversationMessages((conversation.messages || []) as Message[]);
+    setSelectedConversation(conversation);
+    setShowMessageHistory(true);
+  };
+
   const handleModerate = (conversation: typeof initialConversations[0]) => {
     setConversationToModerate(conversation);
     setShowModerationModal(true);
   };
 
-  const handleModerationAction = (action: "delete" | "archive" | "mute") => {
+  const generatePrintContent = (conversation: typeof initialConversations[0]) => {
+    return `
+CONVERSATION PRINT REPORT
+========================
+
+Conversation Title: ${conversation.title}
+Type: ${conversation.type}
+Participants: ${conversation.participants}
+Total Messages: ${conversation.messageCount}
+Status: ${conversation.isActive ? 'Active' : 'Inactive'}
+Last Activity: ${conversation.lastActivity}
+
+Last Message: ${conversation.lastMessage}
+
+Generated on: ${new Date().toLocaleString()}
+OffChat Admin Dashboard
+    `.trim();
+  };
+
+  const generateFullMessageHistory = (conversation: typeof initialConversations[0], messages: Message[]) => {
+    const messageHistory = messages.map((msg, index) => {
+      return `
+[${index + 1}] ${msg.sender} (${new Date(msg.timestamp).toLocaleString()})
+Type: ${msg.type}
+${msg.content}
+${'-'.repeat(50)}`;
+    }).join('\n');
+
+    return `
+COMPLETE MESSAGE HISTORY REPORT
+==============================
+
+Conversation: ${conversation.title}
+Type: ${conversation.type}
+Participants: ${conversation.participants}
+Total Messages: ${messages.length}
+Status: ${conversation.isActive ? 'Active' : 'Inactive'}
+
+MESSAGE HISTORY (First to Last):
+${messageHistory}
+
+Generated on: ${new Date().toLocaleString()}
+OffChat Admin Dashboard
+    `.trim();
+  };
+
+  const handlePrint = () => {
+    const printWindow = window.open('', '_blank');
+    if (printWindow) {
+      printWindow.document.write(`
+        <html>
+          <head>
+            <title>Conversation Report - ${conversationToModerate?.title}</title>
+            <style>
+              body { font-family: monospace; margin: 20px; }
+              pre { white-space: pre-wrap; }
+            </style>
+          </head>
+          <body>
+            <pre>${printContent}</pre>
+          </body>
+        </html>
+      `);
+      printWindow.document.close();
+      printWindow.print();
+      setShowPrintDialog(false);
+    }
+  };
+
+  const handleModerationAction = (action: "delete" | "archive" | "mute" | "warn" | "logout" | "print") => {
     if (!conversationToModerate) return;
 
     // Simulate moderation action
@@ -350,6 +448,24 @@ export const ConversationMonitor = ({ onTrashConversation }: ConversationMonitor
               return { ...conv, isActive: false, lastActivity: "Archived" };
             case "mute":
               return { ...conv, isActive: false, lastActivity: "Muted" };
+            case "warn":
+              // Send warning message to conversation members
+              console.log(`Sending warning message "${warningMessage}" to conversation: ${conversationToModerate.id}`);
+              // In a real implementation, this would send a system message to all participants
+              // Show success message
+              setTimeout(() => {
+                alert(`Warning message sent successfully to all members of "${conversationToModerate.title}"`);
+              }, 100);
+              return { ...conv, lastActivity: "Warning Sent" };
+            case "logout":
+              // Force logout all conversation members
+              console.log(`Forcing logout of all members in conversation: ${conversationToModerate.id}`);
+              // In a real implementation, this would trigger logout for all participants
+              // Show success message
+              setTimeout(() => {
+                alert(`All members of "${conversationToModerate.title}" have been logged out successfully`);
+              }, 100);
+              return { ...conv, isActive: false, lastActivity: "Members Logged Out" };
             default:
               return conv;
           }
@@ -582,6 +698,10 @@ export const ConversationMonitor = ({ onTrashConversation }: ConversationMonitor
                           <Eye className="w-4 h-4 mr-2" />
                           View Details
                         </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => handleViewMessageHistory(conversation)}>
+                          <MessageCircle className="w-4 h-4 mr-2" />
+                          View Message History
+                        </DropdownMenuItem>
                         <DropdownMenuItem onClick={() => handleModerate(conversation)}>
                           <MessageCircle className="w-4 h-4 mr-2" />
                           Moderate
@@ -797,6 +917,56 @@ export const ConversationMonitor = ({ onTrashConversation }: ConversationMonitor
                 </div>
               </Button>
 
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setShowWarningDialog(true);
+                  setShowModerationModal(false);
+                }}
+                className="justify-start h-auto p-4"
+              >
+                <AlertTriangle className="w-5 h-5 mr-3 text-yellow-500" />
+                <div className="text-left">
+                  <div className="font-medium">Send Warning Message</div>
+                  <div className="text-sm text-muted-foreground">Send warning to conversation members</div>
+                </div>
+              </Button>
+
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className="justify-start h-auto p-4"
+                  >
+                    <AlertTriangle className="w-5 h-5 mr-3 text-red-500" />
+                    <div className="text-left">
+                      <div className="font-medium">Force Logout Users</div>
+                      <div className="text-sm text-muted-foreground">Force logout all conversation members</div>
+                    </div>
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle className="flex items-center space-x-2">
+                      <AlertTriangle className="w-5 h-5 text-red-500" />
+                      <span>Force Logout Users</span>
+                    </AlertDialogTitle>
+                    <AlertDialogDescription>
+                      Are you sure you want to force logout all members of "{conversationToModerate?.title}"? This action will immediately log out all participants from this conversation.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogAction
+                      onClick={() => handleModerationAction("logout")}
+                      className="bg-red-600 hover:bg-red-700"
+                    >
+                      Force Logout
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+
               <AlertDialog>
                 <AlertDialogTrigger asChild>
                   <Button
@@ -837,6 +1007,190 @@ export const ConversationMonitor = ({ onTrashConversation }: ConversationMonitor
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowModerationModal(false)}>
               Cancel
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Warning Message Dialog */}
+      <Dialog open={showWarningDialog} onOpenChange={setShowWarningDialog}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center space-x-2">
+              <AlertTriangle className="w-5 h-5 text-yellow-500" />
+              <span>Send Warning Message</span>
+            </DialogTitle>
+            <DialogDescription>
+              Send a warning message to all members of: {conversationToModerate?.title}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="warning-message">Warning Message</Label>
+              <Textarea
+                id="warning-message"
+                value={warningMessage}
+                onChange={(e) => setWarningMessage(e.target.value)}
+                placeholder="Enter your warning message..."
+                rows={4}
+              />
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => {
+              setShowWarningDialog(false);
+              setShowModerationModal(true);
+            }}>
+              Cancel
+            </Button>
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button
+                  disabled={!warningMessage.trim()}
+                  className="bg-yellow-600 hover:bg-yellow-700"
+                >
+                  Send Warning
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Confirm Warning Message</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Are you sure you want to send this warning message to all members of "{conversationToModerate?.title}"?
+                    <div className="mt-3 p-3 bg-yellow-50 border border-yellow-200 rounded-md">
+                      <p className="text-sm text-yellow-800">{warningMessage}</p>
+                    </div>
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={() => {
+                      handleModerationAction("warn");
+                      setShowWarningDialog(false);
+                    }}
+                    className="bg-yellow-600 hover:bg-yellow-700"
+                  >
+                    Send Warning
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Message History Dialog */}
+      <Dialog open={showMessageHistory} onOpenChange={setShowMessageHistory}>
+        <DialogContent className="max-w-4xl max-h-[80vh]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center space-x-3">
+              {selectedConversation?.type === 'group' ? (
+                <div className="w-8 h-8 bg-admin-secondary/20 rounded-full flex items-center justify-center">
+                  <Users className="w-4 h-4 text-admin-secondary" />
+                </div>
+              ) : (
+                <Avatar className="w-8 h-8">
+                  <AvatarImage src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${selectedConversation?.id}`} />
+                  <AvatarFallback>
+                    {selectedConversation?.title.split(' ').slice(0, 2).map(n => n[0]).join('')}
+                  </AvatarFallback>
+                </Avatar>
+              )}
+              <div>
+                <span>Message History - {selectedConversation?.title}</span>
+                <Badge variant={selectedConversation?.type === 'group' ? 'default' : 'secondary'} className="ml-2">
+                  {selectedConversation?.type}
+                </Badge>
+              </div>
+            </DialogTitle>
+            <DialogDescription>
+              Complete message history from first to last message
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="flex-1 overflow-y-auto max-h-[60vh] space-y-4">
+            {conversationMessages.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                <MessageCircle className="w-12 h-12 mx-auto mb-2 opacity-50" />
+                <p>No messages found in this conversation.</p>
+              </div>
+            ) : (
+              conversationMessages.map((message, index) => (
+                <div key={message.id} className="flex space-x-3">
+                  <Avatar className="w-8 h-8 flex-shrink-0">
+                    <AvatarImage src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${message.senderId}`} />
+                    <AvatarFallback>
+                      {message.sender.split(' ').map(n => n[0]).join('')}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center space-x-2 mb-1">
+                      <span className="font-medium text-sm">{message.sender}</span>
+                      <span className="text-xs text-muted-foreground">
+                        {new Date(message.timestamp).toLocaleString()}
+                      </span>
+                      <Badge variant="outline" className="text-xs">
+                        {message.type}
+                      </Badge>
+                    </div>
+                    <div className="bg-muted/50 rounded-lg p-3">
+                      <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+                    </div>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowMessageHistory(false)}>
+              Close
+            </Button>
+            <Button
+              onClick={() => {
+                const content = generateFullMessageHistory(selectedConversation!, conversationMessages);
+                setPrintContent(content);
+                setShowPrintDialog(true);
+                setShowMessageHistory(false);
+              }}
+              className="bg-blue-600 hover:bg-blue-700"
+            >
+              <Printer className="w-4 h-4 mr-2" />
+              Print History
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Print Dialog */}
+      <Dialog open={showPrintDialog} onOpenChange={setShowPrintDialog}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center space-x-2">
+              <Printer className="w-5 h-5 text-blue-500" />
+              <span>Print Conversation Report</span>
+            </DialogTitle>
+            <DialogDescription>
+              Preview and print the conversation report for: {conversationToModerate?.title}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div className="border rounded-lg p-4 bg-muted/50">
+              <pre className="text-sm whitespace-pre-wrap font-mono">{printContent}</pre>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowPrintDialog(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handlePrint} className="bg-blue-600 hover:bg-blue-700">
+              <Printer className="w-4 h-4 mr-2" />
+              Print Report
             </Button>
           </DialogFooter>
         </DialogContent>
