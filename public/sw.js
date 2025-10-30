@@ -8,9 +8,6 @@ const STATIC_FILES = [
   '/',
   '/index.html',
   '/manifest.json',
-  '/favicon.ico',
-  '/placeholder.svg',
-  '/robots.txt'
 ];
 
 // Install event - cache static assets
