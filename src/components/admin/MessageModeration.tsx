@@ -64,23 +64,10 @@ export const MessageModeration = ({ flaggedMessages: initialMessages = mockFlagg
   const [selectedMessage, setSelectedMessage] = useState<FlaggedMessage | null>(null);
   const { toast } = useToast();
 
-  // Load from localStorage on mount
+  // Initialize with mock data (no localStorage)
   useEffect(() => {
-    const stored = localStorage.getItem('offchat-flagged-messages');
-    if (stored) {
-      try {
-        const parsed = JSON.parse(stored);
-        setFlaggedMessages(parsed);
-      } catch (error) {
-        console.error('Failed to parse stored flagged messages:', error);
-      }
-    }
+    setFlaggedMessages(mockFlaggedMessages);
   }, []);
-
-  // Save to localStorage whenever messages change
-  useEffect(() => {
-    localStorage.setItem('offchat-flagged-messages', JSON.stringify(flaggedMessages));
-  }, [flaggedMessages]);
 
   const pendingMessages = flaggedMessages.filter(msg => msg.status === "pending");
 

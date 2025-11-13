@@ -25,11 +25,8 @@ export const LoginForm = ({ onToggleMode, onLogin }: LoginFormProps) => {
     setTimeout(() => {
       onLogin(identifier, password);
       setIsLoading(false);
-      // Check if login was successful by checking localStorage for user
-      const loggedIn = localStorage.getItem("offchat-current-user");
-      if (loggedIn) {
-        navigate("/chat");
-      }
+      // Navigate to chat (parent component handles authentication state)
+      navigate("/chat");
     }, 1000);
   };
 

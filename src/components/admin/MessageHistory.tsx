@@ -88,23 +88,10 @@ export const MessageHistory = ({ messages: initialMessages = mockMessages, onMes
   const [showMessageDetail, setShowMessageDetail] = useState(false);
   const { toast } = useToast();
 
-  // Load from localStorage on mount
+  // Initialize with mock data (no localStorage)
   useEffect(() => {
-    const stored = localStorage.getItem('offchat-message-history');
-    if (stored) {
-      try {
-        const parsed = JSON.parse(stored);
-        setMessages(parsed);
-      } catch (error) {
-        console.error('Failed to parse stored message history:', error);
-      }
-    }
+    setMessages(mockMessages);
   }, []);
-
-  // Save to localStorage whenever messages change
-  useEffect(() => {
-    localStorage.setItem('offchat-message-history', JSON.stringify(messages));
-  }, [messages]);
 
   const filteredMessages = useMemo(() => {
     return messages.filter(message => {

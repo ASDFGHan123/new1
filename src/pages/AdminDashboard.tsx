@@ -299,94 +299,15 @@ const AdminDashboard = ({ users: propUsers, roles: propRoles, conversations: pro
     admin: string;
   }>>([]);
 
-  // Load trash data from localStorage on mount
+  // Initialize trash data (no localStorage loading)
   React.useEffect(() => {
-    const storedTrashedUsers = localStorage.getItem('offchat-trashed-users');
-    const storedTrashedConversations = localStorage.getItem('offchat-trashed-conversations');
-    const storedTrashedTemplates = localStorage.getItem('offchat-trashed-templates');
-    const storedTrashedMessages = localStorage.getItem('offchat-trashed-messages');
-    const storedTrashedRoles = localStorage.getItem('offchat-trashed-roles');
-
-    if (storedTrashedUsers) {
-      try {
-        setTrashedUsers(JSON.parse(storedTrashedUsers));
-      } catch (error) {
-        console.error('Failed to parse stored trashed users:', error);
-      }
-    }
-
-    if (storedTrashedConversations) {
-      try {
-        setTrashedConversations(JSON.parse(storedTrashedConversations));
-      } catch (error) {
-        console.error('Failed to parse stored trashed conversations:', error);
-      }
-    }
-
-    if (storedTrashedTemplates) {
-      try {
-        setTrashedMessageTemplates(JSON.parse(storedTrashedTemplates));
-      } catch (error) {
-        console.error('Failed to parse stored trashed templates:', error);
-      }
-    }
-
-    if (storedTrashedMessages) {
-      try {
-        setTrashedMessages(JSON.parse(storedTrashedMessages));
-      } catch (error) {
-        console.error('Failed to parse stored trashed messages:', error);
-      }
-    }
-
-    if (storedTrashedRoles) {
-      try {
-        setTrashedRoles(JSON.parse(storedTrashedRoles));
-      } catch (error) {
-        console.error('Failed to parse stored trashed roles:', error);
-      }
-    }
-
-    // Load settings
-    const storedSettings = localStorage.getItem('offchat-admin-settings');
-    if (storedSettings) {
-      try {
-        const settings = JSON.parse(storedSettings);
-        setMaintenanceMode(settings.maintenanceMode ?? false);
-        setUserRegistration(settings.userRegistration ?? true);
-        setEmailNotifications(settings.emailNotifications ?? false);
-        setTwoFactorAuth(settings.twoFactorAuth ?? "optional");
-        setSessionTimeout(settings.sessionTimeout ?? 30);
-        setMaxFileSize(settings.maxFileSize ?? 10);
-        setBackupFrequency(settings.backupFrequency ?? "daily");
-        setCustomBackupStartDate(settings.customBackupStartDate ?? "");
-        setCustomBackupEndDate(settings.customBackupEndDate ?? "");
-      } catch (error) {
-        console.error('Failed to parse stored settings:', error);
-      }
-    }
+    // Initialize with empty trash data
+    setTrashedUsers([]);
+    setTrashedConversations([]);
+    setTrashedMessageTemplates([]);
+    setTrashedMessages([]);
+    setTrashedRoles([]);
   }, []);
-
-  // Save trash data to localStorage whenever it changes
-  React.useEffect(() => {
-    localStorage.setItem('offchat-trashed-users', JSON.stringify(trashedUsers));
-  }, [trashedUsers]);
-
-  React.useEffect(() => {
-    localStorage.setItem('offchat-trashed-conversations', JSON.stringify(trashedConversations));
-  }, [trashedConversations]);
-
-  React.useEffect(() => {
-    localStorage.setItem('offchat-trashed-templates', JSON.stringify(trashedMessageTemplates));
-  }, [trashedMessageTemplates]);
-
-  React.useEffect(() => {
-    localStorage.setItem('offchat-trashed-messages', JSON.stringify(trashedMessages));
-  }, [trashedMessages]);
-
-  React.useEffect(() => {
-    localStorage.setItem('offchat-trashed-roles', JSON.stringify(trashedRoles));
-  }, [trashedRoles]);
 
   const handleViewProfile = (user: User) => {
     setSelectedUser(user);
@@ -812,21 +733,7 @@ const AdminDashboard = ({ users: propUsers, roles: propRoles, conversations: pro
   };
 
   const handleRestoreMessage = async (message: any) => {
-    // For messages, we need to restore them to MessageHistory's localStorage
-    const stored = localStorage.getItem('offchat-message-history');
-    let messages = [];
-    if (stored) {
-      try {
-        messages = JSON.parse(stored);
-      } catch (error) {
-        console.error('Failed to parse stored message history:', error);
-        messages = [];
-      }
-    }
-    // Add the message back
-    messages.unshift(message);
-    localStorage.setItem('offchat-message-history', JSON.stringify(messages));
-    // Remove from trash
+    // For messages, we'll just remove from trash (in-memory only)
     setTrashedMessages(prev => prev.filter(m => m.id !== message.id));
   };
 
@@ -861,18 +768,6 @@ const AdminDashboard = ({ users: propUsers, roles: propRoles, conversations: pro
   const handleSaveSettings = async () => {
     // Simulate API call
     await new Promise(resolve => setTimeout(resolve, 1000));
-    const settings = {
-      maintenanceMode,
-      userRegistration,
-      emailNotifications,
-      twoFactorAuth,
-      sessionTimeout,
-      maxFileSize,
-      backupFrequency,
-      customBackupStartDate,
-      customBackupEndDate
-    };
-    localStorage.setItem('offchat-admin-settings', JSON.stringify(settings));
     alert('Settings saved successfully!');
   };
 

@@ -38,7 +38,10 @@ export const BackupManager = ({ detailed = false }: BackupManagerProps) => {
       month: selectedMonth,
       types: backupTypes,
       data: {
-        users: backupTypes.users ? JSON.parse(localStorage.getItem("offchat-users") || "[]") : null,
+        users: backupTypes.users ? [
+          { id: "admin", username: "admin", email: "admin@offchat.com", status: "active", role: "admin" },
+          { id: "user1", username: "john_doe", email: "john@example.com", status: "active", role: "user" }
+        ] : null,
         messages: backupTypes.messages ? "Sample message data" : null,
         settings: backupTypes.settings ? "Sample settings data" : null,
         logs: backupTypes.logs ? "Sample log data" : null

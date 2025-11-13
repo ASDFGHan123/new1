@@ -85,34 +85,60 @@ class ApiService {
   private baseURL = process.env.REACT_APP_API_URL || '/api';
   private isDevelopment = process.env.NODE_ENV === 'development';
 
+  // In-memory data storage (no localStorage)
+  private mockUsers: User[] = [
+    {
+      id: "admin",
+      username: "admin",
+      email: "admin@offchat.com",
+      password: "12341234",
+      status: "active",
+      role: "admin",
+      joinDate: "2024-01-01",
+      lastActive: "2 minutes ago",
+      messageCount: 1250,
+      reportCount: 0,
+      avatar: undefined
+    },
+    {
+      id: "user1",
+      username: "john_doe",
+      email: "john@example.com",
+      password: "password",
+      status: "active",
+      role: "user",
+      joinDate: "2024-01-15",
+      lastActive: "1 hour ago",
+      messageCount: 89,
+      reportCount: 1,
+      avatar: undefined
+    },
+    {
+      id: "user2",
+      username: "jane_smith",
+      email: "jane@example.com",
+      password: "password",
+      status: "suspended",
+      role: "user",
+      joinDate: "2024-01-10",
+      lastActive: "3 days ago",
+      messageCount: 156,
+      reportCount: 3,
+      avatar: undefined
+    }
+  ];
+
+  private mockCurrentUser: User | null = null;
+  private mockToken: string | null = null;
+
   // Generic request method with error handling
   private async request<T>(
     endpoint: string,
     options: RequestInit = {}
   ): Promise<ApiResponse<T>> {
     try {
-      // In development, simulate API calls with localStorage
-      if (this.isDevelopment) {
-        return this.mockRequest<T>(endpoint, options);
-      }
-
-      const response = await fetch(`${this.baseURL}${endpoint}`, {
-        headers: {
-          'Content-Type': 'application/json',
-          ...options.headers,
-        },
-        ...options,
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const data = await response.json();
-      return {
-        data,
-        success: true,
-      };
+      // Always use mock implementation (no localStorage)
+      return this.mockRequest<T>(endpoint, options);
     } catch (error) {
       console.error('API request failed:', error);
       return {
@@ -132,13 +158,18 @@ class ApiService {
     await new Promise(resolve => setTimeout(resolve, 500));
 
     const method = options.method || 'GET';
+    
+    // Convert body to string if it exists
+    const bodyString = options.body ?
+      (typeof options.body === 'string' ? options.body : JSON.stringify(options.body)) :
+      null;
 
     try {
       switch (endpoint) {
         case '/auth/login':
-          return this.mockLogin(options.body) as ApiResponse<T>;
+          return this.mockLogin(bodyString!) as ApiResponse<T>;
         case '/auth/signup':
-          return this.mockSignup(options.body) as ApiResponse<T>;
+          return this.mockSignup(bodyString!) as ApiResponse<T>;
         case '/auth/logout':
           return this.mockLogout() as ApiResponse<T>;
         case '/users':
@@ -151,7 +182,7 @@ class ApiService {
           return this.mockGetMessages() as ApiResponse<T>;
         default:
           if (endpoint.startsWith('/users/') && method === 'PUT') {
-            return this.mockUpdateUser(endpoint.split('/')[2], options.body) as ApiResponse<T>;
+            return this.mockUpdateUser(endpoint.split('/')[2], bodyString!) as ApiResponse<T>;
           }
           if (endpoint.startsWith('/users/') && method === 'DELETE') {
             return this.mockDeleteUser(endpoint.split('/')[2]) as ApiResponse<T>;
@@ -251,9 +282,8 @@ class ApiService {
   // Mock implementations
   private mockLogin(body: string): ApiResponse<{ user: User; token: string }> {
     const { identifier, password } = JSON.parse(body);
-    const users = this.getStoredUsers();
 
-    const user = users.find(u =>
+    const user = this.mockUsers.find(u =>
       (u.username === identifier || u.email === identifier) &&
       u.password === password &&
       u.status === 'active'
@@ -264,7 +294,8 @@ class ApiService {
     }
 
     const token = `mock-jwt-${user.id}-${Date.now()}`;
-    localStorage.setItem('auth-token', token);
+    this.mockToken = token;
+    this.mockCurrentUser = { ...user };
 
     const { password: _, ...userWithoutPassword } = user;
     return {
@@ -273,14 +304,10 @@ class ApiService {
     };
   }
 
-  private mockSignup(body: BodyInit | null | undefined): ApiResponse<{ user: User; token: string }> {
-    if (!body || typeof body !== 'string') {
-      throw new Error('Invalid request body');
-    }
+  private mockSignup(body: string): ApiResponse<{ user: User; token: string }> {
     const { username, email, password } = JSON.parse(body);
-    const users = this.getStoredUsers();
 
-    if (users.some(u => u.username === username || u.email === email)) {
+    if (this.mockUsers.some(u => u.username === username || u.email === email)) {
       throw new Error('Username or email already exists');
     }
 
@@ -297,11 +324,11 @@ class ApiService {
       reportCount: 0,
     };
 
-    users.push(newUser);
-    localStorage.setItem('offchat-users', JSON.stringify(users));
+    this.mockUsers.push(newUser);
 
     const token = `mock-jwt-${newUser.id}-${Date.now()}`;
-    localStorage.setItem('auth-token', token);
+    this.mockToken = token;
+    this.mockCurrentUser = null; // New users need approval
 
     const { password: _, ...userWithoutPassword } = newUser;
     return {
@@ -311,60 +338,70 @@ class ApiService {
   }
 
   private mockLogout(): ApiResponse<void> {
-    localStorage.removeItem('auth-token');
-    localStorage.removeItem('offchat-current-user');
+    this.mockToken = null;
+    this.mockCurrentUser = null;
     return { data: undefined, success: true };
   }
 
   private mockGetUsers(): ApiResponse<User[]> {
-    const users = this.getStoredUsers().map(({ password, ...user }) => user);
+    const users = this.mockUsers.map(({ password, ...user }) => user);
     return { data: users, success: true };
   }
 
   private mockGetUserProfile(): ApiResponse<User> {
-    const currentUser = localStorage.getItem('offchat-current-user');
-    if (!currentUser) throw new Error('Not authenticated');
+    if (!this.mockCurrentUser) {
+      throw new Error('Not authenticated');
+    }
 
-    const user = JSON.parse(currentUser);
-    return { data: user, success: true };
+    const { password, ...userWithoutPassword } = this.mockCurrentUser;
+    return { data: userWithoutPassword, success: true };
   }
 
-  private mockUpdateUser(userId: string, body: BodyInit | null | undefined): ApiResponse<User> {
-    if (!body || typeof body !== 'string') {
-      throw new Error('Invalid request body');
-    }
+  private mockUpdateUser(userId: string, body: string): ApiResponse<User> {
     const updates = JSON.parse(body);
-    const users = this.getStoredUsers();
-    const userIndex = users.findIndex(u => u.id === userId);
+    const userIndex = this.mockUsers.findIndex(u => u.id === userId);
 
     if (userIndex === -1) throw new Error('User not found');
 
-    users[userIndex] = { ...users[userIndex], ...updates };
-    localStorage.setItem('offchat-users', JSON.stringify(users));
+    this.mockUsers[userIndex] = { ...this.mockUsers[userIndex], ...updates };
 
-    const { password, ...userWithoutPassword } = users[userIndex];
+    const { password, ...userWithoutPassword } = this.mockUsers[userIndex];
     return { data: userWithoutPassword, success: true };
   }
 
   private mockDeleteUser(userId: string): ApiResponse<void> {
-    const users = this.getStoredUsers();
-    const filteredUsers = users.filter(u => u.id !== userId);
-    localStorage.setItem('offchat-users', JSON.stringify(filteredUsers));
+    this.mockUsers = this.mockUsers.filter(u => u.id !== userId);
     return { data: undefined, success: true };
   }
 
   private mockGetConversations(): ApiResponse<Conversation[]> {
-    const conversations = JSON.parse(localStorage.getItem('offchat-conversations') || '[]');
-    return { data: conversations, success: true };
+    // Return mock conversations
+    return {
+      data: [
+        {
+          id: "general",
+          type: "group",
+          title: "General Chat",
+          participants: ["admin", "user1"],
+          messages: [
+            {
+              id: "1",
+              content: "Welcome to OffChat!",
+              sender: "system",
+              timestamp: new Date().toISOString(),
+              type: "system"
+            }
+          ],
+          createdAt: new Date().toISOString(),
+          isActive: true
+        }
+      ],
+      success: true
+    };
   }
 
   private mockGetMessages(): ApiResponse<Message[]> {
-    // Simplified - would need conversationId parameter
     return { data: [], success: true };
-  }
-
-  private getStoredUsers(): User[] {
-    return JSON.parse(localStorage.getItem('offchat-users') || '[]');
   }
 }
 
