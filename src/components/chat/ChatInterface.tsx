@@ -52,7 +52,7 @@ export const ChatInterface = ({ user, onLogout, onUpdateUser }: ChatInterfacePro
   const [messages, setMessages] = useState<Message[]>([
     {
       id: "1",
-      content: "Welcome to OffChat! 🎉",
+      content: "Welcome to OffChat! ",
       sender: "system",
       timestamp: new Date(),
     },
