@@ -33,12 +33,22 @@ export interface Conversation {
   isActive: boolean;
 }
 
+export interface Attachment {
+  id: string;
+  name: string;
+  type: string;
+  size: number;
+  url: string;
+  uploadedAt: string;
+}
+
 export interface Message {
   id: string;
   content: string;
   sender: string;
   timestamp: string;
   type?: "system" | "admin" | "user";
+  attachments?: Attachment[];
 }
 
 export interface Role {
@@ -250,10 +260,32 @@ class ApiService {
     return this.request(`/conversations/${conversationId}/messages`);
   }
 
-  async sendMessage(conversationId: string, content: string): Promise<ApiResponse<Message>> {
+  async sendMessage(conversationId: string, content: string, attachments?: File[]): Promise<ApiResponse<Message>> {
+    // For now, we'll simulate file uploads and return attachment data
+    const mockAttachments: Attachment[] = attachments?.map((file, index) => ({
+      id: `attachment-${Date.now()}-${index}`,
+      name: file.name,
+      type: file.type,
+      size: file.size,
+      url: URL.createObjectURL(file), // Simulate a URL for the file
+      uploadedAt: new Date().toISOString()
+    })) || [];
+
     return this.request(`/conversations/${conversationId}/messages`, {
       method: 'POST',
-      body: JSON.stringify({ content }),
+      body: JSON.stringify({ content, attachments: mockAttachments }),
+    });
+  }
+
+  async uploadAttachment(file: File): Promise<ApiResponse<Attachment>> {
+    return this.request('/attachments/upload', {
+      method: 'POST',
+      body: JSON.stringify({
+        name: file.name,
+        type: file.type,
+        size: file.size,
+        data: URL.createObjectURL(file) // Simulate file data
+      }),
     });
   }
 

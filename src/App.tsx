@@ -104,7 +104,15 @@ const App = () => {
 
   // Demo authentication state
   const [authMode, setAuthMode] = useState<'login' | 'signup'>("login");
-  const [user, setUser] = useState<null | { id: string; username: string; avatar?: string; status: "online" | "away" | "offline"; role?: string }>(null);
+  const [user, setUser] = useState<null | { id: string; username: string; avatar?: string; status: "online" | "away" | "offline"; role?: string }>(() => {
+    // Try to restore user from localStorage on app start
+    try {
+      const savedUser = localStorage.getItem('offchat_user');
+      return savedUser ? JSON.parse(savedUser) : null;
+    } catch {
+      return null;
+    }
+  });
   
   // Messages and conversations
   const [conversations, setConversations] = useState<AppConversation[]>([
@@ -294,8 +302,18 @@ const App = () => {
     setUsers(prev => [...prev, newUser]);
     alert("Account created! Welcome to OffChat.");
   };
+  // Helper function to update user state and persist to localStorage
+  const updateUserState = (userData: typeof user) => {
+    setUser(userData);
+    if (userData) {
+      localStorage.setItem('offchat_user', JSON.stringify(userData));
+    } else {
+      localStorage.removeItem('offchat_user');
+    }
+  };
+
   const handleLogout = () => {
-    setUser(null);
+    updateUserState(null);
   };
 
   // Admin login handler
