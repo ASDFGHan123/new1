@@ -37,6 +37,7 @@ export const ChatInterface = ({ user, onLogout, onUpdateUser }: ChatInterfacePro
   const [attachments, setAttachments] = useState<File[]>([]);
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const formRef = useRef<HTMLFormElement>(null);
 
   // Sync avatar with user prop
   useEffect(() => {
@@ -91,8 +92,10 @@ export const ChatInterface = ({ user, onLogout, onUpdateUser }: ChatInterfacePro
     addFiles(e.dataTransfer.files);
   };
 
-  const handleSendMessage = (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSendMessage = (e?: React.FormEvent | React.KeyboardEvent) => {
+    if (e) {
+      e.preventDefault();
+    }
     if (!message.trim() && attachments.length === 0) return;
 
     const newMessage: Message = {
@@ -290,16 +293,35 @@ export const ChatInterface = ({ user, onLogout, onUpdateUser }: ChatInterfacePro
             </div>
           )}
           
-          <form onSubmit={handleSendMessage} className="flex gap-3">
-            <div className="flex-1 flex gap-3">
+          <form
+            ref={formRef}
+            onSubmit={handleSendMessage}
+            className="flex gap-3"
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                handleSendMessage();
+              }
+            }}
+          >
+            <div
+              className="flex-1 flex gap-3"
+              onDragOver={handleDragOver}
+              onDragLeave={handleDragLeave}
+              onDrop={handleDrop}
+            >
               <Input
                 value={message}
                 onChange={(e) => setMessage(e.target.value)}
                 placeholder="Type your message..."
                 className="flex-1 transition-all duration-300 focus:shadow-glow"
-                onDragOver={handleDragOver}
-                onDragLeave={handleDragLeave}
-                onDrop={handleDrop}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    handleSendMessage();
+                  }
+                }}
               />
               <input
                 ref={fileInputRef}
@@ -321,7 +343,7 @@ export const ChatInterface = ({ user, onLogout, onUpdateUser }: ChatInterfacePro
             </div>
             <Button
               type="submit"
-              disabled={!message.trim() && attachments.length === 0}
+              disabled={attachments.length === 0 && !message.trim()}
               className="bg-gradient-to-r from-primary to-primary-glow hover:shadow-glow transition-all duration-300 disabled:opacity-50"
             >
               <Send className="h-4 w-4" />
