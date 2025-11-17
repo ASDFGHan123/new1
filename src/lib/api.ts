@@ -40,6 +40,7 @@ export interface Attachment {
   size: number;
   url: string;
   uploadedAt: string;
+  duration?: number; // For audio/video attachments
 }
 
 export interface Message {
@@ -49,6 +50,10 @@ export interface Message {
   timestamp: string;
   type?: "system" | "admin" | "user";
   attachments?: Attachment[];
+  edited?: boolean;
+  editedAt?: Date;
+  forwarded?: boolean;
+  originalSender?: string;
 }
 
 export interface Role {
