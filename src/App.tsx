@@ -4,8 +4,9 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { ThemeProvider } from "next-themes";
-import { Suspense, lazy, useState, useEffect } from "react";
+import { Suspense, lazy, useState } from "react";
 import { LoadingPage } from "@/components/ui/loading";
+import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 
 // Type definitions to match AdminDashboard interfaces
 interface AppUser {
@@ -60,9 +61,9 @@ const AdminDashboard = lazy(() => import("./pages/AdminDashboard"));
 const AdminDemo = lazy(() => import("./pages/AdminDemo"));
 const AdminLogin = lazy(() => import("./pages/AdminLogin"));
 const NotFound = lazy(() => import("./pages/NotFound"));
+const UnifiedChatPage = lazy(() => import("./pages/UnifiedChatPage").then(module => ({ default: module.UnifiedChatPage })));
 const LoginForm = lazy(() => import("@/components/auth/LoginForm").then(module => ({ default: module.LoginForm })));
 const SignupForm = lazy(() => import("@/components/auth/SignupForm").then(module => ({ default: module.SignupForm })));
-const ChatInterface = lazy(() => import("@/components/chat/ChatInterface").then(module => ({ default: module.ChatInterface })));
 
 const queryClient = new QueryClient();
 
@@ -448,9 +449,10 @@ const App = () => {
         disableTransitionOnChange
       >
         <TooltipProvider>
-          <Toaster />
-          <Sonner />
-          <BrowserRouter>
+          <AuthProvider>
+            <Toaster />
+            <Sonner />
+            <BrowserRouter>
             <Suspense fallback={<LoadingPage message="Loading page..." />}>
               <Routes>
               <Route path="/" element={<AdminLogin onLogin={handleAdminLogin} />} />
@@ -504,24 +506,18 @@ const App = () => {
                   />
                 }
               />
+
               <Route
                 path="/chat"
-                element={
-                  user ? (
-                    <ChatInterface user={user} onLogout={handleLogout} onUpdateUser={handleUpdateUser} />
-                  ) : (
-                    <LoginForm
-                      onToggleMode={() => setAuthMode("signup")}
-                      onLogin={handleLogin}
-                    />
-                  )
-                }
+                element={<UnifiedChatPage />}
               />
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
               <Route path="*" element={<NotFound />} />
              </Routes>
            </Suspense>
          </BrowserRouter>
+
+          </AuthProvider>
         </TooltipProvider>
       </ThemeProvider>
     </QueryClientProvider>

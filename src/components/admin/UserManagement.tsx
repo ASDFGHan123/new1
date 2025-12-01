@@ -1,5 +1,5 @@
 import React from "react";
-import { Search, Filter, MoreHorizontal, UserPlus } from "lucide-react";
+import { Search, Filter, MoreHorizontal, UserPlus, Printer } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -18,7 +18,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-
+import { openPrintWindow, generateUserListHTML } from "@/lib/printUtils";
 
 interface User {
   id: string;
@@ -132,6 +132,14 @@ export const UserManagement = ({ users, approveUser, rejectUser, addUser, update
     return matchesSearch && matchesStatus && matchesRole;
   });
 
+  const handlePrintUsers = () => {
+    const printData = generateUserListHTML(filteredUsers);
+    openPrintWindow({
+      ...printData,
+      subtitle: `Filtered Results: ${filteredUsers.length} of ${users.length} users`
+    });
+  };
+
   return (
     <Card className="bg-gradient-card border-border/50">
       <CardHeader>
@@ -142,7 +150,17 @@ export const UserManagement = ({ users, approveUser, rejectUser, addUser, update
               Manage users, roles, and permissions
             </CardDescription>
           </div>
-          <Dialog open={open} onOpenChange={setOpen}>
+          <div className="flex items-center space-x-2">
+            <Button 
+              onClick={handlePrintUsers}
+              variant="outline"
+              size="sm"
+              className="bg-blue-50 hover:bg-blue-100 border-blue-200 text-blue-700"
+            >
+              <Printer className="w-4 h-4 mr-2" />
+              Print Users
+            </Button>
+            <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
               <Button className="bg-admin-primary hover:bg-admin-primary/90">
                 <UserPlus className="w-4 h-4 mr-2" />
@@ -222,6 +240,7 @@ export const UserManagement = ({ users, approveUser, rejectUser, addUser, update
               </form>
             </DialogContent>
           </Dialog>
+          </div>
         </div>
         {/* Search and Filters */}
         <div className="flex items-center space-x-4 mt-4">

@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from "react";
+import React, { useState, useMemo, useEffect, useRef } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,9 +9,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-import { Search, Filter, Eye, Trash2, Clock, Users, User, AlertTriangle, Plus, BarChart3 } from "lucide-react";
+import { Progress } from "@/components/ui/progress";
+import { Textarea } from "@/components/ui/textarea";
+import { Search, Filter, Eye, Trash2, Clock, Users, User, AlertTriangle, Plus, BarChart3, Printer, Download, Upload, FileText, Database, Shield, CheckCircle, XCircle, Loader2, Archive, RotateCcw } from "lucide-react";
 import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
+import { openPrintWindow, generateMessageHistoryHTML } from "@/lib/printUtils";
 
 interface SentMessage {
   id: string;
@@ -86,12 +89,41 @@ export const MessageHistory = ({ messages: initialMessages = mockMessages, onMes
   const [priorityFilter, setPriorityFilter] = useState<string>("all");
   const [selectedMessage, setSelectedMessage] = useState<SentMessage | null>(null);
   const [showMessageDetail, setShowMessageDetail] = useState(false);
+  const [isBackingUp, setIsBackingUp] = useState(false);
+  const [backupProgress, setBackupProgress] = useState(0);
+  const [backupFormat, setBackupFormat] = useState<"json" | "csv" | "xml">("json");
+  const [showRestoreDialog, setShowRestoreDialog] = useState(false);
+  const [showBackupOptions, setShowBackupOptions] = useState(false);
+  const [backupOptions, setBackupOptions] = useState({
+    includeStatistics: true,
+    includeFilters: true,
+    compressData: false,
+    validateIntegrity: true,
+    includeMetadata: true
+  });
+  const [restoreData, setRestoreData] = useState<string>("");
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
   // Initialize with mock data (no localStorage)
   useEffect(() => {
     setMessages(mockMessages);
   }, []);
+
+  // Close backup options when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (showBackupOptions) {
+        const target = event.target as Element;
+        if (!target.closest('[data-backup-options]')) {
+          setShowBackupOptions(false);
+        }
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showBackupOptions]);
 
   const filteredMessages = useMemo(() => {
     return messages.filter(message => {
@@ -256,6 +288,337 @@ export const MessageHistory = ({ messages: initialMessages = mockMessages, onMes
     addSentMessage(randomContent, randomType, randomPriority, ["all"], 1250);
   };
 
+  const handlePrintMessageHistory = () => {
+    const printData = generateMessageHistoryHTML(filteredMessages);
+    openPrintWindow({
+      ...printData,
+      subtitle: `Filtered Results: ${filteredMessages.length} of ${messages.length} messages`
+    });
+  };
+
+  // Generate integrity hash for backup validation
+  const generateIntegrityHash = (data: string): string => {
+    let hash = 0;
+    for (let i = 0; i < data.length; i++) {
+      const char = data.charCodeAt(i);
+      hash = ((hash << 5) - hash) + char;
+      hash = hash & hash; // Convert to 32-bit integer
+    }
+    return Math.abs(hash).toString(36);
+  };
+
+  // Convert messages to CSV format
+  const convertToCSV = (messages: SentMessage[]): string => {
+    const headers = ['ID', 'Type', 'Content', 'Recipients', 'Recipient Count', 'Sent By', 'Sent At', 'Status', 'Priority'];
+    const rows = messages.map(msg => [
+      msg.id,
+      msg.type,
+      `"${msg.content.replace(/"/g, '""')}"`, // Escape quotes
+      `"${msg.recipients.join(', ')}"`,
+      msg.recipientCount.toString(),
+      msg.sentBy,
+      msg.sentAt,
+      msg.status,
+      msg.priority
+    ]);
+    return [headers, ...rows].map(row => row.join(',')).join('\n');
+  };
+
+  // Convert messages to XML format
+  const convertToXML = (messages: SentMessage[]): string => {
+    const xmlHeader = '<?xml version="1.0" encoding="UTF-8"?>';
+    const messageElements = messages.map(msg => `
+    <message>
+      <id>${msg.id}</id>
+      <type>${msg.type}</type>
+      <content><![CDATA[${msg.content}]]></content>
+      <recipients>
+        ${msg.recipients.map(recipient => `<recipient>${recipient}</recipient>`).join('')}
+      </recipients>
+      <recipientCount>${msg.recipientCount}</recipientCount>
+      <sentBy>${msg.sentBy}</sentBy>
+      <sentAt>${msg.sentAt}</sentAt>
+      <status>${msg.status}</status>
+      <priority>${msg.priority}</priority>
+    </message>`).join('');
+    
+    return `${xmlHeader}
+<messageHistory>
+  <timestamp>${new Date().toISOString()}</timestamp>
+  <statistics>
+    <totalMessages>${messageStats.total}</totalMessages>
+    <totalRecipients>${messageStats.totalRecipients}</totalRecipients>
+    <byType>
+      <broadcast>${messageStats.byType.broadcast || 0}</broadcast>
+      <system>${messageStats.byType.system || 0}</system>
+      <targeted>${messageStats.byType.targeted || 0}</targeted>
+    </byType>
+    <byStatus>
+      <sent>${messageStats.byStatus.sent || 0}</sent>
+      <delivered>${messageStats.byStatus.delivered || 0}</delivered>
+      <failed>${messageStats.byStatus.failed || 0}</failed>
+    </byStatus>
+    <byPriority>
+      <low>${messageStats.byPriority.low || 0}</low>
+      <normal>${messageStats.byPriority.normal || 0}</normal>
+      <high>${messageStats.byPriority.high || 0}</high>
+      <urgent>${messageStats.byPriority.urgent || 0}</urgent>
+    </byPriority>
+  </statistics>
+  ${messageElements}
+</messageHistory>`;
+  };
+
+  // Enhanced backup function with multiple formats and features
+  const handleBackupMessageHistory = async () => {
+    setIsBackingUp(true);
+    setBackupProgress(0);
+    
+    try {
+      // Step 1: Prepare data (10%)
+      await new Promise(resolve => setTimeout(resolve, 100));
+      setBackupProgress(10);
+      
+      const backupData: any = {
+        timestamp: new Date().toISOString(),
+        version: "1.0",
+        format: backupFormat,
+        backupOptions: { ...backupOptions }
+      };
+
+      // Step 2: Add metadata (20%)
+      if (backupOptions.includeMetadata) {
+        backupData.metadata = {
+          totalMessages: filteredMessages.length,
+          filterApplied: {
+            searchQuery,
+            typeFilter,
+            statusFilter,
+            priorityFilter
+          },
+          backupGeneratedBy: "MessageHistory Component",
+          systemInfo: {
+            userAgent: navigator.userAgent,
+            timestamp: new Date().toISOString()
+          }
+        };
+      }
+      setBackupProgress(20);
+
+      // Step 3: Add statistics (30%)
+      if (backupOptions.includeStatistics) {
+        backupData.statistics = messageStats;
+      }
+      setBackupProgress(30);
+
+      // Step 4: Add filters (40%)
+      if (backupOptions.includeFilters) {
+        backupData.filters = {
+          searchQuery,
+          typeFilter,
+          statusFilter,
+          priorityFilter
+        };
+      }
+      setBackupProgress(40);
+
+      // Step 5: Add messages (60-90%)
+      const messageData = backupFormat === "json" ? JSON.stringify(filteredMessages, null, 2) : 
+                         backupFormat === "csv" ? convertToCSV(filteredMessages) :
+                         convertToXML(filteredMessages);
+      
+      for (let i = 60; i <= 90; i += 10) {
+        await new Promise(resolve => setTimeout(resolve, 50));
+        setBackupProgress(i);
+      }
+
+      // Step 6: Add data and integrity check (95%)
+      if (backupFormat === "json") {
+        backupData.data = messageData;
+        
+        if (backupOptions.validateIntegrity) {
+          backupData.integrity = {
+            hash: generateIntegrityHash(messageData),
+            algorithm: "simple-hash",
+            timestamp: new Date().toISOString()
+          };
+        }
+      } else {
+        backupData.data = messageData;
+        
+        if (backupOptions.validateIntegrity) {
+          backupData.integrity = {
+            hash: generateIntegrityHash(messageData),
+            algorithm: "simple-hash",
+            timestamp: new Date().toISOString()
+          };
+        }
+      }
+      setBackupProgress(95);
+
+      // Step 7: Generate and download file (100%)
+      const timestamp = new Date().toISOString().split('T')[0];
+      const filename = `message-history-backup-${timestamp}.${backupFormat}`;
+      
+      let blob: Blob;
+      let mimeType: string;
+      
+      switch (backupFormat) {
+        case "csv":
+          blob = new Blob([messageData], { type: 'text/csv' });
+          mimeType = 'text/csv';
+          break;
+        case "xml":
+          blob = new Blob([messageData], { type: 'application/xml' });
+          mimeType = 'application/xml';
+          break;
+        default:
+          blob = new Blob([JSON.stringify(backupData, null, 2)], { type: 'application/json' });
+          mimeType = 'application/json';
+      }
+
+      // Apply compression if requested
+      if (backupOptions.compressData && 'CompressionStream' in window) {
+        try {
+          const compressed = await compressData(blob);
+          blob = compressed;
+        } catch (error) {
+          console.warn('Compression failed, using uncompressed data:', error);
+        }
+      }
+      
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      a.click();
+      URL.revokeObjectURL(url);
+      
+      setBackupProgress(100);
+      
+      toast({
+        title: "Backup Completed",
+        description: `Message history exported as ${backupFormat.toUpperCase()} file.`,
+      });
+      
+      // Reset progress after a delay
+      setTimeout(() => {
+        setBackupProgress(0);
+        setIsBackingUp(false);
+      }, 1000);
+      
+    } catch (error) {
+      console.error('Backup failed:', error);
+      toast({
+        title: "Backup Failed",
+        description: "An error occurred while creating the backup.",
+        variant: "destructive"
+      });
+      setIsBackingUp(false);
+      setBackupProgress(0);
+    }
+  };
+
+  // Simple compression function (fallback for browsers without CompressionStream)
+  const compressData = async (blob: Blob): Promise<Blob> => {
+    if ('CompressionStream' in window) {
+      const compressionStream = new (window as any).CompressionStream('gzip');
+      const compressedStream = blob.stream().pipeThrough(compressionStream);
+      return new Response(compressedStream).blob();
+    } else {
+      // Fallback: return original blob
+      return blob;
+    }
+  };
+
+  // Restore/Import functionality
+  const handleRestoreMessages = async () => {
+    if (!restoreData.trim()) {
+      toast({
+        title: "No Data",
+        description: "Please paste backup data to restore.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    try {
+      let parsedData: any;
+      
+      // Try to parse JSON first
+      try {
+        parsedData = JSON.parse(restoreData);
+      } catch {
+        // If JSON parsing fails, assume it's CSV or XML and inform user
+        toast({
+          title: "Invalid Format",
+          description: "Only JSON backup files are supported for restoration.",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      // Validate backup structure
+      if (!parsedData.data || !Array.isArray(parsedData.data)) {
+        throw new Error("Invalid backup format: missing or invalid message data");
+      }
+
+      // Validate integrity if present
+      if (parsedData.integrity && backupOptions.validateIntegrity) {
+        const dataString = JSON.stringify(parsedData.data);
+        const expectedHash = parsedData.integrity.hash;
+        const actualHash = generateIntegrityHash(dataString);
+        
+        if (expectedHash !== actualHash) {
+          throw new Error("Backup integrity check failed: data may be corrupted");
+        }
+      }
+
+      // Confirm restore operation
+      const confirmed = window.confirm(
+        `This will restore ${parsedData.data.length} messages and replace current message history. Continue?`
+      );
+      
+      if (confirmed) {
+        setMessages(parsedData.data);
+        setShowRestoreDialog(false);
+        setRestoreData("");
+        
+        toast({
+          title: "Restore Completed",
+          description: `${parsedData.data.length} messages have been restored.`,
+        });
+      }
+      
+    } catch (error) {
+      console.error('Restore failed:', error);
+      toast({
+        title: "Restore Failed",
+        description: error instanceof Error ? error.message : "Invalid backup data format.",
+        variant: "destructive"
+      });
+    }
+  };
+
+  // File upload handler
+  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const content = e.target?.result as string;
+      setRestoreData(content);
+      setShowRestoreDialog(true);
+    };
+    reader.readAsText(file);
+    
+    // Reset input
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
   return (
     <Card className="bg-gradient-card border-border/50">
       <CardHeader>
@@ -265,15 +628,129 @@ export const MessageHistory = ({ messages: initialMessages = mockMessages, onMes
             <CardDescription>View and manage sent system messages</CardDescription>
           </div>
           <div className="flex items-center gap-2">
+            {/* Backup Progress */}
+            {isBackingUp && (
+              <div className="flex items-center gap-2 px-3 py-1 bg-blue-50 border border-blue-200 rounded">
+                <Loader2 className="w-4 h-4 animate-spin text-blue-600" />
+                <span className="text-sm text-blue-700">Creating backup...</span>
+                <Progress value={backupProgress} className="w-16 h-2" />
+                <span className="text-xs text-blue-600">{backupProgress}%</span>
+              </div>
+            )}
+            
+            {/* Enhanced Backup Controls */}
+            <div className="flex items-center gap-1">
+              <Button
+                onClick={() => setShowBackupOptions(!showBackupOptions)}
+                variant="outline"
+                size="sm"
+                className="bg-green-50 hover:bg-green-100 border-green-200 text-green-700"
+              >
+                <Archive className="w-4 h-4 mr-1" />
+                Backup
+              </Button>
+              
+              {showBackupOptions && (
+                <div data-backup-options className="absolute top-full right-0 mt-1 p-4 bg-white border rounded-lg shadow-lg z-50 min-w-[300px]">
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <Label className="text-sm font-medium">Backup Format</Label>
+                      <Select value={backupFormat} onValueChange={(value: "json" | "csv" | "xml") => setBackupFormat(value)}>
+                        <SelectTrigger className="w-24 h-8">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="json">JSON</SelectItem>
+                          <SelectItem value="csv">CSV</SelectItem>
+                          <SelectItem value="xml">XML</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <Label className="text-sm font-medium">Backup Options</Label>
+                      <div className="space-y-1">
+                        {[
+                          { key: 'includeStatistics', label: 'Include Statistics' },
+                          { key: 'includeFilters', label: 'Include Current Filters' },
+                          { key: 'compressData', label: 'Compress Data' },
+                          { key: 'validateIntegrity', label: 'Validate Integrity' },
+                          { key: 'includeMetadata', label: 'Include Metadata' }
+                        ].map(({ key, label }) => (
+                          <div key={key} className="flex items-center space-x-2">
+                            <input
+                              type="checkbox"
+                              checked={backupOptions[key as keyof typeof backupOptions]}
+                              onChange={(e) => setBackupOptions(prev => ({ ...prev, [key]: e.target.checked }))}
+                              className="rounded"
+                            />
+                            <label className="text-xs">{label}</label>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                    
+                    <div className="flex gap-2">
+                      <Button
+                        onClick={() => {
+                          handleBackupMessageHistory();
+                          setShowBackupOptions(false);
+                        }}
+                        disabled={isBackingUp}
+                        size="sm"
+                        className="flex-1"
+                      >
+                        <Download className="w-4 h-4 mr-1" />
+                        Create Backup
+                      </Button>
+                      <Button
+                        onClick={() => setShowBackupOptions(false)}
+                        variant="outline"
+                        size="sm"
+                      >
+                        Cancel
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Restore/Import Button */}
+            <div className="relative">
+              <Button
+                onClick={() => setShowRestoreDialog(true)}
+                variant="outline"
+                size="sm"
+                className="bg-purple-50 hover:bg-purple-100 border-purple-200 text-purple-700"
+              >
+                <Upload className="w-4 h-4 mr-1" />
+                Restore
+              </Button>
+            </div>
+
+            {/* Print Button */}
+            <Button
+              onClick={handlePrintMessageHistory}
+              variant="outline"
+              size="sm"
+              className="bg-blue-50 hover:bg-blue-100 border-blue-200 text-blue-700"
+            >
+              <Printer className="w-4 h-4 mr-1" />
+              Print
+            </Button>
+
+            {/* Add Test Message Button */}
             <Button
               variant="outline"
               size="sm"
               onClick={addTestMessage}
               className="bg-blue-50 hover:bg-blue-100 border-blue-200 text-blue-700"
             >
-              <Plus className="w-4 h-4 mr-2" />
-              Add Test Message
+              <Plus className="w-4 h-4 mr-1" />
+              Test
             </Button>
+
             <Badge variant="secondary" className="text-xs">
               {filteredMessages.length} message{filteredMessages.length !== 1 ? 's' : ''}
             </Badge>
@@ -557,6 +1034,100 @@ export const MessageHistory = ({ messages: initialMessages = mockMessages, onMes
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowMessageDetail(false)}>
               Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Restore/Import Dialog */}
+      <Dialog open={showRestoreDialog} onOpenChange={setShowRestoreDialog}>
+        <DialogContent className="sm:max-w-[600px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <RotateCcw className="w-5 h-5" />
+              Restore Message History
+            </DialogTitle>
+            <DialogDescription>
+              Restore message history from a backup file or paste backup data below.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            {/* File Upload */}
+            <div>
+              <Label className="text-sm font-medium">Upload Backup File</Label>
+              <div className="mt-2">
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".json,.csv,.xml"
+                  onChange={handleFileUpload}
+                  className="hidden"
+                />
+                <Button
+                  onClick={() => fileInputRef.current?.click()}
+                  variant="outline"
+                  className="w-full"
+                >
+                  <Upload className="w-4 h-4 mr-2" />
+                  Choose Backup File
+                </Button>
+              </div>
+            </div>
+
+            {/* Divider */}
+            <div className="relative">
+              <div className="absolute inset-0 flex items-center">
+                <span className="w-full border-t" />
+              </div>
+              <div className="relative flex justify-center text-xs uppercase">
+                <span className="bg-background px-2 text-muted-foreground">Or paste backup data</span>
+              </div>
+            </div>
+
+            {/* Paste Area */}
+            <div>
+              <Label className="text-sm font-medium">Backup Data</Label>
+              <Textarea
+                placeholder="Paste your backup JSON data here..."
+                value={restoreData}
+                onChange={(e) => setRestoreData(e.target.value)}
+                className="mt-2 min-h-[200px] font-mono text-xs"
+              />
+            </div>
+
+            {/* Restore Options */}
+            <div className="space-y-2">
+              <Label className="text-sm font-medium">Restore Options</Label>
+              <div className="flex items-center space-x-2">
+                <input
+                  type="checkbox"
+                  checked={backupOptions.validateIntegrity}
+                  onChange={(e) => setBackupOptions(prev => ({ ...prev, validateIntegrity: e.target.checked }))}
+                  className="rounded"
+                />
+                <label className="text-xs">Validate backup integrity before restore</label>
+              </div>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowRestoreDialog(false);
+                setRestoreData("");
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleRestoreMessages}
+              disabled={!restoreData.trim()}
+              className="bg-purple-600 hover:bg-purple-700"
+            >
+              <RotateCcw className="w-4 h-4 mr-2" />
+              Restore Messages
             </Button>
           </DialogFooter>
         </DialogContent>

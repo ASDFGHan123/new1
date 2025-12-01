@@ -1,0 +1,807 @@
+import { useState, useRef } from "react";
+import { useUnifiedChat } from "@/hooks/useUnifiedChat";
+import { useAuth } from "@/contexts/AuthContext";
+import { UnifiedSidebar } from "./UnifiedSidebar.tsx";
+import { SearchDialog } from "./SearchDialog.tsx";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Card } from "@/components/ui/card";
+import { Separator } from "@/components/ui/separator";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { ImageUpload } from "@/components/ui/image-upload";
+import { Label } from "@/components/ui/label";
+import { CreateGroupDialog } from "./CreateGroupDialog.tsx";
+import { ThemeToggle } from "@/components/ThemeToggle";
+import { 
+  Send, 
+  Search, 
+  Settings, 
+  LogOut, 
+  MessageCircle, 
+  Paperclip, 
+  X, 
+  FileText, 
+  Image, 
+  Mic, 
+  MicOff, 
+  Play, 
+  Pause, 
+  Edit, 
+  Check, 
+  MoreHorizontal, 
+  Trash2, 
+  Copy, 
+  Forward, 
+  Share2, 
+  Users, 
+  UserPlus,
+  Crown,
+  Shield,
+  User as UserIcon,
+  Hash,
+  Lock,
+  Globe,
+  Info
+} from "lucide-react";
+import type { Conversation, IndividualMessage, GroupMessage, User, Attachment } from "@/types/chat";
+
+export const UnifiedChatInterface = () => {
+  const { user: authUser, logout: authLogout } = useAuth();
+  const chat = useUnifiedChat();
+  
+  const [message, setMessage] = useState("");
+  const [avatar, setAvatar] = useState(authUser?.avatar);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [showSearch, setShowSearch] = useState(false);
+  const [attachments, setAttachments] = useState<File[]>([]);
+  const [isDragging, setIsDragging] = useState(false);
+  const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
+  const [editMessageContent, setEditMessageContent] = useState("");
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+  
+  // Voice recording states
+  const [isRecording, setIsRecording] = useState(false);
+  const [recordingDuration, setRecordingDuration] = useState(0);
+  const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
+  const [audioUrl, setAudioUrl] = useState<string | null>(null);
+  const [isPlaying, setIsPlaying] = useState<string | null>(null);
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const formRef = useRef<HTMLFormElement>(null);
+
+  if (!authUser) {
+    return (
+      <div className="flex h-screen items-center justify-center">
+        <div className="text-center">
+          <MessageCircle className="h-16 w-16 mx-auto mb-4 text-muted-foreground" />
+          <h3 className="text-xl font-semibold mb-2">Please log in</h3>
+          <p className="text-muted-foreground">You need to be logged in to access the chat.</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Sync avatar with user prop
+  const currentConversation = chat.currentConversation;
+
+  const addFiles = (files: FileList | null) => {
+    if (!files) return;
+    const fileArray = Array.from(files);
+    setAttachments(prev => [...prev, ...fileArray]);
+  };
+
+  const removeFile = (index: number) => {
+    setAttachments(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+    addFiles(e.dataTransfer.files);
+  };
+
+  const handleSendMessage = (e?: React.FormEvent | React.KeyboardEvent) => {
+    if (e) {
+      e.preventDefault();
+    }
+    if (!message.trim() && attachments.length === 0 && !audioBlob) return;
+    if (!chat.currentConversationId) return;
+
+    const newAttachments: Attachment[] = [
+      ...attachments.map((file, index) => ({
+        id: `attachment-${Date.now()}-${index}`,
+        name: file.name,
+        type: file.type,
+        size: file.size,
+        url: URL.createObjectURL(file),
+        uploadedAt: new Date().toISOString()
+      })),
+      ...(audioBlob ? [{
+        id: `voice-${Date.now()}`,
+        name: `Voice message ${formatDuration(recordingDuration)}`,
+        type: 'audio/webm',
+        size: audioBlob.size,
+        url: audioUrl!,
+        uploadedAt: new Date().toISOString(),
+        duration: recordingDuration
+      }] : [])
+    ];
+
+    chat.sendMessage(chat.currentConversationId, message, newAttachments);
+
+    setMessage("");
+    setAttachments([]);
+    cancelRecording();
+  };
+
+  const startEditingMessage = (messageId: string, currentContent: string) => {
+    setEditingMessageId(messageId);
+    setEditMessageContent(currentContent);
+    setOpenMenuId(null);
+  };
+
+  const saveMessageEdit = () => {
+    if (!editingMessageId || !editMessageContent.trim() || !chat.currentConversationId) return;
+
+    chat.editMessage(chat.currentConversationId, editingMessageId, editMessageContent.trim());
+
+    setEditingMessageId(null);
+    setEditMessageContent("");
+  };
+
+  const cancelMessageEdit = () => {
+    setEditingMessageId(null);
+    setEditMessageContent("");
+  };
+
+  const handleLogout = () => {
+    chat.logout();
+    authLogout();
+  };
+
+  const getOtherUser = (conversation: Conversation): User | null => {
+    if (conversation.type !== 'individual') return null;
+    return conversation.participants.find(p => p.id !== authUser.id) || null;
+  };
+
+  const getStatusColor = (status: User["status"]) => {
+    switch (status) {
+      case "online":
+        return "bg-green-500";
+      case "away":
+        return "bg-yellow-500";
+      case "offline":
+        return "bg-gray-500";
+      default:
+        return "bg-gray-500";
+    }
+  };
+
+  const getRoleIcon = (role?: string) => {
+    switch (role) {
+      case "admin":
+        return <Crown className="h-4 w-4 text-yellow-500" />;
+      case "moderator":
+        return <Shield className="h-4 w-4 text-blue-500" />;
+      default:
+        return <UserIcon className="h-4 w-4 text-gray-500" />;
+    }
+  };
+
+  const getGroupIcon = (conversation: Conversation) => {
+    if (conversation.type !== 'group') return null;
+    return conversation.isGroupPrivate ? <Lock className="h-4 w-4" /> : <Globe className="h-4 w-4" />;
+  };
+
+  const formatFileSize = (bytes: number) => {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+  };
+
+  const getFileIcon = (fileName: string, fileType: string) => {
+    if (fileType.startsWith('image/')) {
+      return <Image className="h-4 w-4" />;
+    }
+    if (fileType.startsWith('audio/')) {
+      return <Mic className="h-4 w-4" />;
+    }
+    return <FileText className="h-4 w-4" />;
+  };
+
+  const formatDuration = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  // Voice recording functions (simplified for now)
+  const startRecording = () => {
+    setIsRecording(true);
+    setRecordingDuration(0);
+    // In a real app, you'd implement actual recording logic
+  };
+
+  const stopRecording = () => {
+    setIsRecording(false);
+    // In a real app, you'd stop the recording
+  };
+
+  const cancelRecording = () => {
+    setIsRecording(false);
+    setAudioBlob(null);
+    setAudioUrl(null);
+    setRecordingDuration(0);
+  };
+
+  if (!currentConversation) {
+    return (
+      <div className="flex h-screen bg-gradient-to-br from-background to-muted">
+        <UnifiedSidebar 
+          conversations={chat.conversations}
+          currentConversationId={chat.currentConversationId}
+          onSelectConversation={chat.selectConversation}
+          onSearchOpen={() => setShowSearch(true)}
+          currentUser={authUser}
+          availableUsers={chat.availableUsers}
+          groups={chat.groups}
+          onCreateGroup={chat.createGroup}
+          onCreateIndividualChat={chat.createIndividualConversation}
+        />
+        <div className="flex-1 flex items-center justify-center">
+          <div className="text-center">
+            <MessageCircle className="h-16 w-16 mx-auto mb-4 text-muted-foreground" />
+            <h3 className="text-xl font-semibold mb-2">Welcome to OffChat</h3>
+            <p className="text-muted-foreground mb-6">
+              Select a conversation from the sidebar or search for users and groups to start chatting
+            </p>
+            <Button onClick={() => setShowSearch(true)}>
+              <Search className="h-4 w-4 mr-2" />
+              Search Users & Groups
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex h-screen bg-gradient-to-br from-background to-muted">
+      {/* Sidebar */}
+      <UnifiedSidebar 
+        conversations={chat.conversations}
+        currentConversationId={chat.currentConversationId}
+        onSelectConversation={chat.selectConversation}
+        onSearchOpen={() => setShowSearch(true)}
+        currentUser={authUser}
+        availableUsers={chat.availableUsers}
+        groups={chat.groups}
+        onCreateGroup={chat.createGroup}
+        onCreateIndividualChat={chat.createIndividualConversation}
+      />
+
+      {/* Main Chat Area */}
+      <div className="flex-1 flex flex-col">
+        {/* Chat Header */}
+        <div className="p-6 border-b border-border/50 bg-card/30 backdrop-blur-sm">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              {currentConversation.type === 'group' ? (
+                <Avatar className="h-10 w-10">
+                  <AvatarImage src={currentConversation.groupAvatar} />
+                  <AvatarFallback className="bg-primary text-primary-foreground">
+                    {currentConversation.groupName?.slice(0, 2).toUpperCase()}
+                  </AvatarFallback>
+                </Avatar>
+              ) : (
+                <Avatar className="h-10 w-10">
+                  <AvatarImage src={getOtherUser(currentConversation)?.avatar} />
+                  <AvatarFallback className="bg-primary text-primary-foreground">
+                    {getOtherUser(currentConversation)?.username.slice(0, 2).toUpperCase()}
+                  </AvatarFallback>
+                </Avatar>
+              )}
+              <div>
+                <div className="flex items-center gap-2">
+                  <h2 className="text-xl font-semibold">
+                    {currentConversation.type === 'group' 
+                      ? currentConversation.groupName 
+                      : getOtherUser(currentConversation)?.username
+                    }
+                  </h2>
+                  {getGroupIcon(currentConversation)}
+                  {currentConversation.unreadCount > 0 && (
+                    <Badge variant="destructive" className="text-xs">
+                      {currentConversation.unreadCount}
+                    </Badge>
+                  )}
+                </div>
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  {currentConversation.type === 'group' ? (
+                    <>
+                      <Users className="h-4 w-4" />
+                      <span>{currentConversation.participants.length} members</span>
+                    </>
+                  ) : (
+                    <div className="flex items-center gap-2">
+                      <div 
+                        className={`w-3 h-3 rounded-full ${getStatusColor(getOtherUser(currentConversation)?.status || 'offline')}`}
+                      />
+                      <span className="capitalize">{getOtherUser(currentConversation)?.status || 'offline'}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3">
+              {currentConversation.type === 'group' && (
+                <>
+                  {/* Online Members */}
+                  <div className="flex -space-x-2">
+                    {currentConversation.participants
+                      .filter(p => p.status === "online")
+                      .slice(0, 3)
+                      .map((member) => (
+                        <Avatar key={member.id} className="h-8 w-8 border-2 border-card">
+                          <AvatarImage src={member.avatar} />
+                          <AvatarFallback className="text-xs">
+                            {member.username.slice(0, 2).toUpperCase()}
+                          </AvatarFallback>
+                        </Avatar>
+                      ))}
+                    {currentConversation.participants.filter(p => p.status === "online").length > 3 && (
+                      <div className="h-8 w-8 rounded-full bg-muted border-2 border-card flex items-center justify-center">
+                        <span className="text-xs font-medium">
+                          +{currentConversation.participants.filter(p => p.status === "online").length - 3}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+
+                  <Button variant="ghost" size="sm">
+                    <Info className="h-4 w-4" />
+                  </Button>
+                </>
+              )}
+
+              <ThemeToggle />
+              <Dialog open={settingsOpen} onOpenChange={setSettingsOpen}>
+                <DialogTrigger asChild>
+                  <Button variant="ghost" size="sm">
+                    <Settings className="h-4 w-4" />
+                  </Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Profile Settings</DialogTitle>
+                  </DialogHeader>
+                  <div className="space-y-4">
+                    <div>
+                      <Label>Profile Image</Label>
+                      <ImageUpload value={avatar} onChange={setAvatar} />
+                    </div>
+                  </div>
+                </DialogContent>
+              </Dialog>
+              <Button variant="ghost" size="sm" onClick={handleLogout}>
+                <LogOut className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+        </div>
+
+        {/* Messages */}
+        <ScrollArea className="flex-1 p-6">
+          <div className="space-y-4">
+            {chat.currentMessages.length === 0 ? (
+              <div className="text-center py-12">
+                <div className="mx-auto w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mb-4">
+                  <MessageCircle className="h-8 w-8 text-primary" />
+                </div>
+                <h3 className="text-lg font-semibold mb-2">Start the conversation</h3>
+                <p className="text-muted-foreground">
+                  Be the first to send a message in this chat
+                </p>
+              </div>
+            ) : (
+              chat.currentMessages.map((msg) => {
+                const isOwnMessage = msg.senderId === authUser.id;
+                const sender = currentConversation.participants.find(p => p.id === msg.senderId);
+                
+                return (
+                  <div
+                    key={msg.id}
+                    className={`group flex ${isOwnMessage ? "justify-end" : "justify-start"}`}
+                  >
+                    {isOwnMessage ? (
+                      // Sender message: Blue dot + minimal content
+                      <div className="flex items-end gap-2 max-w-xs">
+                        <div className="flex flex-col items-end gap-1">
+                          {/* Blue dot indicator */}
+                          <div className="w-3 h-3 bg-primary rounded-full"></div>
+                          
+                          {/* Message content for sender */}
+                          <div className="text-right">
+                            {editingMessageId === msg.id ? (
+                              // Editing interface for sender
+                              <div className="space-y-2">
+                                <Input
+                                  value={editMessageContent}
+                                  onChange={(e) => setEditMessageContent(e.target.value)}
+                                  className="text-sm"
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter' && !e.shiftKey) {
+                                      e.preventDefault();
+                                      saveMessageEdit();
+                                    }
+                                    if (e.key === 'Escape') {
+                                      cancelMessageEdit();
+                                    }
+                                  }}
+                                  autoFocus
+                                />
+                                <div className="flex gap-2 justify-end">
+                                  <Button size="sm" onClick={saveMessageEdit} disabled={!editMessageContent.trim()}>
+                                    <Check className="h-3 w-3 mr-1" />
+                                    Save
+                                  </Button>
+                                  <Button variant="outline" size="sm" onClick={cancelMessageEdit}>
+                                    Cancel
+                                  </Button>
+                                </div>
+                              </div>
+                            ) : (
+                              // Normal sender message display
+                              <div className="bg-primary/10 rounded-lg px-3 py-2">
+                                <p className="text-sm text-foreground">{msg.content}</p>
+                                {msg.attachments && msg.attachments.length > 0 && (
+                                  <div className="mt-2 space-y-2">
+                                    {msg.attachments.map((attachment) => (
+                                      <div key={attachment.id} className="flex items-center gap-2 p-2 bg-primary/20 rounded-lg">
+                                        {getFileIcon(attachment.name, attachment.type)}
+                                        <div className="flex-1 min-w-0">
+                                          <p className="text-xs font-medium truncate">{attachment.name}</p>
+                                          <div className="flex items-center gap-2 text-xs opacity-70">
+                                            <span>{formatFileSize(attachment.size)}</span>
+                                            {attachment.duration && (
+                                              <span>• {formatDuration(attachment.duration)}</span>
+                                            )}
+                                          </div>
+                                        </div>
+                                        
+                                        {attachment.type.startsWith('image/') && (
+                                          <img
+                                            src={attachment.url}
+                                            alt={attachment.name}
+                                            className="h-12 w-12 object-cover rounded"
+                                          />
+                                        )}
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
+                                <div className="flex items-center justify-end gap-1 mt-1">
+                                  <p className="text-xs opacity-70">
+                                    {msg.timestamp.toLocaleTimeString([], {
+                                      hour: "2-digit",
+                                      minute: "2-digit",
+                                    })}
+                                    {msg.edited && <span className="ml-2">• Edited</span>}
+                                    {msg.forwarded && <span className="ml-2">• Forwarded</span>}
+                                  </p>
+                                  
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => startEditingMessage(msg.id, msg.content)}
+                                    className="h-4 w-4 p-0 opacity-0 group-hover:opacity-100 hover:opacity-100"
+                                  >
+                                    <Edit className="h-3 w-3" />
+                                  </Button>
+                                  
+                                  <DropdownMenu open={openMenuId === msg.id} onOpenChange={(open) => setOpenMenuId(open ? msg.id : null)}>
+                                    <DropdownMenuTrigger asChild>
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        className="h-4 w-4 p-0 opacity-0 group-hover:opacity-100 hover:opacity-100"
+                                      >
+                                        <MoreHorizontal className="h-3 w-3" />
+                                      </Button>
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent align="end" className="w-40">
+                                      <DropdownMenuItem>
+                                        <Copy className="h-4 w-4 mr-2" />
+                                        Copy
+                                      </DropdownMenuItem>
+                                      <DropdownMenuItem>
+                                        <Forward className="h-4 w-4 mr-2" />
+                                        Forward
+                                      </DropdownMenuItem>
+                                      <DropdownMenuItem>
+                                        <Share2 className="h-4 w-4 mr-2" />
+                                        Share
+                                      </DropdownMenuItem>
+                                      <DropdownMenuItem 
+                                        onClick={() => chat.deleteMessage(chat.currentConversationId!, msg.id)}
+                                        className="text-red-600 focus:text-red-600"
+                                      >
+                                        <Trash2 className="h-4 w-4 mr-2" />
+                                        Delete
+                                      </DropdownMenuItem>
+                                    </DropdownMenuContent>
+                                  </DropdownMenu>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      // Other messages: Keep original gray box style
+                      <div className="max-w-xs lg:max-w-md px-4 py-2 rounded-2xl bg-muted text-muted-foreground">
+                        {currentConversation.type === 'group' && (
+                          <div className="flex items-center gap-2 mb-1">
+                            {getRoleIcon(sender?.id ? 'member' : undefined)}
+                            <span className="text-xs font-medium">{sender?.username}</span>
+                          </div>
+                        )}
+                        
+                        {editingMessageId === msg.id ? (
+                          // Editing interface
+                          <div className="space-y-2">
+                            <Input
+                              value={editMessageContent}
+                              onChange={(e) => setEditMessageContent(e.target.value)}
+                              className="text-sm"
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter' && !e.shiftKey) {
+                                  e.preventDefault();
+                                  saveMessageEdit();
+                                }
+                                if (e.key === 'Escape') {
+                                  cancelMessageEdit();
+                                }
+                              }}
+                              autoFocus
+                            />
+                            <div className="flex gap-2">
+                              <Button size="sm" onClick={saveMessageEdit} disabled={!editMessageContent.trim()}>
+                                <Check className="h-3 w-3 mr-1" />
+                                Save
+                              </Button>
+                              <Button variant="outline" size="sm" onClick={cancelMessageEdit}>
+                                Cancel
+                              </Button>
+                            </div>
+                          </div>
+                        ) : (
+                          // Normal message display
+                          <>
+                            <p className="text-sm">{msg.content}</p>
+                            {msg.attachments && msg.attachments.length > 0 && (
+                              <div className="mt-2 space-y-2">
+                                {msg.attachments.map((attachment) => (
+                                  <div key={attachment.id} className="flex items-center gap-2 p-2 bg-black/10 rounded-lg">
+                                    {getFileIcon(attachment.name, attachment.type)}
+                                    <div className="flex-1 min-w-0">
+                                      <p className="text-xs font-medium truncate">{attachment.name}</p>
+                                      <div className="flex items-center gap-2 text-xs opacity-70">
+                                        <span>{formatFileSize(attachment.size)}</span>
+                                        {attachment.duration && (
+                                          <span>• {formatDuration(attachment.duration)}</span>
+                                        )}
+                                      </div>
+                                    </div>
+                                    
+                                    {attachment.type.startsWith('image/') && (
+                                      <img
+                                        src={attachment.url}
+                                        alt={attachment.name}
+                                        className="h-12 w-12 object-cover rounded"
+                                      />
+                                    )}
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </>
+                        )}
+                        
+                        <div className="flex items-center justify-between mt-1">
+                          <p className="text-xs opacity-70">
+                            {msg.timestamp.toLocaleTimeString([], {
+                              hour: "2-digit",
+                              minute: "2-digit",
+                            })}
+                            {msg.edited && <span className="ml-2">• Edited</span>}
+                            {msg.forwarded && <span className="ml-2">• Forwarded</span>}
+                          </p>
+                          
+                          <DropdownMenu open={openMenuId === msg.id} onOpenChange={(open) => setOpenMenuId(open ? msg.id : null)}>
+                            <DropdownMenuTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 hover:opacity-100"
+                              >
+                                <MoreHorizontal className="h-3 w-3" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="w-40">
+                              <DropdownMenuItem>
+                                <Copy className="h-4 w-4 mr-2" />
+                                Copy
+                              </DropdownMenuItem>
+                              <DropdownMenuItem>
+                                <Forward className="h-4 w-4 mr-2" />
+                                Forward
+                              </DropdownMenuItem>
+                              <DropdownMenuItem>
+                                <Share2 className="h-4 w-4 mr-2" />
+                                Share
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })
+            )}
+          </div>
+        </ScrollArea>
+
+        {/* Message Input */}
+        <div className="p-6 border-t border-border/50 bg-card/30 backdrop-blur-sm">
+          {/* Selected attachments preview */}
+          {attachments.length > 0 && (
+            <div className="mb-3 flex flex-wrap gap-2">
+              {attachments.map((file, index) => (
+                <div key={index} className="flex items-center gap-2 bg-muted px-3 py-2 rounded-lg">
+                  {getFileIcon(file.name, file.type)}
+                  <span className="text-sm truncate max-w-32">{file.name}</span>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-4 w-4 p-0"
+                    onClick={() => removeFile(index)}
+                  >
+                    <X className="h-3 w-3" />
+                  </Button>
+                </div>
+              ))}
+            </div>
+          )}
+          
+          <form
+            ref={formRef}
+            onSubmit={handleSendMessage}
+            className="flex gap-3"
+          >
+            <div
+              className="flex-1 flex gap-3"
+              onDragOver={handleDragOver}
+              onDragLeave={handleDragLeave}
+              onDrop={handleDrop}
+            >
+              {isRecording ? (
+                <div className="flex-1 flex items-center gap-3 bg-red-50 border border-red-200 rounded-lg px-4 py-2">
+                  <div className="flex items-center gap-2">
+                    <div className="w-3 h-3 bg-red-500 rounded-full animate-pulse"></div>
+                    <span className="text-red-700 font-medium">Recording</span>
+                    <span className="text-red-600">{formatDuration(recordingDuration)}</span>
+                  </div>
+                  <div className="flex gap-2 ml-auto">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={cancelRecording}
+                      className="text-red-600 hover:text-red-700"
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={stopRecording}
+                      className="text-red-600 hover:text-red-700"
+                    >
+                      <MicOff className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <Input
+                    value={message}
+                    onChange={(e) => setMessage(e.target.value)}
+                    placeholder={`Message ${currentConversation.type === 'group' ? currentConversation.groupName : getOtherUser(currentConversation)?.username}...`}
+                    className="flex-1"
+                  />
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    multiple
+                    onChange={(e) => addFiles(e.target.files)}
+                    className="hidden"
+                    accept="image/*,application/pdf,.doc,.docx,.txt"
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="px-3"
+                  >
+                    <Paperclip className="h-4 w-4" />
+                  </Button>
+                </>
+              )}
+              
+              {!isRecording && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={startRecording}
+                  className="px-3 text-red-600 hover:text-red-700"
+                >
+                  <Mic className="h-4 w-4" />
+                </Button>
+              )}
+            </div>
+            <Button
+              type="submit"
+              disabled={attachments.length === 0 && !message.trim() && !audioBlob}
+            >
+              <Send className="h-4 w-4" />
+            </Button>
+          </form>
+        </div>
+      </div>
+
+      {/* Search Dialog */}
+      <SearchDialog 
+        open={showSearch}
+        onOpenChange={setShowSearch}
+        onSelectUser={(user) => {
+          chat.createIndividualConversation(user.id);
+          setShowSearch(false);
+        }}
+        onSelectGroup={(groupId) => {
+          chat.selectConversation(`group-${groupId}`);
+          setShowSearch(false);
+        }}
+        searchUsers={chat.searchUsers}
+        searchGroups={chat.searchGroups}
+        searchConversations={chat.searchConversations}
+      />
+    </div>
+  );
+};

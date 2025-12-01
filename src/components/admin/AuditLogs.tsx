@@ -1,4 +1,4 @@
-import { Search, Filter, Clock, User, Activity, ChevronUp, ChevronDown, Eye, Download, MoreHorizontal } from "lucide-react";
+import { Search, Filter, Clock, User, Activity, ChevronUp, ChevronDown, Eye, Download, MoreHorizontal, Printer } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -34,6 +34,7 @@ import {
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { useState, useEffect } from "react";
+import { openPrintWindow, generateAuditLogsHTML } from "@/lib/printUtils";
 
 const initialAuditLogs = [
   {
@@ -225,6 +226,14 @@ export const AuditLogs = () => {
     linkElement.click();
   };
 
+  const handlePrintLogs = () => {
+    const printData = generateAuditLogsHTML(filteredAndSortedLogs);
+    openPrintWindow({
+      ...printData,
+      subtitle: `Filtered Results: ${filteredAndSortedLogs.length} of ${auditLogs.length} audit logs`
+    });
+  };
+
   return (
     <Card className="bg-gradient-card border-border/50">
       <CardHeader>
@@ -235,10 +244,21 @@ export const AuditLogs = () => {
               Track all system actions and changes
             </CardDescription>
           </div>
-          <Button variant="outline" size="sm" onClick={handleExport}>
-            <Download className="w-4 h-4 mr-2" />
-            Export Logs
-          </Button>
+          <div className="flex items-center space-x-2">
+            <Button 
+              onClick={handlePrintLogs}
+              variant="outline"
+              size="sm"
+              className="bg-blue-50 hover:bg-blue-100 border-blue-200 text-blue-700"
+            >
+              <Printer className="w-4 h-4 mr-2" />
+              Print Logs
+            </Button>
+            <Button variant="outline" size="sm" onClick={handleExport}>
+              <Download className="w-4 h-4 mr-2" />
+              Export Logs
+            </Button>
+          </div>
         </div>
         
         {/* Search and Filters */}

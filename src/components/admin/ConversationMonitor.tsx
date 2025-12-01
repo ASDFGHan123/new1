@@ -47,6 +47,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { useState, useEffect } from "react";
+import { openPrintWindow, generateConversationReportHTML } from "@/lib/printUtils";
 
 const initialConversations = [
   {
@@ -489,6 +490,14 @@ OffChat Admin Dashboard
     linkElement.setAttribute('download', exportFileDefaultName);
     linkElement.click();
   };
+
+  const handlePrintConversations = () => {
+    const printData = generateConversationReportHTML(filteredAndSortedConversations);
+    openPrintWindow({
+      ...printData,
+      subtitle: `Filtered Results: ${filteredAndSortedConversations.length} of ${conversations.length} conversations`
+    });
+  };
   return (
     <Card className="bg-gradient-card border-border/50">
       <CardHeader>
@@ -503,6 +512,15 @@ OffChat Admin Dashboard
             <Badge variant="secondary" className="bg-admin-success/20 text-admin-success border-admin-success/30">
               {conversations.filter(c => c.isActive).length} Active
             </Badge>
+            <Button 
+              onClick={handlePrintConversations}
+              variant="outline"
+              size="sm"
+              className="bg-blue-50 hover:bg-blue-100 border-blue-200 text-blue-700"
+            >
+              <Printer className="w-4 h-4 mr-2" />
+              Print Conversations
+            </Button>
             <Button
               variant="outline"
               size="sm"

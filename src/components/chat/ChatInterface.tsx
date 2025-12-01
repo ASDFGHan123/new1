@@ -38,9 +38,10 @@ interface ChatInterfaceProps {
   user: User;
   onLogout: () => void;
   onUpdateUser?: (updates: Partial<User>) => void;
+  onTrashMessage?: (message: Message) => void;
 }
 
-export const ChatInterface = ({ user, onLogout, onUpdateUser }: ChatInterfaceProps) => {
+export const ChatInterface = ({ user, onLogout, onUpdateUser, onTrashMessage }: ChatInterfaceProps) => {
   const [message, setMessage] = useState("");
   const [avatar, setAvatar] = useState(user.avatar);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -244,7 +245,16 @@ export const ChatInterface = ({ user, onLogout, onUpdateUser }: ChatInterfacePro
 
   // Message management functions
   const deleteMessage = (messageId: string) => {
-    setMessages(prevMessages => prevMessages.filter(msg => msg.id !== messageId));
+    const messageToDelete = messages.find(msg => msg.id === messageId);
+    
+    if (onTrashMessage && messageToDelete) {
+      // Move to trash instead of permanent delete
+      onTrashMessage(messageToDelete);
+    } else {
+      // Permanent delete if no trash function available
+      setMessages(prevMessages => prevMessages.filter(msg => msg.id !== messageId));
+    }
+    
     setOpenMenuId(null);
   };
 
@@ -504,7 +514,7 @@ export const ChatInterface = ({ user, onLogout, onUpdateUser }: ChatInterfacePro
                 ) : (
                   // Normal message display
                   <>
-                    <p className="text-sm">{msg.content}</p>
+                    <p className="text-sm text-foreground">{msg.content}</p>
                     {msg.attachments && msg.attachments.length > 0 && (
                       <div className="mt-2 space-y-2">
                         {msg.attachments.map((attachment) => (
@@ -606,7 +616,7 @@ export const ChatInterface = ({ user, onLogout, onUpdateUser }: ChatInterfacePro
                               className="text-red-600 focus:text-red-600"
                             >
                               <Trash2 className="h-4 w-4 mr-2" />
-                              Delete
+                              {onTrashMessage ? "Move to Trash" : "Delete"}
                             </DropdownMenuItem>
                           </>
                         )}

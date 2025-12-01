@@ -1,11 +1,12 @@
 import React from "react";
-import { Download, Calendar, Database, Users, MessageSquare, Settings } from "lucide-react";
+import { Download, Calendar, Database, Users, MessageSquare, Settings, Printer } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Progress } from "@/components/ui/progress";
+import { openPrintWindow, generateBackupReportHTML } from "@/lib/printUtils";
 
 interface BackupManagerProps {
   detailed?: boolean;
@@ -64,6 +65,27 @@ export const BackupManager = ({ detailed = false }: BackupManagerProps) => {
     setBackupTypes(prev => ({ ...prev, [key]: value }));
   };
 
+  const handlePrintBackup = () => {
+    const backupInfo = {
+      lastBackup: "2024-01-20",
+      nextScheduled: "2024-01-25",
+      size: "2.4 MB",
+      status: "completed",
+      dataTypes: {
+        users: backupTypes.users,
+        messages: backupTypes.messages,
+        settings: backupTypes.settings,
+        logs: backupTypes.logs
+      }
+    };
+    
+    const printData = generateBackupReportHTML(backupInfo);
+    openPrintWindow({
+      ...printData,
+      subtitle: `Backup Configuration: ${selectedMonth} - ${Object.values(backupTypes).filter(Boolean).length} data types selected`
+    });
+  };
+
   const recentBackups = [
     { date: "2024-01-20", size: "2.4 MB", status: "completed" },
     { date: "2024-01-15", size: "2.1 MB", status: "completed" },
@@ -102,11 +124,26 @@ export const BackupManager = ({ detailed = false }: BackupManagerProps) => {
   return (
     <Card className="bg-gradient-card border-border/50">
       <CardHeader>
-        <CardTitle className="text-xl flex items-center">
-          <Database className="w-6 h-6 mr-2" />
-          Backup Manager
-        </CardTitle>
-        <CardDescription>Create and manage system backups</CardDescription>
+        <div className="flex items-center justify-between">
+          <div>
+            <CardTitle className="text-xl flex items-center">
+              <Database className="w-6 h-6 mr-2" />
+              Backup Manager
+            </CardTitle>
+            <CardDescription>Create and manage system backups</CardDescription>
+          </div>
+          <div className="flex items-center space-x-2">
+            <Button 
+              onClick={handlePrintBackup}
+              variant="outline"
+              size="sm"
+              className="bg-blue-50 hover:bg-blue-100 border-blue-200 text-blue-700"
+            >
+              <Printer className="w-4 h-4 mr-2" />
+              Print Backup Report
+            </Button>
+          </div>
+        </div>
       </CardHeader>
       <CardContent className="space-y-6">
         {/* Backup Configuration */}

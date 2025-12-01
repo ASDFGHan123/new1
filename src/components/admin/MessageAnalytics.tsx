@@ -1,6 +1,9 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, PieChart, Pie, Cell } from "recharts";
 import { useState, useEffect } from "react";
+import { Printer, Download } from "lucide-react";
+import { openPrintWindow, generateMessageAnalyticsHTML } from "@/lib/printUtils";
 
 const initialMessageData = [
   { time: "00:00", messages: 1200 },
@@ -36,6 +39,49 @@ export const MessageAnalytics = ({ detailed = false }: MessageAnalyticsProps) =>
   const [messageData, setMessageData] = useState(initialMessageData);
   const [messageTypeData, setMessageTypeData] = useState(initialMessageTypeData);
   const [dailyStats, setDailyStats] = useState(initialDailyStats);
+
+  const handlePrintAnalytics = () => {
+    const analytics = {
+      totalMessages: dailyStats.reduce((sum, day) => sum + day.sent, 0),
+      messagesToday: messageData[messageData.length - 1]?.messages || 0,
+      activeUsers: 2847, // This would come from props or API
+      averageMessages: Math.round(dailyStats.reduce((sum, day) => sum + day.sent, 0) / dailyStats.length),
+      messageTypes: messageTypeData.reduce((acc, type) => ({ ...acc, [type.type]: type.count }), {})
+    };
+    
+    const printData = generateMessageAnalyticsHTML(analytics);
+    openPrintWindow({
+      ...printData,
+      subtitle: "Real-time Message Analytics"
+    });
+  };
+
+  const handleBackupAnalytics = () => {
+    const analyticsData = {
+      timestamp: new Date().toISOString(),
+      timeRange: "current",
+      data: {
+        messageData,
+        messageTypeData,
+        dailyStats,
+        summary: {
+          totalMessages: dailyStats.reduce((sum, day) => sum + day.sent, 0),
+          messagesToday: messageData[messageData.length - 1]?.messages || 0,
+          activeUsers: 2847,
+          averageMessages: Math.round(dailyStats.reduce((sum, day) => sum + day.sent, 0) / dailyStats.length),
+          messageTypes: messageTypeData.reduce((acc, type) => ({ ...acc, [type.type]: type.count }), {})
+        }
+      }
+    };
+    
+    const blob = new Blob([JSON.stringify(analyticsData, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `message-analytics-backup-${new Date().toISOString().split('T')[0]}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -85,8 +131,32 @@ export const MessageAnalytics = ({ detailed = false }: MessageAnalyticsProps) =>
   return (
     <Card className="bg-gradient-card border-border/50">
       <CardHeader>
-        <CardTitle>Message Activity</CardTitle>
-        <CardDescription>Real-time message flow</CardDescription>
+        <div className="flex items-center justify-between">
+          <div>
+            <CardTitle>Message Activity</CardTitle>
+            <CardDescription>Real-time message flow</CardDescription>
+          </div>
+          <div className="flex items-center space-x-2">
+            <Button 
+              onClick={handleBackupAnalytics}
+              variant="outline"
+              size="sm"
+              className="bg-green-50 hover:bg-green-100 border-green-200 text-green-700"
+            >
+              <Download className="w-4 h-4 mr-2" />
+              Backup Data
+            </Button>
+            <Button 
+              onClick={handlePrintAnalytics}
+              variant="outline"
+              size="sm"
+              className="bg-blue-50 hover:bg-blue-100 border-blue-200 text-blue-700"
+            >
+              <Printer className="w-4 h-4 mr-2" />
+              Print Analytics
+            </Button>
+          </div>
+        </div>
       </CardHeader>
       <CardContent>
         <ResponsiveContainer width="100%" height={300}>

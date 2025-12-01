@@ -1,4 +1,4 @@
-import { Trash2, RotateCcw, X, Search, Filter, Eye, MoreHorizontal, AlertTriangle } from "lucide-react";
+import { Trash2, RotateCcw, X, Search, Filter, Eye, MoreHorizontal, AlertTriangle, Printer } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -37,6 +37,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { useState } from "react";
+import { openPrintWindow, generateTrashReportHTML } from "@/lib/printUtils";
 
 interface User {
   id: string;
@@ -238,14 +239,18 @@ export const Trash = ({
     }
   };
 
-  const handleBulkRestore = () => {
-    selectedItems.forEach(itemId => {
+  const handleBulkRestore = async () => {
+    const restorePromises = selectedItems.map(async itemId => {
       const [itemType, id] = itemId.split('-', 2);
       const item = filteredAndSortedItems.find(i => `${i.itemType}-${i.id}` === itemId);
       if (item) {
         handleRestore(item);
+        // Add a small delay to avoid overwhelming the system
+        await new Promise(resolve => setTimeout(resolve, 100));
       }
     });
+    
+    await Promise.all(restorePromises);
     setSelectedItems([]);
     setSelectAll(false);
   };
@@ -260,6 +265,14 @@ export const Trash = ({
     });
     setSelectedItems([]);
     setSelectAll(false);
+  };
+
+  const handlePrintTrash = () => {
+    const printData = generateTrashReportHTML(filteredAndSortedItems, `Filtered Results: ${filteredAndSortedItems.length} of ${allTrashedItems.length} items`);
+    openPrintWindow({
+      ...printData,
+      subtitle: `Generated: ${new Date().toLocaleString()}`
+    });
   };
 
   const getItemName = (item: TrashedItem): string => {
@@ -337,9 +350,21 @@ export const Trash = ({
               Manage deleted items - restore or permanently delete
             </CardDescription>
           </div>
-          <Badge variant="secondary" className="bg-red-100 text-red-700">
-            {allTrashedItems.length} items
-          </Badge>
+          <div className="flex items-center space-x-2">
+            <Button 
+              onClick={handlePrintTrash}
+              variant="outline"
+              size="sm"
+              className="bg-blue-50 hover:bg-blue-100 border-blue-200 text-blue-700"
+              disabled={filteredAndSortedItems.length === 0}
+            >
+              <Printer className="w-4 h-4 mr-2" />
+              Print Trash Report
+            </Button>
+            <Badge variant="secondary" className="bg-red-100 text-red-700">
+              {allTrashedItems.length} items
+            </Badge>
+          </div>
         </div>
 
         {/* Bulk Actions */}

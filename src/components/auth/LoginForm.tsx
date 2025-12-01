@@ -25,8 +25,7 @@ export const LoginForm = ({ onToggleMode, onLogin }: LoginFormProps) => {
     setTimeout(() => {
       onLogin(identifier, password);
       setIsLoading(false);
-      // Navigate to chat (parent component handles authentication state)
-      navigate("/chat");
+      // Navigation is handled by parent component based on authentication state
     }, 1000);
   };
 

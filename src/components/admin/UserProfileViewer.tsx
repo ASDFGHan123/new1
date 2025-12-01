@@ -6,6 +6,17 @@ import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 interface UserProfile {
   id: string;
@@ -26,9 +37,10 @@ interface UserProfileViewerProps {
   onClose: () => void;
   onExportData: (userId: string) => void;
   onDeleteData: (userId: string) => void;
+  onTrashUser?: (userId: string) => void;
 }
 
-export const UserProfileViewer = ({ user, isOpen, onClose, onExportData, onDeleteData }: UserProfileViewerProps) => {
+export const UserProfileViewer = ({ user, isOpen, onClose, onExportData, onDeleteData, onTrashUser }: UserProfileViewerProps) => {
   if (!user) return null;
 
   const getStatusColor = (status: string) => {
@@ -124,7 +136,7 @@ export const UserProfileViewer = ({ user, isOpen, onClose, onExportData, onDelet
               <CardDescription>Export or delete user data for compliance</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="flex space-x-2">
+              <div className="flex flex-wrap gap-2">
                 <Button 
                   variant="outline" 
                   size="sm"
@@ -133,6 +145,36 @@ export const UserProfileViewer = ({ user, isOpen, onClose, onExportData, onDelet
                   <Download className="w-4 h-4 mr-2" />
                   Export Data
                 </Button>
+                {onTrashUser && (
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button variant="destructive" size="sm">
+                        <Trash2 className="w-4 h-4 mr-2" />
+                        Move to Trash
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Move User to Trash</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          Are you sure you want to move {user.username} to trash? The user can be restored later from the Trash tab.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction
+                          onClick={() => {
+                            onTrashUser(user.id);
+                            onClose();
+                          }}
+                          className="bg-red-600 hover:bg-red-700"
+                        >
+                          Move to Trash
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                )}
                 <Button 
                   variant="destructive" 
                   size="sm"

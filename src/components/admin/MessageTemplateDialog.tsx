@@ -7,12 +7,24 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
+import { Trash2 } from "lucide-react";
 
 interface MessageTemplate {
   id: string;
@@ -25,6 +37,7 @@ interface MessageTemplateDialogProps {
   isOpen: boolean;
   onClose: () => void;
   onSave: (template: Omit<MessageTemplate, "id">) => void;
+  onTrash?: (templateId: string) => void;
   template?: MessageTemplate | null;
   mode: "add" | "edit";
 }
@@ -42,6 +55,7 @@ export const MessageTemplateDialog = ({
   isOpen,
   onClose,
   onSave,
+  onTrash,
   template,
   mode,
 }: MessageTemplateDialogProps) => {
@@ -165,21 +179,53 @@ export const MessageTemplateDialog = ({
         </div>
 
         <DialogFooter>
-          <Button variant="outline" onClick={handleClose} disabled={isSaving}>
-            Cancel
-          </Button>
-          <Button onClick={handleSave} disabled={isSaving || !name.trim() || !content.trim()}>
-            {isSaving ? (
-              <>
-                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />
-                {mode === "add" ? "Creating..." : "Updating..."}
-              </>
-            ) : (
-              <>
-                {mode === "add" ? "Create Template" : "Update Template"}
-              </>
+          <div className="flex space-x-2">
+            <Button variant="outline" onClick={handleClose} disabled={isSaving}>
+              Cancel
+            </Button>
+            <Button onClick={handleSave} disabled={isSaving || !name.trim() || !content.trim()}>
+              {isSaving ? (
+                <>
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />
+                  {mode === "add" ? "Creating..." : "Updating..."}
+                </>
+              ) : (
+                <>
+                  {mode === "add" ? "Create Template" : "Update Template"}
+                </>
+              )}
+            </Button>
+            {mode === "edit" && template && onTrash && (
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button variant="destructive" disabled={isSaving}>
+                    <Trash2 className="w-4 h-4 mr-2" />
+                    Move to Trash
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Move Template to Trash</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      Are you sure you want to move the template "{template.name}" to trash? It can be restored later from the Trash tab.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogAction
+                      onClick={() => {
+                        onTrash(template.id);
+                        onClose();
+                      }}
+                      className="bg-red-600 hover:bg-red-700"
+                    >
+                      Move to Trash
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
             )}
-          </Button>
+          </div>
         </DialogFooter>
       </DialogContent>
     </Dialog>

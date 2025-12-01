@@ -1,5 +1,5 @@
 import React from "react";
-import { Search, Filter, Eye, Shield, Database, MoreHorizontal } from "lucide-react";
+import { Search, Filter, Eye, Shield, Database, MoreHorizontal, Printer } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,6 +8,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { openPrintWindow, generateEnhancedUserListHTML } from "@/lib/printUtils";
 
 interface User {
   id: string;
@@ -51,6 +52,14 @@ export const EnhancedUserList = ({ users, onViewProfile, onModerate, onDataManag
     }
   };
 
+  const handlePrintUserList = () => {
+    const printData = generateEnhancedUserListHTML(filteredUsers);
+    openPrintWindow({
+      ...printData,
+      subtitle: `Filtered Results: ${filteredUsers.length} of ${users.length} users`
+    });
+  };
+
   return (
     <Card className="bg-gradient-card border-border/50">
       <CardHeader>
@@ -59,7 +68,18 @@ export const EnhancedUserList = ({ users, onViewProfile, onModerate, onDataManag
             <CardTitle className="text-xl">User Management</CardTitle>
             <CardDescription>Find and manage users with advanced filtering</CardDescription>
           </div>
-          <Badge variant="outline">{filteredUsers.length} users</Badge>
+          <div className="flex items-center space-x-2">
+            <Button 
+              onClick={handlePrintUserList}
+              variant="outline"
+              size="sm"
+              className="bg-blue-50 hover:bg-blue-100 border-blue-200 text-blue-700"
+            >
+              <Printer className="w-4 h-4 mr-2" />
+              Print User List
+            </Button>
+            <Badge variant="outline">{filteredUsers.length} users</Badge>
+          </div>
         </div>
         
         <div className="flex items-center space-x-4 mt-4">

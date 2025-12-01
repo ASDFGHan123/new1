@@ -121,6 +121,7 @@ interface AdminDashboardProps {
   onLogout?: () => void;
   onTrashUser?: (userId: string) => void;
   onTrashMessage?: (message: any) => void;
+  onTrashRole?: (roleId: string) => void;
 }
 
 const AdminDashboard = ({ users: propUsers, roles: propRoles, conversations: propConversations, messageTemplates: propMessageTemplates, user, approveUser, rejectUser, addUser, updateUser, addRole, updateRole, deleteRole, hasPermission, sendSystemMessage, sendBulkMessage, addMessageTemplate, deleteMessageTemplate, forceLogoutUser, deleteUser, onMessageSent, onLogout, onTrashUser }: AdminDashboardProps) => {
@@ -1093,6 +1094,20 @@ The OffChat Security Team`;
                       </div>
                     </div>
                   </CardContent>
+                  <div className="px-6 pb-6 pt-4">
+                    <div className="flex justify-end space-x-2 border-t pt-4">
+                      <Button variant="outline">
+                        Cancel
+                      </Button>
+                      <Button 
+                        onClick={handleSaveSettings}
+                        className="bg-admin-primary hover:bg-admin-primary/90"
+                      >
+                        <Save className="w-4 h-4 mr-2" />
+                        Save Settings
+                      </Button>
+                    </div>
+                  </div>
                 </Card>
               </div>
             </TabsContent>
@@ -1371,6 +1386,20 @@ The OffChat Security Team`;
                       </div>
                     </div>
                   </CardContent>
+                  <div className="px-6 pb-6 pt-4">
+                    <div className="flex justify-end space-x-2 border-t pt-4">
+                      <Button variant="outline">
+                        Cancel
+                      </Button>
+                      <Button 
+                        onClick={handleSaveSettings}
+                        className="bg-admin-primary hover:bg-admin-primary/90"
+                      >
+                        <Save className="w-4 h-4 mr-2" />
+                        Save Settings
+                      </Button>
+                    </div>
+                  </div>
                 </Card>
               </div>
             </TabsContent>
@@ -1379,19 +1408,11 @@ The OffChat Security Team`;
               <div className="space-y-6">
                 <Card className="bg-gradient-card border-border/50">
                   <CardHeader>
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <CardTitle className="flex items-center space-x-2">
-                          <SettingsIcon className="w-5 h-5" />
-                          <span>System Settings</span>
-                        </CardTitle>
-                        <CardDescription>Configure system-wide settings and preferences</CardDescription>
-                      </div>
-                      <Button onClick={handleSaveSettings} className="bg-admin-primary hover:bg-admin-primary/90">
-                        <Save className="w-4 h-4 mr-2" />
-                        Save Settings
-                      </Button>
-                    </div>
+                    <CardTitle className="flex items-center space-x-2">
+                      <SettingsIcon className="w-5 h-5" />
+                      <span>System Settings</span>
+                    </CardTitle>
+                    <CardDescription>Configure system-wide settings and preferences</CardDescription>
                   </CardHeader>
                   <CardContent>
                     <div className="space-y-8">
@@ -1437,6 +1458,66 @@ The OffChat Security Team`;
 
                       <Separator />
 
+
+                      <Separator />
+
+                      {/* Backup Settings */}
+                      <div>
+                        <h4 className="font-medium mb-4 flex items-center space-x-2">
+                          <Database className="w-4 h-4" />
+                          <span>Backup Settings</span>
+                        </h4>
+                        <div className="space-y-4">
+                          <div className="space-y-2">
+                            <Label className="text-sm font-medium">Backup Frequency</Label>
+                            <Select value={backupFrequency} onValueChange={(value: any) => setBackupFrequency(value)}>
+                              <SelectTrigger>
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="daily">Daily</SelectItem>
+                                <SelectItem value="weekly">Weekly</SelectItem>
+                                <SelectItem value="monthly">Monthly</SelectItem>
+                                <SelectItem value="custom">Custom Range</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            {backupFrequency === "custom" && (
+                              <div className="grid grid-cols-2 gap-2 mt-2">
+                                <div>
+                                  <Label className="text-xs">Start Date</Label>
+                                  <Input
+                                    type="date"
+                                    value={customBackupStartDate}
+                                    onChange={(e) => setCustomBackupStartDate(e.target.value)}
+                                    className="text-xs"
+                                  />
+                                </div>
+                                <div>
+                                  <Label className="text-xs">End Date</Label>
+                                  <Input
+                                    type="date"
+                                    value={customBackupEndDate}
+                                    onChange={(e) => setCustomBackupEndDate(e.target.value)}
+                                    className="text-xs"
+                                  />
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                          <div className="pt-2">
+                            <Button 
+                              onClick={() => setActiveTab("overview")} 
+                              className="bg-admin-primary hover:bg-admin-primary/90"
+                            >
+                              <Database className="w-4 h-4 mr-2" />
+                              Create Manual Backup
+                            </Button>
+                            <p className="text-xs text-muted-foreground mt-1">
+                              Navigate to the Overview tab to access the Backup Manager
+                            </p>
+                          </div>
+                        </div>
+                      </div>
 
                       <Separator />
 
@@ -1504,6 +1585,20 @@ The OffChat Security Team`;
                       </div>
                     </div>
                   </CardContent>
+                  <div className="px-6 pb-6 pt-4">
+                    <div className="flex justify-end space-x-2 border-t pt-4">
+                      <Button variant="outline">
+                        Cancel
+                      </Button>
+                      <Button 
+                        onClick={handleSaveSettings}
+                        className="bg-admin-primary hover:bg-admin-primary/90"
+                      >
+                        <Save className="w-4 h-4 mr-2" />
+                        Save Settings
+                      </Button>
+                    </div>
+                  </div>
                 </Card>
               </div>
             </TabsContent>
@@ -1541,6 +1636,7 @@ The OffChat Security Team`;
             onClose={() => setShowProfile(false)}
             onExportData={(userId) => handleExportData(userId, { messages: true, profile: true, activity: false, connections: false })}
             onDeleteData={(userId) => handleDeleteData(userId, { messages: true, profile: true, activity: false, connections: false })}
+            onTrashUser={handleTrashUser}
           />
           <ModerationTools
             userId={selectedUser.id}
@@ -1579,6 +1675,7 @@ The OffChat Security Team`;
         isOpen={showTemplateDialog}
         onClose={() => setShowTemplateDialog(false)}
         onSave={handleSaveTemplate}
+        onTrash={handleTrashMessageTemplate}
         template={selectedTemplate}
         mode={templateDialogMode}
       />

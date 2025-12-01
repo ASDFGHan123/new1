@@ -1,6 +1,8 @@
-import { Users, MessageSquare, Activity, Shield } from "lucide-react";
+import { Users, MessageSquare, Activity, Shield, Printer } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { useState, useEffect } from "react";
+import { openPrintWindow, generateStatsCardsHTML } from "@/lib/printUtils";
 
 const initialStats = [
   {
@@ -36,6 +38,14 @@ const initialStats = [
 export const StatsCards = () => {
   const [stats, setStats] = useState(initialStats);
 
+  const handlePrintStats = () => {
+    const printData = generateStatsCardsHTML(stats);
+    openPrintWindow({
+      ...printData,
+      subtitle: "System Performance Overview"
+    });
+  };
+
   useEffect(() => {
     const interval = setInterval(() => {
       setStats(prevStats =>
@@ -54,28 +64,44 @@ export const StatsCards = () => {
 
     return () => clearInterval(interval);
   }, []);
+
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-      {stats.map((stat, index) => (
-        <Card key={index} className="bg-gradient-card border-border/50 hover:shadow-card transition-all duration-300">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-card-foreground/70">
-              {stat.title}
-            </CardTitle>
-            <div className={`p-2 rounded-lg bg-${stat.color}/20`}>
-              <stat.icon className={`w-4 h-4 text-${stat.color}`} />
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-card-foreground">{stat.value.toLocaleString()}</div>
-            <p className={`text-xs ${
-              stat.change >= 0 ? 'text-admin-success' : 'text-admin-error'
-            }`}>
-              {stat.change >= 0 ? '+' : ''}{stat.change.toFixed(1)}% from last month
-            </p>
-          </CardContent>
-        </Card>
-      ))}
+    <div className="space-y-4">
+      {/* Print Button */}
+      <div className="flex justify-end">
+        <Button 
+          onClick={handlePrintStats}
+          variant="outline"
+          size="sm"
+          className="bg-blue-50 hover:bg-blue-100 border-blue-200 text-blue-700"
+        >
+          <Printer className="w-4 h-4 mr-2" />
+          Print Statistics
+        </Button>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        {stats.map((stat, index) => (
+          <Card key={index} className="bg-gradient-card border-border/50 hover:shadow-card transition-all duration-300">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium text-card-foreground/70">
+                {stat.title}
+              </CardTitle>
+              <div className={`p-2 rounded-lg bg-${stat.color}/20`}>
+                <stat.icon className={`w-4 h-4 text-${stat.color}`} />
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-card-foreground">{stat.value.toLocaleString()}</div>
+              <p className={`text-xs ${
+                stat.change >= 0 ? 'text-admin-success' : 'text-admin-error'
+              }`}>
+                {stat.change >= 0 ? '+' : ''}{stat.change.toFixed(1)}% from last month
+              </p>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
     </div>
   );
 };
