@@ -1,13 +1,14 @@
 import React from "react";
-import { Shield, Lock, User, Eye, EyeOff } from "lucide-react";
+import { Shield, Lock, User, Eye, EyeOff, Bug } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useNavigate } from "react-router-dom";
+import { testEnvironmentAndAPI } from "@/utils/testEnv";
 
 interface AdminLoginProps {
-  onLogin: (identifier: string, password: string) => boolean;
+  onLogin: (identifier: string, password: string) => Promise<boolean>;
 }
 
 const AdminLogin = ({ onLogin }: AdminLoginProps) => {
@@ -15,22 +16,31 @@ const AdminLogin = ({ onLogin }: AdminLoginProps) => {
   const [password, setPassword] = React.useState("");
   const [showPassword, setShowPassword] = React.useState(false);
   const [error, setError] = React.useState("");
+  const [loading, setLoading] = React.useState(false);
   const navigate = useNavigate();
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
+    setLoading(true);
 
     if (!identifier || !password) {
       setError("Please enter both email/username and password");
+      setLoading(false);
       return;
     }
 
-    const success = onLogin(identifier, password);
-    if (success) {
-      navigate("/admin");
-    } else {
-      setError("Invalid credentials or insufficient permissions");
+    try {
+      const success = await onLogin(identifier, password);
+      if (success) {
+        navigate("/admin");
+      } else {
+        setError("Invalid credentials or insufficient permissions");
+      }
+    } catch (err) {
+      setError("Login failed. Please try again.");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -102,7 +112,26 @@ const AdminLogin = ({ onLogin }: AdminLoginProps) => {
           </form>
           
           <div className="mt-4 text-center text-sm text-muted-foreground">
-            Default: admin or admin@offchat.com / 12341234
+            Default: admin or admin@example.com / admin123
+          </div>
+
+          <div className="mt-4 text-center">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                console.log('=== DEBUG INFO ===');
+                console.log('Environment:', import.meta.env);
+                console.log('API URL:', import.meta.env.VITE_API_URL);
+                console.log('Use Real Data:', import.meta.env.VITE_USE_REAL_DATA);
+                testEnvironmentAndAPI();
+              }}
+              className="text-xs"
+            >
+              <Bug className="w-3 h-3 mr-2" />
+              Debug Info
+            </Button>
           </div>
         </CardContent>
       </Card>

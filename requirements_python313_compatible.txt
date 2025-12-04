@@ -1,0 +1,33 @@
+# Updated requirements for Python 3.13 compatibility
+# Core Django packages (Python 3.13 compatible)
+Django>=4.2,<5.0
+djangorestframework>=3.14.0
+django-cors-headers>=4.0.0
+python-decouple>=3.8
+python-dotenv>=1.0.0
+requests>=2.31.0
+pytz>=2023.3
+asgiref>=3.7.0
+
+# Development packages (safer versions)
+pytest>=7.4.0
+factory-boy>=3.3.0
+
+# Alternative packages for problematic ones
+# Use django-celery-beat instead of celery for now
+django-celery-beat>=2.5.0
+
+# Security and validation (updated versions)
+cryptography>=41.0.0
+email-validator>=2.1.0
+
+# HTTP client and async support
+httpx>=0.25.0
+
+# Note: The following packages may need special handling for Python 3.13:
+# - Pillow (image processing) - may require Visual C++ build tools
+# - psycopg2-binary (PostgreSQL) - may have compatibility issues
+# - channels and channels-redis (WebSocket support) - Python 3.13 support varies
+# - django-compressor (CSS/JS) - may need compilation
+# - django-imagekit (image processing) - depends on Pillow
+# - django-silk (profiling) - may have dependencies

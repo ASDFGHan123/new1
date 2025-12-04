@@ -1,10 +1,11 @@
 import React from "react";
-import { Users, MessageSquare, Shield, Activity, AlertTriangle, Database, RefreshCw, UserPlus, Sparkles, Wrench, ShieldAlert, User, Save, Settings as SettingsIcon, Trash2 } from "lucide-react";
+import { Users, MessageSquare, Shield, Activity, AlertTriangle, Database, RefreshCw, UserPlus, Sparkles, Wrench, ShieldAlert, User, Save, Settings as SettingsIcon, Trash2, Loader2 } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -38,19 +39,9 @@ import { MessageHistory } from "@/components/admin/MessageHistory";
 import { MessageModeration } from "@/components/admin/MessageModeration";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { ImageUpload } from "@/components/ui/image-upload";
+import { apiService, User as ApiUser } from "@/lib/api";
 
-interface User {
-  id: string;
-  username: string;
-  email: string;
-  status: "active" | "suspended" | "banned";
-  role: string;
-  joinDate: string;
-  lastActive: string;
-  messageCount: number;
-  reportCount: number;
-  avatar?: string;
-}
+// Using User type from api.ts import
 
 interface Role {
   id: string;
@@ -98,7 +89,7 @@ interface DataExportOptions {
 }
 
 interface AdminDashboardProps {
-  users: User[];
+  users: ApiUser[];
   roles: Role[];
   conversations: Conversation[];
   messageTemplates: MessageTemplate[];
@@ -106,7 +97,7 @@ interface AdminDashboardProps {
   approveUser: (id: string) => void;
   rejectUser: (id: string) => void;
   addUser?: (username: string, password: string, role: string) => void;
-  updateUser?: (id: string, updates: Partial<User>) => void;
+  updateUser?: (id: string, updates: Partial<ApiUser>) => void;
   addRole?: (name: string, description: string, permissions: string[]) => void;
   updateRole?: (id: string, updates: Partial<Role>) => void;
   deleteRole?: (id: string) => void;
@@ -120,13 +111,12 @@ interface AdminDashboardProps {
   onMessageSent?: (content: string, type: "system" | "broadcast" | "targeted", priority: string, recipients: string[], recipientCount: number) => void;
   onLogout?: () => void;
   onTrashUser?: (userId: string) => void;
-  onTrashMessage?: (message: any) => void;
   onTrashRole?: (roleId: string) => void;
 }
 
 const AdminDashboard = ({ users: propUsers, roles: propRoles, conversations: propConversations, messageTemplates: propMessageTemplates, user, approveUser, rejectUser, addUser, updateUser, addRole, updateRole, deleteRole, hasPermission, sendSystemMessage, sendBulkMessage, addMessageTemplate, deleteMessageTemplate, forceLogoutUser, deleteUser, onMessageSent, onLogout, onTrashUser }: AdminDashboardProps) => {
   // Local state for entities when props not provided
-  const [localUsers, setLocalUsers] = React.useState<User[]>([
+  const [localUsers, setLocalUsers] = React.useState<ApiUser[]>([
     {
       id: "1",
       username: "john_doe",
@@ -240,7 +230,7 @@ const AdminDashboard = ({ users: propUsers, roles: propRoles, conversations: pro
   const messageTemplates = propMessageTemplates || localMessageTemplates;
 
   const [activeTab, setActiveTab] = React.useState("overview");
-  const [selectedUser, setSelectedUser] = React.useState<User | null>(null);
+  const [selectedUser, setSelectedUser] = React.useState<ApiUser | null>(null);
   const [showProfile, setShowProfile] = React.useState(false);
   const [showModeration, setShowModeration] = React.useState(false);
   const [showDataTools, setShowDataTools] = React.useState(false);
@@ -253,6 +243,25 @@ const AdminDashboard = ({ users: propUsers, roles: propRoles, conversations: pro
   const [showUserSelectionDialog, setShowUserSelectionDialog] = React.useState(false);
   const [quickActionContent, setQuickActionContent] = React.useState<string>("");
   const [quickActionPriority, setQuickActionPriority] = React.useState<string>("normal");
+
+  // API Integration states
+  const [loading, setLoading] = React.useState<{ [key: string]: boolean }>({
+    users: false,
+    roles: false,
+    conversations: false,
+    templates: false,
+    settings: false,
+    messages: false
+  });
+  const [errors, setErrors] = React.useState<{ [key: string]: string | null }>({
+    users: null,
+    roles: null,
+    conversations: null,
+    templates: null,
+    settings: null,
+    messages: null
+  });
+  const [dataRefresh, setDataRefresh] = React.useState(0);
 
   // Profile related state
   const [showEditProfileDialog, setShowEditProfileDialog] = React.useState(false);
@@ -282,7 +291,7 @@ const AdminDashboard = ({ users: propUsers, roles: propRoles, conversations: pro
   const [customBackupEndDate, setCustomBackupEndDate] = React.useState<string>("");
 
   // Trash related state
-  const [trashedUsers, setTrashedUsers] = React.useState<User[]>([]);
+  const [trashedUsers, setTrashedUsers] = React.useState<ApiUser[]>([]);
   const [trashedConversations, setTrashedConversations] = React.useState<Conversation[]>([]);
   const [trashedMessageTemplates, setTrashedMessageTemplates] = React.useState<MessageTemplate[]>([]);
   const [trashedMessages, setTrashedMessages] = React.useState<any[]>([]);
@@ -310,41 +319,154 @@ const AdminDashboard = ({ users: propUsers, roles: propRoles, conversations: pro
     setTrashedRoles([]);
   }, []);
 
-  const handleViewProfile = (user: User) => {
+  // API Integration Functions
+  const loadUsersFromAPI = async () => {
+    setLoading(prev => ({ ...prev, users: true }));
+    setErrors(prev => ({ ...prev, users: null }));
+    
+    try {
+      const response = await apiService.getUsers();
+      if (response.success && response.data) {
+        // Convert API data to local format if needed
+        setLocalUsers(response.data);
+      } else {
+        throw new Error(response.error || 'Failed to load users');
+      }
+    } catch (error) {
+      console.error('Error loading users:', error);
+      setErrors(prev => ({ ...prev, users: error instanceof Error ? error.message : 'Failed to load users' }));
+    } finally {
+      setLoading(prev => ({ ...prev, users: false }));
+    }
+  };
+
+  const refreshAllData = async () => {
+    setDataRefresh(prev => prev + 1);
+    
+    // Load data from API in parallel
+    await Promise.allSettled([
+      loadUsersFromAPI(),
+      loadConversationsFromAPI(),
+      loadMessageTemplatesFromAPI()
+    ]);
+  };
+
+  const loadConversationsFromAPI = async () => {
+    setLoading(prev => ({ ...prev, conversations: true }));
+    setErrors(prev => ({ ...prev, conversations: null }));
+    
+    try {
+      const response = await apiService.getConversations();
+      if (response.success && response.data) {
+        setLocalConversations(response.data);
+      } else {
+        throw new Error(response.error || 'Failed to load conversations');
+      }
+    } catch (error) {
+      console.error('Error loading conversations:', error);
+      setErrors(prev => ({ ...prev, conversations: error instanceof Error ? error.message : 'Failed to load conversations' }));
+    } finally {
+      setLoading(prev => ({ ...prev, conversations: false }));
+    }
+  };
+
+  const loadMessageTemplatesFromAPI = async () => {
+    setLoading(prev => ({ ...prev, templates: true }));
+    setErrors(prev => ({ ...prev, templates: null }));
+    
+    try {
+      const response = await apiService.getMessageTemplates();
+      if (response.success && response.data) {
+        // Convert API data to local format if needed
+        setLocalMessageTemplates(response.data);
+      } else {
+        throw new Error(response.error || 'Failed to load message templates');
+      }
+    } catch (error) {
+      console.error('Error loading templates:', error);
+      setErrors(prev => ({ ...prev, templates: error instanceof Error ? error.message : 'Failed to load templates' }));
+    } finally {
+      setLoading(prev => ({ ...prev, templates: false }));
+    }
+  };
+
+  const handleViewProfile = (user: ApiUser) => {
     setSelectedUser(user);
     setShowProfile(true);
   };
 
-  const handleModerate = (user: User) => {
+  const handleModerate = (user: ApiUser) => {
     setSelectedUser(user);
     setShowModeration(true);
   };
 
-  const handleDataManagement = (user: User) => {
+  const handleDataManagement = (user: ApiUser) => {
     setSelectedUser(user);
     setShowDataTools(true);
   };
 
-  const handleModerationAction = (userId: string, action: ModerationAction) => {
-    // Update user status
-    if (action.type === 'suspend') {
-      updateUser(userId, { status: 'suspended' });
-    } else if (action.type === 'ban') {
-      updateUser(userId, { status: 'banned' });
+  const handleModerationAction = async (userId: string, action: ModerationAction) => {
+    try {
+      setLoading(prev => ({ ...prev, moderation: true }));
+      
+      let apiResponse;
+      // Call appropriate API endpoint based on action type
+      switch (action.type) {
+        case 'suspend':
+          apiResponse = await apiService.suspendUser(userId);
+          break;
+        case 'ban':
+          apiResponse = await apiService.banUser(userId);
+          break;
+        case 'warn':
+          // Warning doesn't require API call, just local tracking
+          apiResponse = { success: true };
+          break;
+        default:
+          throw new Error(`Unknown action type: ${action.type}`);
+      }
+      
+      if (apiResponse.success) {
+        // Update user status locally
+        if (updateUser) {
+          updateUser(userId, { status: action.type === 'suspend' ? 'suspended' : 'banned' });
+        } else {
+          // Use local state
+          setLocalUsers(prev => prev.map(user =>
+            user.id === userId 
+              ? { ...user, status: action.type === 'suspend' ? 'suspended' : 'banned' }
+              : user
+          ));
+        }
+        
+        // Add to moderation actions
+        const user = users.find(u => u.id === userId);
+        const newAction = {
+          id: Date.now().toString(),
+          userId,
+          username: user?.username || userId,
+          action: action.type,
+          duration: action.duration,
+          reason: action.reason,
+          timestamp: new Date().toISOString(),
+          admin: user?.username || 'admin'
+        };
+        setModerationActions(prev => [newAction, ...prev]);
+        
+        // Clear any previous errors
+        setErrors(prev => ({ ...prev, moderation: null }));
+      } else {
+        throw new Error(apiResponse.error || 'Failed to perform moderation action');
+      }
+    } catch (error) {
+      console.error('Error performing moderation action:', error);
+      setErrors(prev => ({ 
+        ...prev, 
+        moderation: error instanceof Error ? error.message : 'Failed to perform moderation action' 
+      }));
+    } finally {
+      setLoading(prev => ({ ...prev, moderation: false }));
     }
-    // Add to moderation actions
-    const user = users.find(u => u.id === userId);
-    const newAction = {
-      id: Date.now().toString(),
-      userId,
-      username: user?.username || userId,
-      action: action.type,
-      duration: action.duration,
-      reason: action.reason,
-      timestamp: new Date().toISOString(),
-      admin: user?.username || 'admin'
-    };
-    setModerationActions(prev => [newAction, ...prev]);
   };
 
   const handleExportData = (userId: string, options: DataExportOptions) => {
@@ -356,39 +478,115 @@ const AdminDashboard = ({ users: propUsers, roles: propRoles, conversations: pro
   };
 
   const handleSendSystemMessage = async (content: string, priority?: string) => {
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    // In real implementation, call the API
-    if (sendSystemMessage) {
-      // For now, send to a dummy conversation
-      sendSystemMessage("system-conversation", content);
-    }
-    // Add to message history
-    if (onMessageSent) {
-      onMessageSent(content, "system", priority || "normal", ["system"], 1);
+    setLoading(prev => ({ ...prev, messages: true }));
+    setErrors(prev => ({ ...prev, messages: null }));
+    
+    try {
+      // Create a system conversation and send message
+      const conversationResponse = await apiService.createConversation(["system"]);
+      
+      if (conversationResponse.success && conversationResponse.data) {
+        const messageResponse = await apiService.sendMessage(conversationResponse.data.id, content);
+        
+        if (messageResponse.success) {
+          // Add to message history
+          if (onMessageSent) {
+            onMessageSent(content, "system", priority || "normal", ["system"], 1);
+          }
+        } else {
+          throw new Error(messageResponse.error || 'Failed to send system message');
+        }
+      } else {
+        throw new Error(conversationResponse.error || 'Failed to create system conversation');
+      }
+    } catch (error) {
+      console.error('Error sending system message:', error);
+      setErrors(prev => ({ 
+        ...prev, 
+        messages: error instanceof Error ? error.message : 'Failed to send system message' 
+      }));
+    } finally {
+      setLoading(prev => ({ ...prev, messages: false }));
     }
   };
 
   const handleSendBulkMessage = async (content: string, priority?: string) => {
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    // In real implementation, call the API
-    if (sendBulkMessage) {
-      sendBulkMessage(users.map(u => u.id), content);
-    }
-    // Add to message history
-    if (onMessageSent) {
-      onMessageSent(content, "broadcast", priority || "normal", ["all"], users.length);
+    setLoading(prev => ({ ...prev, messages: true }));
+    setErrors(prev => ({ ...prev, messages: null }));
+    
+    try {
+      // For bulk messages, we'd need to implement this in the API
+      // For now, we'll send to each user individually or use a broadcast endpoint
+      
+      // Simulate broadcast by creating conversations for each user
+      const userIds = users.map(u => u.id);
+      const promises = userIds.map(async (userId) => {
+        const conversationResponse = await apiService.createConversation([userId]);
+        if (conversationResponse.success && conversationResponse.data) {
+          return apiService.sendMessage(conversationResponse.data.id, content);
+        }
+        return { success: false, error: 'Failed to create conversation' };
+      });
+      
+      const results = await Promise.allSettled(promises);
+      const successCount = results.filter(result => 
+        result.status === 'fulfilled' && (result.value as any).success
+      ).length;
+      
+      if (successCount > 0) {
+        // Add to message history
+        if (onMessageSent) {
+          onMessageSent(content, "broadcast", priority || "normal", ["all"], successCount);
+        }
+      } else {
+        throw new Error('Failed to send broadcast messages');
+      }
+    } catch (error) {
+      console.error('Error sending bulk message:', error);
+      setErrors(prev => ({ 
+        ...prev, 
+        messages: error instanceof Error ? error.message : 'Failed to send bulk message' 
+      }));
+    } finally {
+      setLoading(prev => ({ ...prev, messages: false }));
     }
   };
 
   const handleSendTargetedMessage = async (content: string, priority?: string) => {
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    // In real implementation, call the API
-    // Add to message history
-    if (onMessageSent) {
-      onMessageSent(content, "targeted", priority || "normal", selectedUsersForMessage, selectedUsersForMessage.length);
+    setLoading(prev => ({ ...prev, messages: true }));
+    setErrors(prev => ({ ...prev, messages: null }));
+    
+    try {
+      // Send to selected users
+      const promises = selectedUsersForMessage.map(async (userId) => {
+        const conversationResponse = await apiService.createConversation([userId]);
+        if (conversationResponse.success && conversationResponse.data) {
+          return apiService.sendMessage(conversationResponse.data.id, content);
+        }
+        return { success: false, error: 'Failed to create conversation' };
+      });
+      
+      const results = await Promise.allSettled(promises);
+      const successCount = results.filter(result => 
+        result.status === 'fulfilled' && (result.value as any).success
+      ).length;
+      
+      if (successCount > 0) {
+        // Add to message history
+        if (onMessageSent) {
+          onMessageSent(content, "targeted", priority || "normal", selectedUsersForMessage, successCount);
+        }
+      } else {
+        throw new Error('Failed to send targeted messages');
+      }
+    } catch (error) {
+      console.error('Error sending targeted message:', error);
+      setErrors(prev => ({ 
+        ...prev, 
+        messages: error instanceof Error ? error.message : 'Failed to send targeted message' 
+      }));
+    } finally {
+      setLoading(prev => ({ ...prev, messages: false }));
     }
   };
 
@@ -423,26 +621,50 @@ const AdminDashboard = ({ users: propUsers, roles: propRoles, conversations: pro
     setShowTemplateDialog(true);
   };
 
-  const handleUseTemplate = (template: MessageTemplate) => {
-    // Pre-fill the system message dialog with template content
-    setMessageDialogMode("system");
-    setShowSystemMessageDialog(true);
-    // Note: In a real implementation, you'd pass the template content to the dialog
+  const handleUseTemplate = async (template: MessageTemplate) => {
+    try {
+      // Record template usage
+      await apiService.useMessageTemplate(template.id);
+      
+      // Pre-fill the system message dialog with template content
+      setMessageDialogMode("system");
+      setShowSystemMessageDialog(true);
+      
+      // Note: In a real implementation, you'd pass the template content to the dialog
+      console.log('Template usage recorded for:', template.name);
+    } catch (error) {
+      console.error('Error recording template usage:', error);
+      // Still open the dialog even if usage recording fails
+      setMessageDialogMode("system");
+      setShowSystemMessageDialog(true);
+    }
   };
 
   const handleSaveTemplate = async (templateData: Omit<MessageTemplate, "id">) => {
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 500));
-    // In real implementation, call API to save template
-    if (addMessageTemplate) {
-      addMessageTemplate(templateData.name, templateData.content, templateData.category);
-    } else {
-      // Use local state
-      const newTemplate: MessageTemplate = {
-        id: Date.now().toString(),
-        ...templateData
-      };
-      setLocalMessageTemplates(prev => [...prev, newTemplate]);
+    try {
+      setLoading(prev => ({ ...prev, templates: true }));
+      
+      let response;
+      if (templateDialogMode === "add") {
+        // Create new template
+        response = await apiService.createMessageTemplate(templateData);
+      } else {
+        // Update existing template
+        if (!selectedTemplate) throw new Error('No template selected for update');
+        response = await apiService.updateMessageTemplate(selectedTemplate.id, templateData);
+      }
+      
+      if (response.success && response.data) {
+        // Refresh templates from API to ensure consistency
+        await loadMessageTemplatesFromAPI();
+      } else {
+        throw new Error(response.error || 'Failed to save template');
+      }
+    } catch (error) {
+      console.error('Error saving template:', error);
+      setErrors(prev => ({ ...prev, templates: error instanceof Error ? error.message : 'Failed to save template' }));
+    } finally {
+      setLoading(prev => ({ ...prev, templates: false }));
     }
   };
 
@@ -560,7 +782,7 @@ const AdminDashboard = ({ users: propUsers, roles: propRoles, conversations: pro
 
   // Local add/update functions for when props not provided
   const localAddUser = (username: string, password: string, role: string, avatar?: string) => {
-    const newUser: User = {
+    const newUser: ApiUser = {
       id: Date.now().toString(),
       username,
       email: `${username}@example.com`,
@@ -575,7 +797,7 @@ const AdminDashboard = ({ users: propUsers, roles: propRoles, conversations: pro
     setLocalUsers(prev => [...prev, newUser]);
   };
 
-  const localUpdateUser = (id: string, updates: Partial<User>) => {
+  const localUpdateUser = (id: string, updates: Partial<ApiUser>) => {
     setLocalUsers(prev => prev.map(user =>
       user.id === id ? { ...user, ...updates } : user
     ));
@@ -645,16 +867,25 @@ const AdminDashboard = ({ users: propUsers, roles: propRoles, conversations: pro
   };
 
   const handleTrashMessageTemplate = async (templateId: string) => {
-    const templateToTrash = messageTemplates.find(t => t.id === templateId);
-    if (templateToTrash) {
-      setTrashedMessageTemplates(prev => [...prev, { ...templateToTrash, deletedAt: new Date().toISOString() }]);
-      // Remove from active templates
-      if (deleteMessageTemplate) {
-        deleteMessageTemplate(templateId);
+    try {
+      const templateToTrash = messageTemplates.find(t => t.id === templateId);
+      if (!templateToTrash) return;
+      
+      // Call API to delete template
+      const response = await apiService.deleteMessageTemplate(templateId);
+      
+      if (response.success) {
+        // Add to trash locally (since the API doesn't have trash functionality for templates)
+        setTrashedMessageTemplates(prev => [...prev, { ...templateToTrash, deletedAt: new Date().toISOString() }]);
+        
+        // Refresh templates from API to ensure consistency
+        await loadMessageTemplatesFromAPI();
       } else {
-        // Use local state
-        setLocalMessageTemplates(prev => prev.filter(t => t.id !== templateId));
+        throw new Error(response.error || 'Failed to delete template');
       }
+    } catch (error) {
+      console.error('Error deleting template:', error);
+      setErrors(prev => ({ ...prev, templates: error instanceof Error ? error.message : 'Failed to delete template' }));
     }
   };
 
@@ -767,9 +998,44 @@ const AdminDashboard = ({ users: propUsers, roles: propRoles, conversations: pro
 
   // Settings handlers
   const handleSaveSettings = async () => {
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    alert('Settings saved successfully!');
+    setLoading(prev => ({ ...prev, settings: true }));
+    setErrors(prev => ({ ...prev, settings: null }));
+    
+    try {
+      // Prepare settings data
+      const settingsData = {
+        maintenance_mode: maintenanceMode,
+        user_registration: userRegistration,
+        email_notifications: emailNotifications,
+        two_factor_auth: twoFactorAuth,
+        session_timeout: sessionTimeout,
+        max_file_size: maxFileSize,
+        backup_frequency: backupFrequency,
+        custom_backup_start_date: customBackupStartDate,
+        custom_backup_end_date: customBackupEndDate
+      };
+      
+      // Call API to save settings using a mock response for now
+      // In a real implementation, this would be: apiService.updateSettings(settingsData)
+      const response = { success: true };
+      
+      if (response.success) {
+        // Settings saved successfully
+        console.log('Settings saved successfully');
+        // You could show a success toast here
+      } else {
+        // Since we're using a mock response, we don't have an error property
+        console.log('Settings save simulated');
+      }
+    } catch (error) {
+      console.error('Error saving settings:', error);
+      setErrors(prev => ({ 
+        ...prev, 
+        settings: error instanceof Error ? error.message : 'Failed to save settings' 
+      }));
+    } finally {
+      setLoading(prev => ({ ...prev, settings: false }));
+    }
   };
 
   const handleQuickAction = (actionType: "welcome" | "maintenance" | "security") => {
@@ -853,33 +1119,61 @@ The OffChat Security Team`;
   return (
     <div className="flex h-screen bg-background">
       <AdminSidebar user={user} activeTab={activeTab} onTabChange={setActiveTab} onLogout={onLogout} />
-      <main className="flex-1 overflow-y-auto p-6">
-        <div className="max-w-7xl mx-auto space-y-6">
-          {/* Header */}
-          <div className="flex items-center justify-between relative border-b border-border py-4 px-2">
-            <div>
-              <h1 className="text-3xl font-bold text-foreground">OffChat Admin Dashboard</h1>
-              <p className="text-muted-foreground">Manage your offline messaging platform</p>
+      <main className="flex-1 flex flex-col overflow-hidden">
+        <div className="flex-1 overflow-y-auto p-6">
+          <div className="max-w-7xl mx-auto space-y-6">
+          {/* Header - Only show in Dashboard section */}
+          {activeTab === "overview" && (
+            <div className="flex items-center justify-between relative border-b border-border py-4 px-2">
+              <div>
+                <h1 className="text-3xl font-bold text-foreground">OffChat Admin Dashboard</h1>
+                <p className="text-muted-foreground">Manage your offline messaging platform</p>
+              </div>
+              <div className="flex items-center space-x-2">
+                <Badge variant="secondary" className="bg-admin-success/20 text-admin-success border-admin-success/30">
+                  System Online
+                </Badge>
+                <ThemeToggle />
+                <Button 
+                  variant="ghost" 
+                  size="sm"
+                  onClick={refreshAllData}
+                  disabled={Object.values(loading).some(isLoading => isLoading)}
+                  className="text-gray-900 hover:text-gray-900 dark:text-gray-100 dark:hover:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-800"
+                >
+                  <RefreshCw className={`w-4 h-4 mr-2 text-gray-900 hover:text-gray-900 dark:text-gray-100 dark:hover:text-gray-100 ${Object.values(loading).some(isLoading => isLoading) ? 'animate-spin' : ''}`} />
+                  {Object.values(loading).some(isLoading => isLoading) ? 'Refreshing...' : 'Refresh Data'}
+                </Button>
+              </div>
             </div>
-            <div className="flex items-center space-x-2">
-              <Badge variant="secondary" className="bg-admin-success/20 text-admin-success border-admin-success/30">
-                System Online
-              </Badge>
-              <ThemeToggle />
-              <Button variant="outline" size="sm">
-                <RefreshCw className="w-4 h-4 mr-2" />
-                Refresh Data
-              </Button>
-            </div>
-          </div>
+          )}
 
-          {/* Stats Overview */}
-          <StatsCards />
+          {/* Error Display */}
+          {Object.entries(errors).some(([_, error]) => error) && (
+            <Alert variant="destructive">
+              <AlertTriangle className="h-4 w-4" />
+              <AlertTitle>Data Loading Errors</AlertTitle>
+              <AlertDescription>
+                <div className="space-y-1">
+                  {Object.entries(errors).map(([key, error]) => 
+                    error && (
+                      <div key={key} className="text-sm">
+                        {key.charAt(0).toUpperCase() + key.slice(1)}: {error}
+                      </div>
+                    )
+                  )}
+                </div>
+              </AlertDescription>
+            </Alert>
+          )}
 
           {/* Main Content Tabs */}
           <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
 
             <TabsContent value="overview" className="space-y-6">
+              {/* Dashboard Stats */}
+              <StatsCards key="stats-cards" />
+              
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 <MessageAnalytics />
                 <BackupManager />
@@ -1013,6 +1307,7 @@ The OffChat Security Team`;
             <TabsContent value="users">
               <div className="space-y-6">
                 <UserManagement
+                  key="user-management"
                   users={users}
                   approveUser={approveUser}
                   rejectUser={rejectUser}
@@ -1022,6 +1317,7 @@ The OffChat Security Team`;
                   deleteUser={handleTrashUser}
                 />
                 <EnhancedUserList
+                  key="enhanced-user-list"
                   users={users}
                   onViewProfile={handleViewProfile}
                   onModerate={handleModerate}
@@ -1101,10 +1397,15 @@ The OffChat Security Team`;
                       </Button>
                       <Button 
                         onClick={handleSaveSettings}
+                        disabled={loading.settings}
                         className="bg-admin-primary hover:bg-admin-primary/90"
                       >
-                        <Save className="w-4 h-4 mr-2" />
-                        Save Settings
+                        {loading.settings ? (
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        ) : (
+                          <Save className="w-4 h-4 mr-2" />
+                        )}
+                        {loading.settings ? 'Saving...' : 'Save Settings'}
                       </Button>
                     </div>
                   </div>
@@ -1224,7 +1525,7 @@ The OffChat Security Team`;
 
                 <MessageAnalytics detailed />
 
-                <MessageHistory onMessageSent={onMessageSent} onTrashMessage={handleTrashMessage} />
+                <MessageHistory />
               </div>
             </TabsContent>
 
@@ -1321,86 +1622,7 @@ The OffChat Security Team`;
                   </CardContent>
                 </Card>
 
-                <Card className="bg-gradient-card border-border/50">
-                  <CardHeader>
-                    <CardTitle>Permission Matrix</CardTitle>
-                    <CardDescription>Overview of all available permissions</CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      <div>
-                        <h4 className="font-medium mb-3">User Management</h4>
-                        <ul className="space-y-2 text-sm">
-                          <li className="flex items-center gap-2">
-                            <div className="w-2 h-2 bg-admin-success rounded-full"></div>
-                            user_management - Create, edit, delete users
-                          </li>
-                          <li className="flex items-center gap-2">
-                            <div className="w-2 h-2 bg-admin-success rounded-full"></div>
-                            role_management - Manage user roles
-                          </li>
-                        </ul>
-                      </div>
-                      <div>
-                        <h4 className="font-medium mb-3">Messaging</h4>
-                        <ul className="space-y-2 text-sm">
-                          <li className="flex items-center gap-2">
-                            <div className="w-2 h-2 bg-admin-primary rounded-full"></div>
-                            send_messages - Send messages
-                          </li>
-                          <li className="flex items-center gap-2">
-                            <div className="w-2 h-2 bg-admin-primary rounded-full"></div>
-                            manage_conversations - Manage conversations
-                          </li>
-                          <li className="flex items-center gap-2">
-                            <div className="w-2 h-2 bg-admin-warning rounded-full"></div>
-                            message_monitoring - Monitor messages
-                          </li>
-                        </ul>
-                      </div>
-                      <div>
-                        <h4 className="font-medium mb-3">System</h4>
-                        <ul className="space-y-2 text-sm">
-                          <li className="flex items-center gap-2">
-                            <div className="w-2 h-2 bg-admin-error rounded-full"></div>
-                            system_settings - System configuration
-                          </li>
-                          <li className="flex items-center gap-2">
-                            <div className="w-2 h-2 bg-admin-error rounded-full"></div>
-                            audit_logs - View audit logs
-                          </li>
-                          <li className="flex items-center gap-2">
-                            <div className="w-2 h-2 bg-admin-error rounded-full"></div>
-                            backup_management - Manage backups
-                          </li>
-                        </ul>
-                      </div>
-                      <div>
-                        <h4 className="font-medium mb-3">Analytics</h4>
-                        <ul className="space-y-2 text-sm">
-                          <li className="flex items-center gap-2">
-                            <div className="w-2 h-2 bg-admin-secondary rounded-full"></div>
-                            view_analytics - View system analytics
-                          </li>
-                        </ul>
-                      </div>
-                    </div>
-                  </CardContent>
-                  <div className="px-6 pb-6 pt-4">
-                    <div className="flex justify-end space-x-2 border-t pt-4">
-                      <Button variant="outline">
-                        Cancel
-                      </Button>
-                      <Button 
-                        onClick={handleSaveSettings}
-                        className="bg-admin-primary hover:bg-admin-primary/90"
-                      >
-                        <Save className="w-4 h-4 mr-2" />
-                        Save Settings
-                      </Button>
-                    </div>
-                  </div>
-                </Card>
+
               </div>
             </TabsContent>
 
@@ -1592,10 +1814,15 @@ The OffChat Security Team`;
                       </Button>
                       <Button 
                         onClick={handleSaveSettings}
+                        disabled={loading.settings}
                         className="bg-admin-primary hover:bg-admin-primary/90"
                       >
-                        <Save className="w-4 h-4 mr-2" />
-                        Save Settings
+                        {loading.settings ? (
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        ) : (
+                          <Save className="w-4 h-4 mr-2" />
+                        )}
+                        {loading.settings ? 'Saving...' : 'Save Settings'}
                       </Button>
                     </div>
                   </div>
@@ -1624,6 +1851,7 @@ The OffChat Security Team`;
             </TabsContent>
 
           </Tabs>
+          </div>
         </div>
       </main>
       
@@ -1821,7 +2049,7 @@ The OffChat Security Team`;
 
       {/* Role Management Dialogs */}
       <Dialog open={showAddRoleDialog} onOpenChange={setShowAddRoleDialog}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Add New Role</DialogTitle>
             <DialogDescription>Create a new user role with specific permissions</DialogDescription>
@@ -1883,7 +2111,7 @@ The OffChat Security Team`;
       </Dialog>
 
       <Dialog open={showEditRoleDialog} onOpenChange={setShowEditRoleDialog}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Edit Role</DialogTitle>
             <DialogDescription>Modify role permissions and settings</DialogDescription>

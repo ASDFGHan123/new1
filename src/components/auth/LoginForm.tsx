@@ -4,30 +4,40 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Eye, EyeOff, MessageCircle } from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Eye, EyeOff, MessageCircle, AlertCircle } from "lucide-react";
 
 interface LoginFormProps {
   onToggleMode: () => void;
   onLogin: (identifier: string, password: string) => void;
+  error?: string | null;
 }
 
 
-export const LoginForm = ({ onToggleMode, onLogin }: LoginFormProps) => {
+export const LoginForm = ({ onToggleMode, onLogin, error }: LoginFormProps) => {
   const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [localError, setLocalError] = useState<string | null>(null);
   const navigate = useNavigate();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
-    setTimeout(() => {
-      onLogin(identifier, password);
-      setIsLoading(false);
+    setLocalError(null);
+    
+    try {
+      await onLogin(identifier, password);
       // Navigation is handled by parent component based on authentication state
-    }, 1000);
+    } catch (err) {
+      setLocalError(err instanceof Error ? err.message : 'Login failed');
+    } finally {
+      setIsLoading(false);
+    }
   };
+
+  const displayError = error || localError;
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background to-muted p-4">
@@ -50,6 +60,12 @@ export const LoginForm = ({ onToggleMode, onLogin }: LoginFormProps) => {
           </div>
         </CardHeader>
         <CardContent>
+          {displayError && (
+            <Alert variant="destructive" className="mb-4">
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>{displayError}</AlertDescription>
+            </Alert>
+          )}
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="identifier">Email or Username</Label>

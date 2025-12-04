@@ -13,13 +13,15 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Send, Settings, LogOut, Users, MessageCircle, Paperclip, X, FileText, Image, Mic, MicOff, Play, Pause, Edit, Check, MoreHorizontal, Trash2, Copy, Forward, Share2, Info, Crown, Shield, User as UserIcon, Hash, Lock, Globe } from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Send, Settings, LogOut, Users, MessageCircle, Paperclip, X, FileText, Image, Mic, MicOff, Play, Pause, Edit, Check, MoreHorizontal, Trash2, Copy, Forward, Share2, Info, Crown, Shield, User as UserIcon, Hash, Lock, Globe, Loader2, RefreshCw, AlertCircle } from "lucide-react";
 import { ImageUpload } from "@/components/ui/image-upload";
 import { Label } from "@/components/ui/label";
 import { User, Group, GroupMessage, Attachment, GroupMember } from "@/types/group";
 import { GroupSidebar } from "./GroupSidebar";
 import { GroupManagementDialog } from "./GroupManagementDialog";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { apiService } from "@/lib/api";
 
 interface GroupChatInterfaceProps {
   user: User;
@@ -70,6 +72,15 @@ export const GroupChatInterface = ({
   const [editMessageContent, setEditMessageContent] = useState("");
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   
+  // API Integration states
+  const [currentGroupMessages, setCurrentGroupMessages] = useState<GroupMessage[]>([]);
+  const [messagesLoading, setMessagesLoading] = useState(false);
+  const [messagesError, setMessagesError] = useState<string | null>(null);
+  const [sendingMessage, setSendingMessage] = useState(false);
+  const [editMessageLoading, setEditMessageLoading] = useState<string | null>(null);
+  const [deleteMessageLoading, setDeleteMessageLoading] = useState<string | null>(null);
+  const [retryCount, setRetryCount] = useState(0);
+  
   // Voice recording states
   const [isRecording, setIsRecording] = useState(false);
   const [recordingDuration, setRecordingDuration] = useState(0);
@@ -86,9 +97,172 @@ export const GroupChatInterface = ({
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
   const currentGroup = groups.find(g => g.id === currentGroupId);
-  const currentGroupMessages = currentGroup ? [] : []; // This would come from your data store
   const isAdmin = currentGroup ? currentGroup.members.find(m => m.userId === user.id)?.role === "admin" : false;
   const isModerator = currentGroup ? currentGroup.members.find(m => m.userId === user.id)?.role === "moderator" : false;
+
+  // API Integration Functions
+  const fetchGroupMessages = async (groupId: string, retryAttempt = 0) => {
+    if (!groupId) return;
+    
+    setMessagesLoading(true);
+    setMessagesError(null);
+    
+    try {
+      const response = await apiService.getMessages(groupId);
+      
+      if (response.success && response.data) {
+        // Convert API messages to GroupMessage format
+        const messages: GroupMessage[] = response.data.map(msg => ({
+          id: msg.id,
+          content: msg.content,
+          senderId: msg.sender,
+          senderName: msg.sender,
+          timestamp: new Date(msg.timestamp),
+          groupId: groupId,
+          attachments: msg.attachments,
+          edited: msg.edited,
+          editedAt: msg.editedAt ? new Date(msg.editedAt) : undefined,
+          forwarded: msg.forwarded,
+          originalSender: msg.originalSender
+        }));
+        
+        setCurrentGroupMessages(messages);
+        setRetryCount(0); // Reset retry count on success
+      } else {
+        throw new Error(response.error || 'Failed to fetch messages');
+      }
+    } catch (error) {
+      console.error('Error fetching messages:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Failed to load messages';
+      setMessagesError(errorMessage);
+      
+      // Retry logic (up to 3 attempts)
+      if (retryAttempt < 3) {
+        setTimeout(() => {
+          fetchGroupMessages(groupId, retryAttempt + 1);
+          setRetryCount(retryAttempt + 1);
+        }, Math.pow(2, retryAttempt) * 1000); // Exponential backoff
+      }
+    } finally {
+      setMessagesLoading(false);
+    }
+  };
+
+  const sendMessageToApi = async (content: string, attachments: File[]) => {
+    if (!currentGroupId) return;
+    
+    setSendingMessage(true);
+    
+    try {
+      const response = await apiService.sendMessage(currentGroupId, content, attachments);
+      
+      if (response.success && response.data) {
+        // Add the new message to the local state
+        const newMessage: GroupMessage = {
+          id: response.data.id,
+          content: response.data.content,
+          senderId: response.data.sender,
+          senderName: response.data.sender,
+          timestamp: new Date(response.data.timestamp),
+          groupId: currentGroupId,
+          attachments: response.data.attachments,
+          edited: response.data.edited,
+          editedAt: response.data.editedAt ? new Date(response.data.editedAt) : undefined,
+          forwarded: response.data.forwarded,
+          originalSender: response.data.originalSender
+        };
+        
+        setCurrentGroupMessages(prev => [...prev, newMessage]);
+        
+        // Call the original callback if provided
+        if (onSendMessage) {
+          onSendMessage(currentGroupId, content, attachments);
+        }
+      } else {
+        throw new Error(response.error || 'Failed to send message');
+      }
+    } catch (error) {
+      console.error('Error sending message:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Failed to send message';
+      setMessagesError(errorMessage);
+    } finally {
+      setSendingMessage(false);
+    }
+  };
+
+  const editMessageInApi = async (messageId: string, content: string) => {
+    if (!currentGroupId) return;
+    
+    setEditMessageLoading(messageId);
+    
+    try {
+      // Call the edit message API endpoint
+      const response = await apiService.request(`/chat/messages/${messageId}/`, {
+        method: 'PATCH',
+        body: JSON.stringify({ content })
+      });
+      
+      if (response.success) {
+        // Update the local message state
+        setCurrentGroupMessages(prev => 
+          prev.map(msg => 
+            msg.id === messageId 
+              ? { ...msg, content, edited: true, editedAt: new Date() }
+              : msg
+          )
+        );
+        
+        // Call the original callback if provided
+        if (onEditMessage) {
+          onEditMessage(currentGroupId, messageId, content);
+        }
+      } else {
+        throw new Error(response.error || 'Failed to edit message');
+      }
+    } catch (error) {
+      console.error('Error editing message:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Failed to edit message';
+      setMessagesError(errorMessage);
+    } finally {
+      setEditMessageLoading(null);
+    }
+  };
+
+  const deleteMessageFromApi = async (messageId: string) => {
+    if (!currentGroupId) return;
+    
+    setDeleteMessageLoading(messageId);
+    
+    try {
+      const response = await apiService.request(`/chat/messages/${messageId}/`, {
+        method: 'DELETE'
+      });
+      
+      if (response.success) {
+        // Remove the message from local state
+        setCurrentGroupMessages(prev => prev.filter(msg => msg.id !== messageId));
+        
+        // Call the original callback if provided
+        if (onDeleteMessage) {
+          onDeleteMessage(currentGroupId, messageId);
+        }
+      } else {
+        throw new Error(response.error || 'Failed to delete message');
+      }
+    } catch (error) {
+      console.error('Error deleting message:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Failed to delete message';
+      setMessagesError(errorMessage);
+    } finally {
+      setDeleteMessageLoading(null);
+    }
+  };
+
+  const handleRetryMessages = () => {
+    if (currentGroupId) {
+      fetchGroupMessages(currentGroupId);
+    }
+  };
 
   // Sync avatar with user prop
   useEffect(() => {
@@ -101,6 +275,13 @@ export const GroupChatInterface = ({
       onUpdateUser({ avatar });
     }
   }, [avatar, user.avatar, onUpdateUser]);
+
+  // Fetch messages when current group changes
+  useEffect(() => {
+    if (currentGroupId) {
+      fetchGroupMessages(currentGroupId);
+    }
+  }, [currentGroupId]);
 
   const addFiles = (files: FileList | null) => {
     if (!files) return;
@@ -227,10 +408,13 @@ export const GroupChatInterface = ({
     setOpenMenuId(null);
   };
 
-  const saveMessageEdit = () => {
+  const saveMessageEdit = async () => {
     if (!editingMessageId || !editMessageContent.trim() || !currentGroupId) return;
 
-    onEditMessage(currentGroupId, editingMessageId, editMessageContent.trim());
+    const content = editMessageContent.trim();
+    
+    // Use the new API integration
+    await editMessageInApi(editingMessageId, content);
 
     setEditingMessageId(null);
     setEditMessageContent("");
@@ -241,34 +425,27 @@ export const GroupChatInterface = ({
     setEditMessageContent("");
   };
 
-  const handleSendMessage = (e?: React.FormEvent | React.KeyboardEvent) => {
+  const handleSendMessage = async (e?: React.FormEvent | React.KeyboardEvent) => {
     if (e) {
       e.preventDefault();
     }
     if (!message.trim() && attachments.length === 0 && !audioBlob) return;
     if (!currentGroupId) return;
 
-    const newAttachments: Attachment[] = [
-      ...attachments.map((file, index) => ({
-        id: `attachment-${Date.now()}-${index}`,
-        name: file.name,
-        type: file.type,
-        size: file.size,
-        url: URL.createObjectURL(file),
-        uploadedAt: new Date().toISOString()
-      })),
-      ...(audioBlob ? [{
-        id: `voice-${Date.now()}`,
-        name: `Voice message ${formatDuration(recordingDuration)}`,
-        type: 'audio/webm',
-        size: audioBlob.size,
-        url: audioUrl!,
-        uploadedAt: new Date().toISOString(),
-        duration: recordingDuration
-      }] : [])
-    ];
+    const messageText = message.trim();
+    const filesToSend = [...attachments];
+    
+    // Add audio blob to attachments if recording
+    if (audioBlob && audioUrl) {
+      // Convert audio blob to file for upload
+      const audioFile = new File([audioBlob], `voice-message-${Date.now()}.webm`, {
+        type: 'audio/webm'
+      });
+      filesToSend.push(audioFile);
+    }
 
-    onSendMessage(currentGroupId, message, newAttachments);
+    // Use the new API integration
+    await sendMessageToApi(messageText, filesToSend);
 
     setMessage("");
     setAttachments([]);
@@ -509,6 +686,36 @@ export const GroupChatInterface = ({
         {/* Messages */}
         <ScrollArea className="flex-1 p-6">
           <div className="space-y-4">
+            {/* Error Message */}
+            {messagesError && (
+              <Alert className="border-red-200 bg-red-50">
+                <AlertCircle className="h-4 w-4 text-red-600" />
+                <AlertDescription className="text-red-800">
+                  <div className="flex items-center justify-between">
+                    <span>{messagesError}</span>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleRetryMessages}
+                      disabled={retryCount >= 3}
+                      className="ml-2"
+                    >
+                      <RefreshCw className={`h-3 w-3 mr-1 ${retryCount > 0 ? 'animate-spin' : ''}`} />
+                      Retry ({retryCount}/3)
+                    </Button>
+                  </div>
+                </AlertDescription>
+              </Alert>
+            )}
+            
+            {/* Loading State */}
+            {messagesLoading && (
+              <div className="text-center py-8">
+                <Loader2 className="h-8 w-8 animate-spin mx-auto mb-2 text-primary" />
+                <p className="text-muted-foreground">Loading messages...</p>
+              </div>
+            )}
+
             {currentGroupMessages.length === 0 ? (
               <div className="text-center py-12">
                 <div className="mx-auto w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mb-4">
@@ -541,8 +748,65 @@ export const GroupChatInterface = ({
                       </div>
                     )}
                     
-                    {/* Message content would go here */}
-                    <p className="text-sm text-foreground">{msg.content}</p>
+                    {/* Message content */}
+                    {editingMessageId === msg.id ? (
+                      <div className="space-y-2">
+                        <Input
+                          value={editMessageContent}
+                          onChange={(e) => setEditMessageContent(e.target.value)}
+                          className="text-sm"
+                          placeholder="Edit your message..."
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' && !e.shiftKey) {
+                              e.preventDefault();
+                              saveMessageEdit();
+                            } else if (e.key === 'Escape') {
+                              cancelMessageEdit();
+                            }
+                          }}
+                          autoFocus
+                        />
+                        <div className="flex gap-1">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={saveMessageEdit}
+                            disabled={editMessageLoading === msg.id}
+                          >
+                            {editMessageLoading === msg.id ? (
+                              <Loader2 className="h-3 w-3 animate-spin" />
+                            ) : (
+                              <Check className="h-3 w-3" />
+                            )}
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={cancelMessageEdit}
+                            disabled={editMessageLoading === msg.id}
+                          >
+                            <X className="h-3 w-3" />
+                          </Button>
+                        </div>
+                      </div>
+                    ) : (
+                      <p className="text-sm text-foreground">{msg.content}</p>
+                    )}
+                    
+                    {/* Attachments */}
+                    {msg.attachments && msg.attachments.length > 0 && (
+                      <div className="mt-2 space-y-1">
+                        {msg.attachments.map(attachment => (
+                          <div key={attachment.id} className="flex items-center gap-2 p-2 bg-muted/50 rounded">
+                            {getFileIcon(attachment.name, attachment.type)}
+                            <span className="text-xs truncate">{attachment.name}</span>
+                            <span className="text-xs text-muted-foreground">
+                              ({formatFileSize(attachment.size)})
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                     
                     <div className="flex items-center justify-between mt-1">
                       <p className="text-xs opacity-70">
@@ -550,7 +814,44 @@ export const GroupChatInterface = ({
                           hour: "2-digit",
                           minute: "2-digit",
                         })}
+                        {msg.edited && <span className="ml-1">(edited)</span>}
                       </p>
+                      
+                      {/* Message actions */}
+                      {(isAdmin || isModerator || msg.senderId === user.id) && (
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="sm" className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100">
+                              <MoreHorizontal className="h-3 w-3" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            {msg.senderId === user.id && (
+                              <DropdownMenuItem 
+                                onClick={() => startEditingMessage(msg.id, msg.content)}
+                                disabled={editMessageLoading === msg.id}
+                              >
+                                <Edit className="h-3 w-3 mr-2" />
+                                Edit
+                              </DropdownMenuItem>
+                            )}
+                            {(isAdmin || isModerator) && (
+                              <DropdownMenuItem 
+                                onClick={() => deleteMessageFromApi(msg.id)}
+                                disabled={deleteMessageLoading === msg.id}
+                                className="text-red-600"
+                              >
+                                {deleteMessageLoading === msg.id ? (
+                                  <Loader2 className="h-3 w-3 mr-2 animate-spin" />
+                                ) : (
+                                  <Trash2 className="h-3 w-3 mr-2" />
+                                )}
+                                Delete
+                              </DropdownMenuItem>
+                            )}
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -679,9 +980,13 @@ export const GroupChatInterface = ({
             </div>
             <Button
               type="submit"
-              disabled={attachments.length === 0 && !message.trim() && !audioBlob}
+              disabled={(attachments.length === 0 && !message.trim() && !audioBlob) || sendingMessage}
             >
-              <Send className="h-4 w-4" />
+              {sendingMessage ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Send className="h-4 w-4" />
+              )}
             </Button>
           </form>
         </div>

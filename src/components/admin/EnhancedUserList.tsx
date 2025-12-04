@@ -9,18 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { openPrintWindow, generateEnhancedUserListHTML } from "@/lib/printUtils";
-
-interface User {
-  id: string;
-  username: string;
-  email: string;
-  status: "active" | "suspended" | "banned";
-  role: string;
-  joinDate: string;
-  lastActive: string;
-  messageCount: number;
-  reportCount: number;
-}
+import { User } from "@/lib/api";
 
 interface EnhancedUserListProps {
   users: User[];
@@ -120,7 +109,8 @@ export const EnhancedUserList = ({ users, onViewProfile, onModerate, onDataManag
       </CardHeader>
       
       <CardContent>
-        <Table>
+        <div className="max-h-[600px] overflow-y-auto">
+          <Table>
           <TableHeader>
             <TableRow>
               <TableHead>User</TableHead>
@@ -153,7 +143,7 @@ export const EnhancedUserList = ({ users, onViewProfile, onModerate, onDataManag
                 <TableCell>
                   <Badge variant="outline">{user.role}</Badge>
                 </TableCell>
-                <TableCell>{user.messageCount.toLocaleString()}</TableCell>
+                <TableCell>{(user.messageCount || 0).toLocaleString()}</TableCell>
                 <TableCell>
                   {user.reportCount > 0 ? (
                     <Badge variant="destructive">{user.reportCount}</Badge>
@@ -189,8 +179,9 @@ export const EnhancedUserList = ({ users, onViewProfile, onModerate, onDataManag
                 </TableCell>
               </TableRow>
             ))}
-          </TableBody>
-        </Table>
+            </TableBody>
+          </Table>
+        </div>
       </CardContent>
     </Card>
   );

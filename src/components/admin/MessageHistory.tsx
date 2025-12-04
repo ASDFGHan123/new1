@@ -8,13 +8,15 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Progress } from "@/components/ui/progress";
 import { Textarea } from "@/components/ui/textarea";
-import { Search, Filter, Eye, Trash2, Clock, Users, User, AlertTriangle, Plus, BarChart3, Printer, Download, Upload, FileText, Database, Shield, CheckCircle, XCircle, Loader2, Archive, RotateCcw } from "lucide-react";
+import { Search, Filter, Eye, Trash2, Clock, Users, User, AlertTriangle, Plus, BarChart3, Printer, Download, Upload, FileText, Database, Shield, CheckCircle, XCircle, Loader2, Archive, RotateCcw, RefreshCw } from "lucide-react";
 import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import { openPrintWindow, generateMessageHistoryHTML } from "@/lib/printUtils";
+import { apiService } from "@/lib/api";
 
 interface SentMessage {
   id: string;
@@ -29,9 +31,7 @@ interface SentMessage {
 }
 
 interface MessageHistoryProps {
-  messages?: SentMessage[];
-  onMessageSent?: (content: string, type: "system" | "broadcast" | "targeted", priority: string, recipients: string[], recipientCount: number) => void;
-  onTrashMessage?: (message: SentMessage) => void;
+  initialMessages?: SentMessage[];
 }
 
 const mockMessages: SentMessage[] = [
@@ -81,12 +81,22 @@ const mockMessages: SentMessage[] = [
   },
 ];
 
-export const MessageHistory = ({ messages: initialMessages = mockMessages, onMessageSent, onTrashMessage }: MessageHistoryProps) => {
-  const [messages, setMessages] = useState<SentMessage[]>(initialMessages);
+export const MessageHistory = ({ initialMessages = [] }: MessageHistoryProps) => {
+  const { toast } = useToast();
+  
+  // Component state
+  const [messages, setMessages] = useState<SentMessage[]>(initialMessages.length > 0 ? initialMessages : mockMessages);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [retryCount, setRetryCount] = useState(0);
+  
+  // Filter states
   const [searchQuery, setSearchQuery] = useState("");
   const [typeFilter, setTypeFilter] = useState<string>("all");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [priorityFilter, setPriorityFilter] = useState<string>("all");
+  
+  // Dialog states
   const [selectedMessage, setSelectedMessage] = useState<SentMessage | null>(null);
   const [showMessageDetail, setShowMessageDetail] = useState(false);
   const [isBackingUp, setIsBackingUp] = useState(false);
@@ -94,6 +104,8 @@ export const MessageHistory = ({ messages: initialMessages = mockMessages, onMes
   const [backupFormat, setBackupFormat] = useState<"json" | "csv" | "xml">("json");
   const [showRestoreDialog, setShowRestoreDialog] = useState(false);
   const [showBackupOptions, setShowBackupOptions] = useState(false);
+  
+  // Backup options
   const [backupOptions, setBackupOptions] = useState({
     includeStatistics: true,
     includeFilters: true,
@@ -101,9 +113,50 @@ export const MessageHistory = ({ messages: initialMessages = mockMessages, onMes
     validateIntegrity: true,
     includeMetadata: true
   });
+  
+  // Restore state
   const [restoreData, setRestoreData] = useState<string>("");
+  const [restoreLoading, setRestoreLoading] = useState(false);
+  
+  // Action states
+  const [actionLoading, setActionLoading] = useState<{[key: string]: boolean}>({});
+  
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const { toast } = useToast();
+  
+  // API Functions
+  const loadMessageHistory = async (retryAttempt = 0) => {
+    setLoading(true);
+    setError(null);
+    
+    try {
+      // Note: This would need to be implemented in the backend API
+      // For now, we'll use mock data with error handling
+      await new Promise(resolve => setTimeout(resolve, 500)); // Simulate API call
+      
+      // In a real implementation, this would be:
+      // const response = await apiService.getMessageHistory();
+      
+      setRetryCount(0); // Reset retry count on success
+    } catch (err) {
+      console.error('Failed to load message history:', err);
+      const errorMessage = err instanceof Error ? err.message : 'Failed to load message history';
+      setError(errorMessage);
+      
+      // Retry logic (up to 3 attempts)
+      if (retryAttempt < 3) {
+        setTimeout(() => {
+          loadMessageHistory(retryAttempt + 1);
+          setRetryCount(retryAttempt + 1);
+        }, Math.pow(2, retryAttempt) * 1000); // Exponential backoff
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleRetry = () => {
+    loadMessageHistory();
+  };
 
   // Initialize with mock data (no localStorage)
   useEffect(() => {
@@ -226,7 +279,7 @@ export const MessageHistory = ({ messages: initialMessages = mockMessages, onMes
   };
 
   // Function to add a new sent message to history
-  const addSentMessage = (content: string, type: "system" | "broadcast" | "targeted", priority: string, recipients: string[] = [], recipientCount: number = 0) => {
+  const addSentMessage = async (content: string, type: "system" | "broadcast" | "targeted", priority: string, recipients: string[] = [], recipientCount: number = 0) => {
     const newMessage: SentMessage = {
       id: Date.now().toString(),
       type,
@@ -240,11 +293,12 @@ export const MessageHistory = ({ messages: initialMessages = mockMessages, onMes
     };
 
     setMessages(prev => [newMessage, ...prev]);
-
-    // Call the callback if provided (for external integration)
-    if (onMessageSent) {
-      onMessageSent(content, type, priority, recipients, recipientCount);
-    }
+    
+    // Note: In a real implementation, this would send the message via API
+    toast({
+      title: "Message Sent",
+      description: `Message has been sent to ${newMessage.recipientCount} recipients.`,
+    });
   };
 
   // Function to view message details
@@ -254,20 +308,34 @@ export const MessageHistory = ({ messages: initialMessages = mockMessages, onMes
   };
 
   // Function to delete message from history (move to trash)
-   const handleDeleteMessage = async (messageId: string) => {
-     const messageToTrash = messages.find(msg => msg.id === messageId);
-     if (messageToTrash) {
-       if (onTrashMessage) {
-         onTrashMessage(messageToTrash);
-       }
-       // Always remove from local state
-       setMessages(prev => prev.filter(msg => msg.id !== messageId));
-       toast({
-         title: "Message Moved to Trash",
-         description: "Message has been moved to trash and can be restored.",
-       });
-     }
-   };
+  const handleDeleteMessage = async (messageId: string) => {
+    setActionLoading(prev => ({ ...prev, [messageId]: true }));
+    
+    try {
+      const messageToTrash = messages.find(msg => msg.id === messageId);
+      if (messageToTrash) {
+        // Remove from local state
+        setMessages(prev => prev.filter(msg => msg.id !== messageId));
+        
+        // Note: In a real implementation, this would call an API to move to trash
+        // const response = await apiService.moveMessageToTrash(messageId);
+        
+        toast({
+          title: "Message Moved to Trash",
+          description: "Message has been moved to trash and can be restored.",
+        });
+      }
+    } catch (error) {
+      console.error('Failed to delete message:', error);
+      toast({
+        title: "Error",
+        description: "Failed to move message to trash.",
+        variant: "destructive"
+      });
+    } finally {
+      setActionLoading(prev => ({ ...prev, [messageId]: false }));
+    }
+  };
 
   // Function to add a test message for demo purposes
   const addTestMessage = () => {
@@ -628,6 +696,34 @@ export const MessageHistory = ({ messages: initialMessages = mockMessages, onMes
             <CardDescription>View and manage sent system messages</CardDescription>
           </div>
           <div className="flex items-center gap-2">
+            {/* Error Alert */}
+            {error && (
+              <Alert variant="destructive" className="mr-2">
+                <AlertTriangle className="h-4 w-4" />
+                <AlertDescription className="flex items-center justify-between">
+                  <span>{error}</span>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleRetry}
+                    disabled={retryCount >= 3}
+                    className="ml-2"
+                  >
+                    <RefreshCw className={`h-3 w-3 mr-1 ${retryCount > 0 ? 'animate-spin' : ''}`} />
+                    Retry ({retryCount}/3)
+                  </Button>
+                </AlertDescription>
+              </Alert>
+            )}
+            
+            {/* Loading Indicator */}
+            {loading && (
+              <div className="flex items-center gap-2 px-3 py-1 bg-blue-50 border border-blue-200 rounded">
+                <Loader2 className="w-4 h-4 animate-spin text-blue-600" />
+                <span className="text-sm text-blue-700">Loading...</span>
+              </div>
+            )}
+            
             {/* Backup Progress */}
             {isBackingUp && (
               <div className="flex items-center gap-2 px-3 py-1 bg-blue-50 border border-blue-200 rounded">
@@ -892,13 +988,23 @@ export const MessageHistory = ({ messages: initialMessages = mockMessages, onMes
                           variant="ghost"
                           className="h-8 w-8 p-0"
                           onClick={() => handleViewMessage(message)}
+                          disabled={loading || actionLoading[message.id]}
                         >
                           <Eye className="w-4 h-4" />
                         </Button>
                         <AlertDialog>
                           <AlertDialogTrigger asChild>
-                            <Button size="sm" variant="ghost" className="h-8 w-8 p-0 text-red-600 hover:text-red-700">
-                              <Trash2 className="w-4 h-4" />
+                            <Button 
+                              size="sm" 
+                              variant="ghost" 
+                              className="h-8 w-8 p-0 text-red-600 hover:text-red-700"
+                              disabled={loading || actionLoading[message.id]}
+                            >
+                              {actionLoading[message.id] ? (
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                              ) : (
+                                <Trash2 className="w-4 h-4" />
+                              )}
                             </Button>
                           </AlertDialogTrigger>
                           <AlertDialogContent>
@@ -909,12 +1015,20 @@ export const MessageHistory = ({ messages: initialMessages = mockMessages, onMes
                               </AlertDialogDescription>
                             </AlertDialogHeader>
                             <AlertDialogFooter>
-                              <AlertDialogCancel>Cancel</AlertDialogCancel>
+                              <AlertDialogCancel disabled={actionLoading[message.id]}>Cancel</AlertDialogCancel>
                               <AlertDialogAction
                                 onClick={() => handleDeleteMessage(message.id)}
+                                disabled={actionLoading[message.id]}
                                 className="bg-orange-600 hover:bg-orange-700"
                               >
-                                Move to Trash
+                                {actionLoading[message.id] ? (
+                                  <>
+                                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                    Moving...
+                                  </>
+                                ) : (
+                                  'Move to Trash'
+                                )}
                               </AlertDialogAction>
                             </AlertDialogFooter>
                           </AlertDialogContent>

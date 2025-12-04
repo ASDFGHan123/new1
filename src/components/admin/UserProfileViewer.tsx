@@ -17,19 +17,9 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import { User as ApiUser } from "@/lib/api";
 
-interface UserProfile {
-  id: string;
-  username: string;
-  email: string;
-  role: string;
-  status: "active" | "suspended" | "banned";
-  joinDate: string;
-  lastActive: string;
-  messageCount: number;
-  reportCount: number;
-  avatar?: string;
-}
+type UserProfile = ApiUser;
 
 interface UserProfileViewerProps {
   user: UserProfile | null;

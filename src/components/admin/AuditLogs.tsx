@@ -314,7 +314,8 @@ export const AuditLogs = () => {
       </CardHeader>
       
       <CardContent>
-        <Table>
+        <div className="max-h-[600px] overflow-y-auto">
+          <Table>
           <TableHeader>
             <TableRow>
               <TableHead
@@ -430,8 +431,9 @@ export const AuditLogs = () => {
                 </TableRow>
               ))
             )}
-          </TableBody>
-        </Table>
+            </TableBody>
+          </Table>
+        </div>
 
         {/* Pagination */}
         {totalPages > 1 && (

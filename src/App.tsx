@@ -4,9 +4,10 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { ThemeProvider } from "next-themes";
-import { Suspense, lazy, useState } from "react";
+import { Suspense, lazy, useState, useEffect } from "react";
 import { LoadingPage } from "@/components/ui/loading";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
+import { apiService, User, Conversation, MessageTemplate, Role } from "@/lib/api";
 
 // Type definitions to match AdminDashboard interfaces
 interface AppUser {
@@ -186,48 +187,84 @@ const App = () => {
     }
   ]);
 
-  // Enhanced user list with full profile data
-  const [users, setUsers] = useState<AppUser[]>([
-    {
-      id: "user1",
-      username: "john_doe",
-      email: "john@example.com",
-      password: "password",
-      status: "active" as const,
-      role: "user",
-      joinDate: "2024-01-15",
-      lastActive: "1 hour ago",
-      messageCount: 89,
-      reportCount: 1,
-      avatar: undefined
-    },
-    {
-      id: "user2",
-      username: "jane_smith",
-      email: "jane@example.com",
-      password: "password",
-      status: "suspended" as const,
-      role: "user",
-      joinDate: "2024-01-10",
-      lastActive: "3 days ago",
-      messageCount: 156,
-      reportCount: 3,
-      avatar: undefined
-    },
-    {
-      id: "admin",
-      username: "admin",
-      email: "admin@offchat.com",
-      password: "12341234",
-      status: "active" as const,
-      role: "admin",
-      joinDate: "2024-01-01",
-      lastActive: "2 minutes ago",
-      messageCount: 1250,
-      reportCount: 0,
-      avatar: undefined
+  // Real data from API
+  const [users, setUsers] = useState<AppUser[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  // Load users from API (only after authentication)
+  useEffect(() => {
+    const loadUsers = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        
+        // Check if we have an auth token and are authenticated
+        const authToken = apiService.getAuthToken();
+        if (!authToken) {
+          // Not authenticated yet, use mock data
+          setUsers([
+            {
+              id: "admin",
+              username: "admin",
+              email: "admin@offchat.com",
+              status: "active" as const,
+              role: "admin",
+              joinDate: "2024-01-01",
+              lastActive: "Just now",
+              messageCount: 0,
+              reportCount: 0,
+              avatar: undefined
+            }
+          ]);
+          setLoading(false);
+          return;
+        }
+
+        const response = await apiService.getUsers();
+        if (response.success && response.data) {
+          setUsers(response.data as AppUser[]);
+        } else if (response.error === 'Authentication failed. Please log in again.') {
+          // Authentication expired, clear tokens and use mock data
+          apiService.logout();
+          setUsers([
+            {
+              id: "admin",
+              username: "admin",
+              email: "admin@offchat.com",
+              status: "active" as const,
+              role: "admin",
+              joinDate: "2024-01-01",
+              lastActive: "Just now",
+              messageCount: 0,
+              reportCount: 0,
+              avatar: undefined
+            }
+          ]);
+          setError('Session expired. Please log in again.');
+        } else {
+          setError('Failed to load users: ' + (response.error || 'Unknown error'));
+          // Fallback to empty array if API fails
+          setUsers([]);
+        }
+      } catch (err) {
+        console.error('Error loading users:', err);
+        setError('Failed to connect to server');
+        // Fallback to empty array if API fails
+        setUsers([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    // Load users when component mounts or when auth token becomes available
+    const authToken = apiService.getAuthToken();
+    if (authToken || !user) {
+      loadUsers();
+    } else {
+      setLoading(false);
     }
-  ]);
+  }, [user]);
 
   // Update current user
   const handleUpdateUser = (updates: Partial<typeof user>) => {
@@ -318,19 +355,57 @@ const App = () => {
   };
 
   // Admin login handler
-  const handleAdminLogin = (identifier: string, password: string): boolean => {
-    const userObj = users.find(u => u.username === identifier || u.email === identifier);
-    if (!userObj || userObj.password !== password) {
+  const handleAdminLogin = async (identifier: string, password: string): Promise<boolean> => {
+    try {
+      console.log('=== APP LOGIN HANDLER DEBUG ===');
+      console.log('Identifier:', identifier);
+      console.log('Password:', password);
+      
+      const response = await apiService.login({ username: identifier, password });
+      console.log('App received response:', response);
+      
+      if (response.success && response.data) {
+        const userData = response.data;
+        const tokens = response.data;
+        
+        console.log('User data:', userData);
+        console.log('Tokens:', tokens);
+        
+        // Check if user is admin
+        if (userData.user.role !== "admin") {
+          alert("Access denied. Admin privileges required.");
+          return false;
+        }
+        
+        // Set authenticated user
+        setUser({ 
+          id: userData.user.id, 
+          username: userData.user.username, 
+          status: "online", 
+          role: userData.user.role,
+          avatar: userData.user.avatar 
+        });
+        
+        // Store token for future requests
+        apiService.setAuthToken(tokens.access);
+        
+        // Reload users after successful login
+        const usersResponse = await apiService.getUsers();
+        if (usersResponse.success && usersResponse.data) {
+          setUsers(usersResponse.data as AppUser[]);
+        }
+        
+        return true;
+      } else {
+        console.log('Login failed in app handler:', response.error);
+        alert("Login failed. Please check your credentials.");
+        return false;
+      }
+    } catch (error) {
+      console.error('Login error:', error);
+      alert("Login failed. Please try again.");
       return false;
     }
-    if (userObj.role !== "admin") {
-      return false;
-    }
-    if (userObj.status !== "active") {
-      return false;
-    }
-    setUser({ id: userObj.id, username: userObj.username, status: "online", role: userObj.role });
-    return true;
   };
 
   // Admin actions

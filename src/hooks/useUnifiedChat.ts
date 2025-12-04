@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useGroupChat } from "@/hooks/useGroupChat";
+import { apiService, User as ApiUser, Conversation as ApiConversation, Message as ApiMessage } from "@/lib/api";
 import { 
   Conversation, 
   IndividualMessage, 
@@ -98,15 +99,164 @@ export const useUnifiedChat = (): UnifiedChatData => {
   
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [currentConversationId, setCurrentConversationId] = useState<string | null>(null);
-  const [individualMessages, setIndividualMessages] = useState<Record<string, IndividualMessage[]>>(sampleIndividualMessages);
+  const [individualMessages, setIndividualMessages] = useState<Record<string, IndividualMessage[]>>({});
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [availableUsers, setAvailableUsers] = useState<User[]>([]);
 
-  // Initialize conversations when auth user changes
+  // Load data from API
   useEffect(() => {
     if (!authUser) return;
 
-    // Create conversations from group chat data
+    const loadData = async () => {
+      setLoading(true);
+      setError(null);
+
+      try {
+        // Load users for search and individual conversations
+        const usersResponse = await apiService.getUsers();
+        if (usersResponse.success && Array.isArray(usersResponse.data)) {
+          // Filter out current user and convert status
+          const otherUsers = usersResponse.data
+            .filter((user: any) => user.id !== authUser.id)
+            .map((user: any) => ({
+              id: user.id,
+              username: user.username,
+              avatar: user.avatar,
+              status: (user.status === 'active' ? 'online' : user.status === 'away' ? 'away' : 'offline') as "online" | "away" | "offline"
+            }));
+          setAvailableUsers(otherUsers);
+        }
+
+        // Load conversations
+        const conversationsResponse = await apiService.getConversations();
+        if (conversationsResponse.success && Array.isArray(conversationsResponse.data)) {
+          // Convert API conversations to local format
+          const convertedConversations: Conversation[] = conversationsResponse.data.map((conv: any) => {
+            const participants = conv.participants.map((p: any) => ({
+              id: p.id,
+              username: p.username,
+              avatar: p.avatar,
+              status: 'offline' as "online" | "away" | "offline"
+            }));
+
+            let lastMessage;
+            if (conv.lastMessage) {
+              lastMessage = {
+                id: conv.lastMessage.id,
+                content: conv.lastMessage.content,
+                senderId: conv.lastMessage.sender,
+                timestamp: new Date(conv.lastMessage.timestamp),
+                receiverId: conv.type === 'individual' ? 
+                  participants.find((p: any) => p.id !== authUser.id)?.id || authUser.id :
+                  authUser.id,
+                attachments: conv.lastMessage.attachments,
+                edited: conv.lastMessage.edited,
+                editedAt: conv.lastMessage.editedAt ? new Date(conv.lastMessage.editedAt) : undefined,
+                forwarded: conv.lastMessage.forwarded,
+                originalSender: conv.lastMessage.originalSender
+              };
+            }
+
+            return {
+              id: conv.id,
+              type: conv.type === 'group' ? 'group' : 'individual' as const,
+              participants,
+              lastMessage,
+              lastActivity: new Date(conv.createdAt),
+              unreadCount: 0,
+              groupId: conv.type === 'group' ? conv.id : undefined,
+              groupName: conv.type === 'group' ? conv.title : undefined,
+              userId: conv.type === 'individual' ? 
+                participants.find((p: any) => p.id !== authUser.id)?.id : undefined
+            };
+          });
+
+          // Add group conversations from groupChatHook
+          const groupConversations: Conversation[] = groupChatHook.groups.map(group => ({
+            id: `group-${group.id}`,
+            type: 'group',
+            participants: group.members.map(member => ({
+              id: member.userId,
+              username: member.username,
+              avatar: member.avatar,
+              status: "online" as const // This would come from actual presence data
+            })),
+            lastMessage: groupChatHook.messages[group.id]?.[groupChatHook.messages[group.id].length - 1],
+            lastActivity: group.lastActivity || group.updatedAt,
+            unreadCount: group.unreadCount,
+            groupId: group.id,
+            groupName: group.name,
+            groupAvatar: group.avatar,
+            isGroupPrivate: group.isPrivate
+          }));
+
+          // Combine conversations
+          const allConversations = [...convertedConversations, ...groupConversations]
+            .sort((a, b) => b.lastActivity.getTime() - a.lastActivity.getTime());
+
+          setConversations(allConversations);
+          
+          // Load messages for each conversation
+          const messagePromises = allConversations.map(async (conv) => {
+            if (conv.type === 'individual') {
+              const messagesResponse = await apiService.getMessages(conv.id);
+              if (messagesResponse.success && Array.isArray(messagesResponse.data)) {
+                const convertedMessages: IndividualMessage[] = messagesResponse.data.map(msg => ({
+                  id: msg.id,
+                  content: msg.content,
+                  senderId: msg.sender,
+                  receiverId: msg.sender === authUser.id ? conv.userId! : authUser.id,
+                  timestamp: new Date(msg.timestamp),
+                  attachments: msg.attachments?.map(att => ({
+                    id: att.id,
+                    name: att.name,
+                    type: att.type,
+                    size: att.size,
+                    url: att.url,
+                    uploadedAt: att.uploadedAt
+                  })),
+                  edited: msg.edited,
+                  editedAt: msg.editedAt ? new Date(msg.editedAt) : undefined,
+                  forwarded: msg.forwarded,
+                  originalSender: msg.originalSender
+                }));
+                
+                setIndividualMessages(prev => ({
+                  ...prev,
+                  [conv.id]: convertedMessages
+                }));
+              }
+            }
+          });
+
+          await Promise.all(messagePromises);
+          
+          // Set current conversation to the most recent one if none selected
+          if (!currentConversationId && allConversations.length > 0) {
+            setCurrentConversationId(allConversations[0].id);
+          }
+        }
+      } catch (err) {
+        console.error('Failed to load chat data:', err);
+        setError(err instanceof Error ? err.message : 'Failed to load data');
+        
+        // Fallback to sample data if API fails
+        const fallbackConversations = createFallbackConversations();
+        setConversations(fallbackConversations);
+        setIndividualMessages(sampleIndividualMessages);
+        setAvailableUsers(sampleUsers);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadData();
+  }, [authUser, groupChatHook.groups, groupChatHook.messages, currentConversationId]);
+
+  // Helper function to create fallback conversations when API fails
+  const createFallbackConversations = (): Conversation[] => {
+    // Create group conversations from groupChatHook data
     const groupConversations: Conversation[] = groupChatHook.groups.map(group => ({
       id: `group-${group.id}`,
       type: 'group',
@@ -114,7 +264,7 @@ export const useUnifiedChat = (): UnifiedChatData => {
         id: member.userId,
         username: member.username,
         avatar: member.avatar,
-        status: "online" // This would come from actual presence data
+        status: "online" as const
       })),
       lastMessage: groupChatHook.messages[group.id]?.[groupChatHook.messages[group.id].length - 1],
       lastActivity: group.lastActivity || group.updatedAt,
@@ -125,36 +275,8 @@ export const useUnifiedChat = (): UnifiedChatData => {
       isGroupPrivate: group.isPrivate
     }));
 
-    // Create individual conversations
-    const individualConversations: Conversation[] = sampleUsers
-      .filter(u => sampleIndividualMessages[`individual-${authUser.id}-${u.id}`]?.length > 0)
-      .map(user => {
-        const conversationId = `individual-${authUser.id}-${user.id}`;
-        const messages = sampleIndividualMessages[conversationId] || [];
-        const lastMessage = messages[messages.length - 1];
-        
-        return {
-          id: conversationId,
-          type: 'individual' as const,
-          participants: [authUser, user],
-          lastMessage,
-          lastActivity: lastMessage?.timestamp || new Date(),
-          unreadCount: 0, // This would be calculated based on read status
-          userId: user.id
-        };
-      });
-
-    // Combine and sort conversations by last activity
-    const allConversations = [...groupConversations, ...individualConversations]
-      .sort((a, b) => b.lastActivity.getTime() - a.lastActivity.getTime());
-
-    setConversations(allConversations);
-    
-    // Set current conversation to the most recent one if none selected
-    if (!currentConversationId && allConversations.length > 0) {
-      setCurrentConversationId(allConversations[0].id);
-    }
-  }, [authUser, groupChatHook.groups, groupChatHook.messages, currentConversationId]);
+    return groupConversations;
+  };
 
   // Authentication actions
   const login = useCallback(async (credentials: any) => {
@@ -186,9 +308,24 @@ export const useUnifiedChat = (): UnifiedChatData => {
   const createIndividualConversation = useCallback((userId: string): Conversation => {
     if (!authUser) throw new Error("User not authenticated");
 
-    const otherUser = sampleUsers.find(u => u.id === userId);
+    const otherUser = (availableUsers.length > 0 ? availableUsers : sampleUsers).find(u => u.id === userId);
     if (!otherUser) throw new Error("User not found");
 
+    // Try to create conversation via API in background
+    apiService.createConversation([userId]).then(response => {
+      if (response.success && response.data) {
+        // If API creation succeeds, update the conversation ID
+        const updatedConversation: Conversation = {
+          ...conversationId ? {
+            id: response.data.id,
+          } : {}
+        } as any;
+      }
+    }).catch(error => {
+      console.warn('Failed to create conversation via API:', error);
+    });
+
+    // Local creation (fallback)
     const conversationId = `individual-${authUser.id}-${userId}`;
     const newConversation: Conversation = {
       id: conversationId,
@@ -203,7 +340,7 @@ export const useUnifiedChat = (): UnifiedChatData => {
     setCurrentConversationId(conversationId);
 
     return newConversation;
-  }, [authUser]);
+  }, [authUser, availableUsers]);
 
   const selectConversation = useCallback((conversationId: string) => {
     setCurrentConversationId(conversationId);
@@ -239,45 +376,73 @@ export const useUnifiedChat = (): UnifiedChatData => {
   }, [currentConversationId, conversations]);
 
   // Message actions
-  const sendMessage = useCallback((conversationId: string, content: string, attachments?: Attachment[]) => {
+  const sendMessage = useCallback(async (conversationId: string, content: string, attachments?: Attachment[]) => {
     if (!authUser) return;
 
-    const message: IndividualMessage | GroupMessage = {
-      id: `msg-${Date.now()}`,
-      content: content.trim(),
-      senderId: authUser.id,
-      timestamp: new Date(),
-      attachments
-    } as IndividualMessage;
+    try {
+      if (conversationId.startsWith('group-')) {
+        // Handle group message
+        const groupId = conversationId.replace('group-', '');
+        await groupChatHook.sendMessage(groupId, content, attachments);
+      } else {
+        // Handle individual message - use real API call
+        const response = await apiService.sendMessage(conversationId, content, 
+          attachments?.map(att => new File([], att.name, { type: att.type }))
+        );
 
-    if (conversationId.startsWith('group-')) {
-      // Handle group message
-      const groupId = conversationId.replace('group-', '');
-      groupChatHook.sendMessage(groupId, content, attachments);
-    } else {
-      // Handle individual message
-      const userId = conversationId.replace(`individual-${authUser.id}-`, '');
-      const individualMessage: IndividualMessage = {
-        ...message,
-        receiverId: userId
-      } as IndividualMessage;
+        if (response.success && response.data) {
+          // Convert API message to local format
+          const newMessage: IndividualMessage = {
+            id: response.data.id,
+            content: response.data.content,
+            senderId: response.data.sender,
+            receiverId: authUser.id, // For sent messages, receiver is the other person
+            timestamp: new Date(response.data.timestamp),
+            attachments: response.data.attachments?.map(att => ({
+              id: att.id,
+              name: att.name,
+              type: att.type,
+              size: att.size,
+              url: att.url,
+              uploadedAt: att.uploadedAt
+            })),
+            edited: response.data.edited,
+            editedAt: response.data.editedAt ? new Date(response.data.editedAt) : undefined,
+            forwarded: response.data.forwarded,
+            originalSender: response.data.originalSender
+          };
 
-      setIndividualMessages(prev => ({
-        ...prev,
-        [conversationId]: [...(prev[conversationId] || []), individualMessage]
-      }));
+          // Update local messages
+          setIndividualMessages(prev => ({
+            ...prev,
+            [conversationId]: [...(prev[conversationId] || []), newMessage]
+          }));
+        }
+      }
+
+      // Update conversation's last activity
+      setConversations(prev => prev.map(conv => 
+        conv.id === conversationId 
+          ? { 
+              ...conv, 
+              lastMessage: {
+                id: `msg-${Date.now()}`,
+                content: content.trim(),
+                senderId: authUser.id,
+                receiverId: conv.type === 'individual' ? 
+                  conv.participants.find(p => p.id !== authUser.id)?.id || authUser.id :
+                  authUser.id,
+                timestamp: new Date(),
+                attachments: attachments
+              } as IndividualMessage,
+              lastActivity: new Date()
+            }
+          : conv
+      ));
+    } catch (error) {
+      console.error('Failed to send message:', error);
+      setError('Failed to send message. Please try again.');
     }
-
-    // Update conversation's last activity
-    setConversations(prev => prev.map(conv => 
-      conv.id === conversationId 
-        ? { 
-            ...conv, 
-            lastMessage: message,
-            lastActivity: new Date()
-          }
-        : conv
-    ));
   }, [authUser, groupChatHook]);
 
   const editMessage = useCallback((conversationId: string, messageId: string, content: string) => {
@@ -337,10 +502,11 @@ export const useUnifiedChat = (): UnifiedChatData => {
   // Search actions
   const searchUsers = useCallback((query: string): User[] => {
     const lowercaseQuery = query.toLowerCase();
-    return sampleUsers.filter(user => 
+    const usersToSearch = availableUsers.length > 0 ? availableUsers : sampleUsers;
+    return usersToSearch.filter(user => 
       user.username.toLowerCase().includes(lowercaseQuery)
     );
-  }, []);
+  }, [availableUsers]);
 
   const searchGroups = useCallback((query: string): Conversation[] => {
     const lowercaseQuery = query.toLowerCase();
@@ -405,7 +571,7 @@ export const useUnifiedChat = (): UnifiedChatData => {
     
     // Group chat data
     groups: groupChatHook.groups,
-    availableUsers: sampleUsers,
+    availableUsers: availableUsers.length > 0 ? availableUsers : sampleUsers,
     currentUser: authUser,
     
     // Group actions

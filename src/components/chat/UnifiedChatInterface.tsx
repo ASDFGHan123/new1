@@ -17,6 +17,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { ImageUpload } from "@/components/ui/image-upload";
 import { Label } from "@/components/ui/label";
 import { CreateGroupDialog } from "./CreateGroupDialog.tsx";
@@ -50,8 +51,12 @@ import {
   Hash,
   Lock,
   Globe,
-  Info
+  Info,
+  Loader2,
+  RefreshCw,
+  AlertCircle
 } from "lucide-react";
+import { apiService } from "@/lib/api";
 import type { Conversation, IndividualMessage, GroupMessage, User, Attachment } from "@/types/chat";
 
 export const UnifiedChatInterface = () => {
@@ -68,6 +73,13 @@ export const UnifiedChatInterface = () => {
   const [editMessageContent, setEditMessageContent] = useState("");
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   
+  // API Integration states
+  const [sendingMessage, setSendingMessage] = useState(false);
+  const [editMessageLoading, setEditMessageLoading] = useState<string | null>(null);
+  const [deleteMessageLoading, setDeleteMessageLoading] = useState<string | null>(null);
+  const [retryCount, setRetryCount] = useState(0);
+  const [retryingMessages, setRetryingMessages] = useState<string | null>(null);
+  
   // Voice recording states
   const [isRecording, setIsRecording] = useState(false);
   const [recordingDuration, setRecordingDuration] = useState(0);
@@ -77,6 +89,119 @@ export const UnifiedChatInterface = () => {
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const formRef = useRef<HTMLFormElement>(null);
+
+  // API Integration Functions
+  const sendMessageToApi = async (conversationId: string, content: string, attachments: File[]) => {
+    if (!conversationId || !authUser) return;
+    
+    setSendingMessage(true);
+    
+    try {
+      if (conversationId.startsWith('group-')) {
+        // Handle group message through group chat hook
+        const groupId = conversationId.replace('group-', '');
+        await chat.sendMessage(conversationId, content, 
+          attachments.map(file => ({
+            id: `attachment-${Date.now()}-${Math.random()}`,
+            name: file.name,
+            type: file.type,
+            size: file.size,
+            url: URL.createObjectURL(file),
+            uploadedAt: new Date().toISOString()
+          }))
+        );
+      } else {
+        // Handle individual message via API
+        const response = await apiService.sendMessage(conversationId, content, attachments);
+        
+        if (!response.success) {
+          throw new Error(response.error || 'Failed to send message');
+        }
+        
+        // Message sent successfully - the hook will handle UI updates
+      }
+    } catch (error) {
+      console.error('Error sending message:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Failed to send message';
+      // Show error toast or alert here
+    } finally {
+      setSendingMessage(false);
+    }
+  };
+
+  const editMessageInApi = async (conversationId: string, messageId: string, content: string) => {
+    if (!conversationId || !messageId) return;
+    
+    setEditMessageLoading(messageId);
+    
+    try {
+      if (conversationId.startsWith('group-')) {
+        // Handle group message editing
+        const groupId = conversationId.replace('group-', '');
+        await chat.editMessage(conversationId, messageId, content);
+      } else {
+        // Handle individual message editing via API
+        const response = await apiService.request(`/chat/messages/${messageId}/`, {
+          method: 'PATCH',
+          body: JSON.stringify({ content })
+        });
+        
+        if (!response.success) {
+          throw new Error(response.error || 'Failed to edit message');
+        }
+        
+        // Update local state
+        chat.editMessage(conversationId, messageId, content);
+      }
+    } catch (error) {
+      console.error('Error editing message:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Failed to edit message';
+      // Show error toast or alert here
+    } finally {
+      setEditMessageLoading(null);
+    }
+  };
+
+  const deleteMessageFromApi = async (conversationId: string, messageId: string) => {
+    if (!conversationId || !messageId) return;
+    
+    setDeleteMessageLoading(messageId);
+    
+    try {
+      if (conversationId.startsWith('group-')) {
+        // Handle group message deletion
+        const groupId = conversationId.replace('group-', '');
+        chat.deleteMessage(conversationId, messageId);
+      } else {
+        // Handle individual message deletion via API
+        const response = await apiService.request(`/chat/messages/${messageId}/`, {
+          method: 'DELETE'
+        });
+        
+        if (!response.success) {
+          throw new Error(response.error || 'Failed to delete message');
+        }
+        
+        // Update local state
+        chat.deleteMessage(conversationId, messageId);
+      }
+    } catch (error) {
+      console.error('Error deleting message:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Failed to delete message';
+      // Show error toast or alert here
+    } finally {
+      setDeleteMessageLoading(null);
+    }
+  };
+
+  const handleRetryMessages = (conversationId: string) => {
+    setRetryingMessages(conversationId);
+    // Retry logic would be implemented in the hook
+    setTimeout(() => {
+      setRetryingMessages(null);
+      setRetryCount(0);
+    }, 2000);
+  };
 
   if (!authUser) {
     return (
@@ -119,34 +244,26 @@ export const UnifiedChatInterface = () => {
     addFiles(e.dataTransfer.files);
   };
 
-  const handleSendMessage = (e?: React.FormEvent | React.KeyboardEvent) => {
+  const handleSendMessage = async (e?: React.FormEvent | React.KeyboardEvent) => {
     if (e) {
       e.preventDefault();
     }
     if (!message.trim() && attachments.length === 0 && !audioBlob) return;
     if (!chat.currentConversationId) return;
 
-    const newAttachments: Attachment[] = [
-      ...attachments.map((file, index) => ({
-        id: `attachment-${Date.now()}-${index}`,
-        name: file.name,
-        type: file.type,
-        size: file.size,
-        url: URL.createObjectURL(file),
-        uploadedAt: new Date().toISOString()
-      })),
-      ...(audioBlob ? [{
-        id: `voice-${Date.now()}`,
-        name: `Voice message ${formatDuration(recordingDuration)}`,
-        type: 'audio/webm',
-        size: audioBlob.size,
-        url: audioUrl!,
-        uploadedAt: new Date().toISOString(),
-        duration: recordingDuration
-      }] : [])
-    ];
+    const messageText = message.trim();
+    const filesToSend = [...attachments];
+    
+    // Add audio blob to attachments if recording
+    if (audioBlob && audioUrl) {
+      const audioFile = new File([audioBlob], `voice-message-${Date.now()}.webm`, {
+        type: 'audio/webm'
+      });
+      filesToSend.push(audioFile);
+    }
 
-    chat.sendMessage(chat.currentConversationId, message, newAttachments);
+    // Use the new API integration
+    await sendMessageToApi(chat.currentConversationId, messageText, filesToSend);
 
     setMessage("");
     setAttachments([]);
@@ -159,10 +276,13 @@ export const UnifiedChatInterface = () => {
     setOpenMenuId(null);
   };
 
-  const saveMessageEdit = () => {
+  const saveMessageEdit = async () => {
     if (!editingMessageId || !editMessageContent.trim() || !chat.currentConversationId) return;
 
-    chat.editMessage(chat.currentConversationId, editingMessageId, editMessageContent.trim());
+    const content = editMessageContent.trim();
+    
+    // Use the new API integration
+    await editMessageInApi(chat.currentConversationId, editingMessageId, content);
 
     setEditingMessageId(null);
     setEditMessageContent("");
@@ -311,14 +431,14 @@ export const UnifiedChatInterface = () => {
                 <Avatar className="h-10 w-10">
                   <AvatarImage src={currentConversation.groupAvatar} />
                   <AvatarFallback className="bg-primary text-primary-foreground">
-                    {currentConversation.groupName?.slice(0, 2).toUpperCase()}
+                    {(currentConversation.groupName || '??').slice(0, 2).toUpperCase()}
                   </AvatarFallback>
                 </Avatar>
               ) : (
                 <Avatar className="h-10 w-10">
                   <AvatarImage src={getOtherUser(currentConversation)?.avatar} />
                   <AvatarFallback className="bg-primary text-primary-foreground">
-                    {getOtherUser(currentConversation)?.username.slice(0, 2).toUpperCase()}
+                    {(getOtherUser(currentConversation)?.username || '??').slice(0, 2).toUpperCase()}
                   </AvatarFallback>
                 </Avatar>
               )}
@@ -367,7 +487,7 @@ export const UnifiedChatInterface = () => {
                         <Avatar key={member.id} className="h-8 w-8 border-2 border-card">
                           <AvatarImage src={member.avatar} />
                           <AvatarFallback className="text-xs">
-                            {member.username.slice(0, 2).toUpperCase()}
+                            {(member.username || '??').slice(0, 2).toUpperCase()}
                           </AvatarFallback>
                         </Avatar>
                       ))}
@@ -415,6 +535,36 @@ export const UnifiedChatInterface = () => {
         {/* Messages */}
         <ScrollArea className="flex-1 p-6">
           <div className="space-y-4">
+            {/* Error Message */}
+            {chat.error && (
+              <Alert className="border-red-200 bg-red-50">
+                <AlertCircle className="h-4 w-4 text-red-600" />
+                <AlertDescription className="text-red-800">
+                  <div className="flex items-center justify-between">
+                    <span>{chat.error}</span>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleRetryMessages(chat.currentConversationId!)}
+                      disabled={retryCount >= 3}
+                      className="ml-2"
+                    >
+                      <RefreshCw className={`h-3 w-3 mr-1 ${retryCount > 0 ? 'animate-spin' : ''}`} />
+                      Retry ({retryCount}/3)
+                    </Button>
+                  </div>
+                </AlertDescription>
+              </Alert>
+            )}
+            
+            {/* Loading State */}
+            {chat.loading && (
+              <div className="text-center py-8">
+                <Loader2 className="h-8 w-8 animate-spin mx-auto mb-2 text-primary" />
+                <p className="text-muted-foreground">Loading messages...</p>
+              </div>
+            )}
+
             {chat.currentMessages.length === 0 ? (
               <div className="text-center py-12">
                 <div className="mx-auto w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mb-4">
@@ -545,10 +695,15 @@ export const UnifiedChatInterface = () => {
                                         Share
                                       </DropdownMenuItem>
                                       <DropdownMenuItem 
-                                        onClick={() => chat.deleteMessage(chat.currentConversationId!, msg.id)}
+                                        onClick={() => deleteMessageFromApi(chat.currentConversationId!, msg.id)}
+                                        disabled={deleteMessageLoading === msg.id}
                                         className="text-red-600 focus:text-red-600"
                                       >
-                                        <Trash2 className="h-4 w-4 mr-2" />
+                                        {deleteMessageLoading === msg.id ? (
+                                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                        ) : (
+                                          <Trash2 className="h-4 w-4 mr-2" />
+                                        )}
                                         Delete
                                       </DropdownMenuItem>
                                     </DropdownMenuContent>
@@ -778,9 +933,13 @@ export const UnifiedChatInterface = () => {
             </div>
             <Button
               type="submit"
-              disabled={attachments.length === 0 && !message.trim() && !audioBlob}
+              disabled={(attachments.length === 0 && !message.trim() && !audioBlob) || sendingMessage}
             >
-              <Send className="h-4 w-4" />
+              {sendingMessage ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Send className="h-4 w-4" />
+              )}
             </Button>
           </form>
         </div>

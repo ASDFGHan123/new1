@@ -38,20 +38,9 @@ import {
 } from "@/components/ui/alert-dialog";
 import { useState } from "react";
 import { openPrintWindow, generateTrashReportHTML } from "@/lib/printUtils";
+import { User as ApiUser } from "@/lib/api";
 
-interface User {
-  id: string;
-  username: string;
-  email: string;
-  status: "active" | "suspended" | "banned";
-  role: string;
-  joinDate: string;
-  lastActive: string;
-  messageCount: number;
-  reportCount: number;
-  avatar?: string;
-  deletedAt?: string;
-}
+type User = ApiUser & { deletedAt?: string };
 
 interface Conversation {
   id: string;
@@ -460,7 +449,8 @@ export const Trash = ({
       </CardHeader>
 
       <CardContent>
-        <Table>
+        <div className="max-h-[600px] overflow-y-auto">
+          <Table>
           <TableHeader>
             <TableRow>
               <TableHead className="w-12">
@@ -561,8 +551,9 @@ export const Trash = ({
                 </TableRow>
               ))
             )}
-          </TableBody>
-        </Table>
+            </TableBody>
+          </Table>
+        </div>
 
         {filteredAndSortedItems.length > 0 && (
           <div className="mt-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">

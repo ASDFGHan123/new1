@@ -1,60 +1,27 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from "react";
 import { AuthUser, LoginCredentials, SignupCredentials } from "@/types/chat";
+import { apiService } from "@/lib/api";
 
 interface AuthContextType {
   user: AuthUser | null;
   isAuthenticated: boolean;
   isLoading: boolean;
+  error: string | null;
   login: (credentials: LoginCredentials) => Promise<AuthUser>;
   signup: (credentials: SignupCredentials) => Promise<AuthUser>;
   logout: () => void;
   updateUser: (updates: Partial<AuthUser>) => void;
+  clearError: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// Sample users for demo
-const sampleUsers: AuthUser[] = [
-  {
-    id: "1",
-    username: "alice.johnson",
-    email: "alice@example.com",
-    avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=alice",
-    status: "online"
-  },
-  {
-    id: "2",
-    username: "bob.smith",
-    email: "bob@example.com",
-    avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=bob",
-    status: "online"
-  },
-  {
-    id: "3",
-    username: "charlie.brown",
-    email: "charlie@example.com",
-    avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=charlie",
-    status: "away"
-  },
-  {
-    id: "4",
-    username: "diana.prince",
-    email: "diana@example.com",
-    avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=diana",
-    status: "online"
-  },
-  {
-    id: "5",
-    username: "eve.wilson",
-    email: "eve@example.com",
-    avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=eve",
-    status: "offline"
-  }
-];
+// Note: Using real API authentication now, no longer using mock sample users
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   // Load user from localStorage on mount
   useEffect(() => {
@@ -70,79 +37,95 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setIsLoading(false);
   }, []);
 
+  const clearError = () => {
+    setError(null);
+  };
+
   const login = async (credentials: LoginCredentials): Promise<AuthUser> => {
     setIsLoading(true);
+    setError(null);
     
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    
-    // Find user by email or username
-    const foundUser = sampleUsers.find(
-      u => u.email === credentials.identifier || u.username === credentials.identifier
-    );
-    
-    if (!foundUser) {
+    try {
+      // Use the real API service
+      const response = await apiService.login({
+        username: credentials.identifier,
+        password: credentials.password
+      });
+      
+      if (response.success && response.data) {
+        const authUser: AuthUser = {
+          ...response.data.user,
+          status: "online"
+        };
+        
+        setUser(authUser);
+        localStorage.setItem("offchat_user", JSON.stringify(authUser));
+        setIsLoading(false);
+        
+        return authUser;
+      } else {
+        const errorMessage = response.error || 'Login failed';
+        setError(errorMessage);
+        throw new Error(errorMessage);
+      }
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Login failed';
+      setError(errorMessage);
       setIsLoading(false);
-      throw new Error("User not found");
+      throw error;
     }
-    
-    // In a real app, you'd verify the password here
-    if (credentials.password.length < 3) {
-      setIsLoading(false);
-      throw new Error("Invalid credentials");
-    }
-    
-    const authUser: AuthUser = {
-      ...foundUser,
-      status: "online"
-    };
-    
-    setUser(authUser);
-    localStorage.setItem("offchat_user", JSON.stringify(authUser));
-    setIsLoading(false);
-    
-    return authUser;
   };
 
   const signup = async (credentials: SignupCredentials): Promise<AuthUser> => {
     setIsLoading(true);
+    setError(null);
     
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    
-    // Check if user already exists
-    const existingUser = sampleUsers.find(
-      u => u.email === credentials.email || u.username === credentials.username
-    );
-    
-    if (existingUser) {
+    try {
+      // Use the real API service
+      const response = await apiService.signup({
+        username: credentials.username,
+        email: credentials.email,
+        password: credentials.password
+      });
+      
+      if (response.success && response.data) {
+        // For new users, they might need approval or automatic login
+        // We'll determine this based on the API response
+        const authUser: AuthUser = {
+          ...response.data.user,
+          status: "online"
+        };
+        
+        setUser(authUser);
+        localStorage.setItem("offchat_user", JSON.stringify(authUser));
+        setIsLoading(false);
+        
+        return authUser;
+      } else {
+        const errorMessage = response.error || 'Signup failed';
+        setError(errorMessage);
+        throw new Error(errorMessage);
+      }
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Signup failed';
+      setError(errorMessage);
       setIsLoading(false);
-      throw new Error("User already exists");
+      throw error;
     }
-    
-    if (credentials.password !== credentials.confirmPassword) {
-      setIsLoading(false);
-      throw new Error("Passwords do not match");
-    }
-    
-    const authUser: AuthUser = {
-      id: `user-${Date.now()}`,
-      username: credentials.username,
-      email: credentials.email,
-      avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${credentials.username}`,
-      status: "online"
-    };
-    
-    setUser(authUser);
-    localStorage.setItem("offchat_user", JSON.stringify(authUser));
-    setIsLoading(false);
-    
-    return authUser;
   };
 
-  const logout = () => {
-    setUser(null);
-    localStorage.removeItem("offchat_user");
+  const logout = async () => {
+    try {
+      // Call logout API
+      await apiService.logout();
+    } catch (error) {
+      console.error('Logout API call failed:', error);
+    } finally {
+      // Clear local state regardless of API call success
+      setUser(null);
+      setError(null);
+      localStorage.removeItem("offchat_user");
+    }
   };
 
   const updateUser = (updates: Partial<AuthUser>) => {
@@ -157,10 +140,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     user,
     isAuthenticated: !!user,
     isLoading,
+    error,
     login,
     signup,
     logout,
-    updateUser
+    updateUser,
+    clearError
   };
 
   return (

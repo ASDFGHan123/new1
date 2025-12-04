@@ -1,5 +1,5 @@
-import React from "react";
-import { Search, Filter, MoreHorizontal, UserPlus, Printer } from "lucide-react";
+import React, { useState, useEffect, useCallback } from "react";
+import { Search, Filter, MoreHorizontal, UserPlus, Printer, Loader2, AlertCircle, RefreshCw } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import { ImageUpload } from "@/components/ui/image-upload";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
   Table,
   TableBody,
@@ -19,71 +20,301 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { openPrintWindow, generateUserListHTML } from "@/lib/printUtils";
-
-interface User {
-  id: string;
-  username: string;
-  email: string;
-  status: "active" | "suspended" | "banned" | "pending";
-  avatar?: string;
-  role?: string;
-  joinDate: string;
-  lastActive: string;
-  messageCount: number;
-  reportCount: number;
-}
+import { apiService, type User } from "@/lib/api";
+import { useToast } from "@/hooks/use-toast";
 
 interface UserManagementProps {
-  users: User[];
-  approveUser: (id: string) => void;
-  rejectUser: (id: string) => void;
+  users?: User[];
+  approveUser?: (userId: string) => void;
+  rejectUser?: (userId: string) => void;
   addUser?: (username: string, password: string, role: string, avatar?: string) => void;
-  updateUser?: (id: string, updates: Partial<User>) => void;
-  forceLogoutUser?: (id: string) => void;
-  deleteUser?: (id: string) => void;
+  updateUser?: (userId: string, updates: Partial<User>) => void;
+  forceLogoutUser?: (userId: string) => void;
+  deleteUser?: (userId: string) => void;
 }
 
-export const UserManagement = ({ users, approveUser, rejectUser, addUser, updateUser, forceLogoutUser, deleteUser }: UserManagementProps) => {
-  const [confirmDeleteId, setConfirmDeleteId] = React.useState<string | null>(null);
-  const [confirmLogoutId, setConfirmLogoutId] = React.useState<string | null>(null);
-  const [open, setOpen] = React.useState(false);
-  const [newUsername, setNewUsername] = React.useState("");
-  const [newPassword, setNewPassword] = React.useState("");
-  const [newRole, setNewRole] = React.useState("user");
-  const [newAvatar, setNewAvatar] = React.useState<string | undefined>(undefined);
-  const [error, setError] = React.useState("");
-  const [search, setSearch] = React.useState("");
-  const [statusFilter, setStatusFilter] = React.useState<string>("all");
-  const [roleFilter, setRoleFilter] = React.useState<string>("all");
-  const [showFilters, setShowFilters] = React.useState(false);
-  const [editingUser, setEditingUser] = React.useState<User | null>(null);
-  const [editUsername, setEditUsername] = React.useState("");
-  const [editEmail, setEditEmail] = React.useState("");
-  const [editRole, setEditRole] = React.useState("user");
-  const [editAvatar, setEditAvatar] = React.useState<string | undefined>(undefined);
+export const UserManagement = React.memo(({ users: propUsers = [], approveUser, rejectUser, addUser, updateUser, forceLogoutUser, deleteUser }: UserManagementProps) => {
+  const { toast } = useToast();
+  
+  // Component state
+  const [users, setUsers] = useState<User[]>(propUsers);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [retryCount, setRetryCount] = useState(0);
+  
+  // Dialog states
+  const [open, setOpen] = useState(false);
+  
+  // Form states
+  const [newUsername, setNewUsername] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [newRole, setNewRole] = useState("user");
+  const [newAvatar, setNewAvatar] = useState<string | undefined>(undefined);
+  const [addLoading, setAddLoading] = useState(false);
+  const [formError, setFormError] = useState("");
+  
+  // Edit states
+  const [editingUser, setEditingUser] = useState<User | null>(null);
+  const [editUsername, setEditUsername] = useState("");
+  const [editEmail, setEditEmail] = useState("");
+  const [editRole, setEditRole] = useState("user");
+  const [editAvatar, setEditAvatar] = useState<string | undefined>(undefined);
+  const [editLoading, setEditLoading] = useState(false);
+  
+  // Filter states
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [roleFilter, setRoleFilter] = useState<string>("all");
+  const [showFilters, setShowFilters] = useState(false);
+  
+  // Action loading states
+  const [actionLoading, setActionLoading] = useState<{[key: string]: boolean}>({});
 
-  const handleAddUser = (e: React.FormEvent) => {
+  // API Functions
+  const loadUsers = useCallback(async (retryAttempt = 0) => {
+    // Prevent multiple simultaneous calls
+    if (loading) return;
+    
+    setLoading(true);
+    setError(null);
+    
+    try {
+      const response = await apiService.getUsers();
+      
+      if (response.success && response.data) {
+        setUsers(response.data);
+        setRetryCount(0); // Reset retry count on success
+      } else {
+        throw new Error(response.error || 'Failed to load users');
+      }
+    } catch (err) {
+      console.error('Failed to load users:', err);
+      const errorMessage = err instanceof Error ? err.message : 'Failed to load users';
+      setError(errorMessage);
+      
+      // Retry logic (up to 3 attempts)
+      if (retryAttempt < 3) {
+        setTimeout(() => {
+          loadUsers(retryAttempt + 1);
+          setRetryCount(retryAttempt + 1);
+        }, Math.pow(2, retryAttempt) * 1000); // Exponential backoff
+      }
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const handleRetry = () => {
+    loadUsers();
+  };
+
+  const approveUserInternal = async (userId: string) => {
+    if (approveUser) {
+      approveUser(userId);
+      return;
+    }
+    
+    setActionLoading(prev => ({ ...prev, [userId]: true }));
+    
+    try {
+      const response = await apiService.approveUser(userId);
+      
+      if (response.success) {
+        // Update local state
+        setUsers(prev => prev.map(user => 
+          user.id === userId ? { ...user, status: "active" } : user
+        ));
+        
+        toast({
+          title: "User Approved",
+          description: "User has been successfully approved.",
+        });
+      } else {
+        throw new Error(response.error || 'Failed to approve user');
+      }
+    } catch (err) {
+      console.error('Failed to approve user:', err);
+      toast({
+        title: "Error",
+        description: err instanceof Error ? err.message : 'Failed to approve user',
+        variant: "destructive"
+      });
+    } finally {
+      setActionLoading(prev => ({ ...prev, [userId]: false }));
+    }
+  };
+
+  const rejectUserInternal = async (userId: string) => {
+    if (rejectUser) {
+      rejectUser(userId);
+      return;
+    }
+    
+    setActionLoading(prev => ({ ...prev, [userId]: true }));
+    
+    try {
+      const response = await apiService.deleteUser(userId);
+      
+      if (response.success) {
+        // Remove from local state
+        setUsers(prev => prev.filter(user => user.id !== userId));
+        
+        toast({
+          title: "User Rejected",
+          description: "User has been rejected and removed.",
+        });
+      } else {
+        throw new Error(response.error || 'Failed to reject user');
+      }
+    } catch (err) {
+      console.error('Failed to reject user:', err);
+      toast({
+        title: "Error",
+        description: err instanceof Error ? err.message : 'Failed to reject user',
+        variant: "destructive"
+      });
+    } finally {
+      setActionLoading(prev => ({ ...prev, [userId]: false }));
+    }
+  };
+
+  const forceLogoutUserInternal = async (userId: string) => {
+    if (forceLogoutUser) {
+      forceLogoutUser(userId);
+      return;
+    }
+    
+    setActionLoading(prev => ({ ...prev, [userId]: true }));
+    
+    try {
+      const response = await apiService.forceLogoutUser(userId);
+      
+      if (response.success) {
+        toast({
+          title: "User Logged Out",
+          description: "User has been forcefully logged out.",
+        });
+      } else {
+        throw new Error(response.error || 'Failed to force logout user');
+      }
+    } catch (err) {
+      console.error('Failed to force logout user:', err);
+      toast({
+        title: "Error",
+        description: err instanceof Error ? err.message : 'Failed to force logout user',
+        variant: "destructive"
+      });
+    } finally {
+      setActionLoading(prev => ({ ...prev, [userId]: false }));
+    }
+  };
+
+  const deleteUserInternal = async (userId: string) => {
+    if (deleteUser) {
+      deleteUser(userId);
+      return;
+    }
+    
+    setActionLoading(prev => ({ ...prev, [userId]: true }));
+    
+    try {
+      const response = await apiService.deleteUser(userId);
+      
+      if (response.success) {
+        // Remove from local state
+        setUsers(prev => prev.filter(user => user.id !== userId));
+        
+        toast({
+          title: "User Deleted",
+          description: "User has been deleted successfully.",
+        });
+      } else {
+        throw new Error(response.error || 'Failed to delete user');
+      }
+    } catch (err) {
+      console.error('Failed to delete user:', err);
+      toast({
+        title: "Error",
+        description: err instanceof Error ? err.message : 'Failed to delete user',
+        variant: "destructive"
+      });
+    } finally {
+      setActionLoading(prev => ({ ...prev, [userId]: false }));
+    }
+  };
+
+  const handleAddUser = async (e: React.FormEvent) => {
     e.preventDefault();
+    
     if (!newUsername || !newPassword) {
-      setError("Username and password are required.");
+      setFormError("Username and password are required.");
       return;
     }
+    
+    // Check if username is unique
     if (users.some(u => u.username === newUsername)) {
-      setError("Username already exists.");
+      setFormError("Username already exists.");
       return;
     }
-    if (users.some(u => u.email === `${newUsername}@example.com`)) {
-      setError("Email already exists.");
+    
+    // Check if email is unique (assuming @example.com domain)
+    const newEmail = `${newUsername}@example.com`;
+    if (users.some(u => u.email === newEmail)) {
+      setFormError("Email already exists.");
       return;
     }
-    if (addUser) {
-      addUser(newUsername, newPassword, newRole, newAvatar);
-      setOpen(false);
-      setNewUsername("");
-      setNewPassword("");
-      setNewRole("user");
-      setNewAvatar(undefined);
-      setError("");
+    
+    setAddLoading(true);
+    setFormError("");
+    
+    try {
+      if (addUser) {
+        addUser(newUsername, newPassword, newRole, newAvatar);
+        
+        // Reset form
+        setOpen(false);
+        setNewUsername("");
+        setNewPassword("");
+        setNewRole("user");
+        setNewAvatar(undefined);
+        
+        toast({
+          title: "User Created",
+          description: "New user has been created successfully.",
+        });
+      } else {
+        // Note: The API service doesn't have a direct signup endpoint for admin creation
+        // This would need to be implemented in the backend
+        const response = await apiService.signup({
+          username: newUsername,
+          email: newEmail,
+          password: newPassword
+        });
+        
+        if (response.success) {
+          // Reload users to get the new one
+          await loadUsers();
+          
+          // Reset form
+          setOpen(false);
+          setNewUsername("");
+          setNewPassword("");
+          setNewRole("user");
+          setNewAvatar(undefined);
+          
+          toast({
+            title: "User Created",
+            description: "New user has been created successfully.",
+          });
+        } else {
+          throw new Error(response.error || 'Failed to create user');
+        }
+      }
+    } catch (err) {
+      console.error('Failed to create user:', err);
+      setFormError(err instanceof Error ? err.message : 'Failed to create user');
+    } finally {
+      setAddLoading(false);
     }
   };
 
@@ -95,33 +326,81 @@ export const UserManagement = ({ users, approveUser, rejectUser, addUser, update
     setEditAvatar(user.avatar);
   };
 
-  const handleSaveEdit = (e: React.FormEvent) => {
+  const handleSaveEdit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
     if (!editingUser) return;
 
     // Check if username is unique (excluding current user)
     if (editUsername !== editingUser.username && users.some(u => u.username === editUsername)) {
-      alert("Username already exists.");
+      setFormError("Username already exists.");
       return;
     }
 
     // Check if email is unique (excluding current user)
     if (editEmail !== editingUser.email && users.some(u => u.email === editEmail)) {
-      alert("Email already exists.");
+      setFormError("Email already exists.");
       return;
     }
 
-    if (updateUser) {
-      updateUser(editingUser.id, {
-        username: editUsername,
-        email: editEmail,
-        role: editRole,
-        avatar: editAvatar,
-      });
-      alert("User updated successfully.");
+    setEditLoading(true);
+    setFormError("");
+    
+    try {
+      if (updateUser) {
+        updateUser(editingUser.id, {
+          username: editUsername,
+          email: editEmail,
+          role: editRole,
+          avatar: editAvatar,
+        });
+        
+        setEditingUser(null);
+        
+        toast({
+          title: "User Updated",
+          description: "User has been updated successfully.",
+        });
+      } else {
+        const response = await apiService.updateUser(editingUser.id, {
+          username: editUsername,
+          email: editEmail,
+          role: editRole,
+          avatar: editAvatar,
+        });
+        
+        if (response.success) {
+          // Update local state
+          setUsers(prev => prev.map(user => 
+            user.id === editingUser.id 
+              ? { ...user, username: editUsername, email: editEmail, role: editRole, avatar: editAvatar }
+              : user
+          ));
+          
+          setEditingUser(null);
+          
+          toast({
+            title: "User Updated",
+            description: "User has been updated successfully.",
+          });
+        } else {
+          throw new Error(response.error || 'Failed to update user');
+        }
+      }
+    } catch (err) {
+      console.error('Failed to update user:', err);
+      setFormError(err instanceof Error ? err.message : 'Failed to update user');
+    } finally {
+      setEditLoading(false);
     }
-    setEditingUser(null);
   };
+
+  // Load users on mount (prevent multiple calls)
+  useEffect(() => {
+    if (propUsers.length === 0 && !loading && users.length === 0) {
+      loadUsers();
+    }
+  }, [propUsers, loading, users.length, loadUsers]);
 
   // Filter users by search, status, and role
   const filteredUsers = users.filter(user => {
@@ -151,6 +430,26 @@ export const UserManagement = ({ users, approveUser, rejectUser, addUser, update
             </CardDescription>
           </div>
           <div className="flex items-center space-x-2">
+            {/* Error Alert */}
+            {error && (
+              <Alert variant="destructive" className="mr-2">
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription className="flex items-center justify-between">
+                  <span>{error}</span>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleRetry}
+                    disabled={retryCount >= 3}
+                    className="ml-2"
+                  >
+                    <RefreshCw className={`h-3 w-3 mr-1 ${retryCount > 0 ? 'animate-spin' : ''}`} />
+                    Retry ({retryCount}/3)
+                  </Button>
+                </AlertDescription>
+              </Alert>
+            )}
+            
             <Button 
               onClick={handlePrintUsers}
               variant="outline"
@@ -160,88 +459,135 @@ export const UserManagement = ({ users, approveUser, rejectUser, addUser, update
               <Printer className="w-4 h-4 mr-2" />
               Print Users
             </Button>
+            
             <Dialog open={open} onOpenChange={setOpen}>
-            <DialogTrigger asChild>
-              <Button className="bg-admin-primary hover:bg-admin-primary/90">
-                <UserPlus className="w-4 h-4 mr-2" />
-                Add User
-              </Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Add User</DialogTitle>
-                <DialogDescription>Add a new user with a role and password. User will be approved by default.</DialogDescription>
-              </DialogHeader>
-              <form onSubmit={handleAddUser} className="space-y-4">
-                <div>
-                  <Label htmlFor="username">Username</Label>
-                  <Input id="username" value={newUsername} onChange={e => setNewUsername(e.target.value)} required />
-                </div>
-                <div>
-                  <Label htmlFor="password">Password</Label>
-                  <Input id="password" type="password" value={newPassword} onChange={e => setNewPassword(e.target.value)} required />
-                </div>
-                <div>
-                  <Label htmlFor="role">Role</Label>
-                  <select id="role" className="w-full border rounded-md p-2" value={newRole} onChange={e => setNewRole(e.target.value)}>
-                    <option value="user">User</option>
-                    <option value="admin">Admin</option>
-                  </select>
-                </div>
-                <div>
-                  <Label>Profile Image (optional)</Label>
-                  <ImageUpload value={newAvatar} onChange={setNewAvatar} />
-                  <p className="text-xs text-muted-foreground mt-1">Upload an image or leave empty for system-generated avatar</p>
-                </div>
-                {error && <div className="text-red-500 text-sm">{error}</div>}
-                <DialogFooter>
-                  <Button type="submit" className="bg-admin-primary hover:bg-admin-primary/90">Add</Button>
-                  <DialogClose asChild>
-                    <Button type="button" variant="outline">Cancel</Button>
-                  </DialogClose>
-                </DialogFooter>
-              </form>
-            </DialogContent>
-          </Dialog>
+              <DialogTrigger asChild>
+                <Button className="bg-admin-primary hover:bg-admin-primary/90" disabled={loading}>
+                  <UserPlus className="w-4 h-4 mr-2" />
+                  Add User
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Add User</DialogTitle>
+                  <DialogDescription>Add a new user with a role and password. User will be approved by default.</DialogDescription>
+                </DialogHeader>
+                <form onSubmit={handleAddUser} className="space-y-4">
+                  <div>
+                    <Label htmlFor="username">Username</Label>
+                    <Input 
+                      id="username" 
+                      value={newUsername} 
+                      onChange={e => setNewUsername(e.target.value)} 
+                      required 
+                      disabled={addLoading}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="password">Password</Label>
+                    <Input 
+                      id="password" 
+                      type="password" 
+                      value={newPassword} 
+                      onChange={e => setNewPassword(e.target.value)} 
+                      required 
+                      disabled={addLoading}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="role">Role</Label>
+                    <select 
+                      id="role" 
+                      className="w-full border rounded-md p-2" 
+                      value={newRole} 
+                      onChange={e => setNewRole(e.target.value)}
+                      disabled={addLoading}
+                    >
+                      <option value="user">User</option>
+                      <option value="admin">Admin</option>
+                    </select>
+                  </div>
+                  <div>
+                    <Label>Profile Image (optional)</Label>
+                    <ImageUpload value={newAvatar} onChange={setNewAvatar} />
+                    <p className="text-xs text-muted-foreground mt-1">Upload an image or leave empty for system-generated avatar</p>
+                  </div>
+                  {formError && <div className="text-red-500 text-sm">{formError}</div>}
+                  <DialogFooter>
+                    <Button type="submit" className="bg-admin-primary hover:bg-admin-primary/90" disabled={addLoading}>
+                      {addLoading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
+                      {addLoading ? 'Creating...' : 'Add'}
+                    </Button>
+                    <DialogClose asChild>
+                      <Button type="button" variant="outline" disabled={addLoading}>Cancel</Button>
+                    </DialogClose>
+                  </DialogFooter>
+                </form>
+              </DialogContent>
+            </Dialog>
 
-          {/* Edit User Dialog */}
-          <Dialog open={!!editingUser} onOpenChange={open => !open && setEditingUser(null)}>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Edit User</DialogTitle>
-                <DialogDescription>Update user information and settings.</DialogDescription>
-              </DialogHeader>
-              <form onSubmit={handleSaveEdit} className="space-y-4">
-                <div>
-                  <Label htmlFor="edit-username">Username</Label>
-                  <Input id="edit-username" value={editUsername} onChange={e => setEditUsername(e.target.value)} required />
-                </div>
-                <div>
-                  <Label htmlFor="edit-email">Email</Label>
-                  <Input id="edit-email" type="email" value={editEmail} onChange={e => setEditEmail(e.target.value)} required />
-                </div>
-                <div>
-                  <Label htmlFor="edit-role">Role</Label>
-                  <select id="edit-role" className="w-full border rounded-md p-2" value={editRole} onChange={e => setEditRole(e.target.value)}>
-                    <option value="user">User</option>
-                    <option value="admin">Admin</option>
-                  </select>
-                </div>
-                <div>
-                  <Label>Profile Image</Label>
-                  <ImageUpload value={editAvatar} onChange={setEditAvatar} />
-                </div>
-                <DialogFooter>
-                  <Button type="submit" className="bg-admin-primary hover:bg-admin-primary/90">Save Changes</Button>
-                  <DialogClose asChild>
-                    <Button type="button" variant="outline">Cancel</Button>
-                  </DialogClose>
-                </DialogFooter>
-              </form>
-            </DialogContent>
-          </Dialog>
+            {/* Edit User Dialog */}
+            <Dialog open={!!editingUser} onOpenChange={open => !open && setEditingUser(null)}>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Edit User</DialogTitle>
+                  <DialogDescription>Update user information and settings.</DialogDescription>
+                </DialogHeader>
+                <form onSubmit={handleSaveEdit} className="space-y-4">
+                  <div>
+                    <Label htmlFor="edit-username">Username</Label>
+                    <Input 
+                      id="edit-username" 
+                      value={editUsername} 
+                      onChange={e => setEditUsername(e.target.value)} 
+                      required 
+                      disabled={editLoading}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="edit-email">Email</Label>
+                    <Input 
+                      id="edit-email" 
+                      type="email" 
+                      value={editEmail} 
+                      onChange={e => setEditEmail(e.target.value)} 
+                      required 
+                      disabled={editLoading}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="edit-role">Role</Label>
+                    <select 
+                      id="edit-role" 
+                      className="w-full border rounded-md p-2" 
+                      value={editRole} 
+                      onChange={e => setEditRole(e.target.value)}
+                      disabled={editLoading}
+                    >
+                      <option value="user">User</option>
+                      <option value="admin">Admin</option>
+                    </select>
+                  </div>
+                  <div>
+                    <Label>Profile Image</Label>
+                    <ImageUpload value={editAvatar} onChange={setEditAvatar} />
+                  </div>
+                  {formError && <div className="text-red-500 text-sm">{formError}</div>}
+                  <DialogFooter>
+                    <Button type="submit" className="bg-admin-primary hover:bg-admin-primary/90" disabled={editLoading}>
+                      {editLoading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
+                      {editLoading ? 'Saving...' : 'Save Changes'}
+                    </Button>
+                    <DialogClose asChild>
+                      <Button type="button" variant="outline" disabled={editLoading}>Cancel</Button>
+                    </DialogClose>
+                  </DialogFooter>
+                </form>
+              </DialogContent>
+            </Dialog>
           </div>
         </div>
+        
         {/* Search and Filters */}
         <div className="flex items-center space-x-4 mt-4">
           <div className="relative flex-1">
@@ -251,11 +597,12 @@ export const UserManagement = ({ users, approveUser, rejectUser, addUser, update
               className="pl-10 bg-input border-border"
               value={search}
               onChange={e => setSearch(e.target.value)}
+              disabled={loading}
             />
           </div>
           <Popover open={showFilters} onOpenChange={setShowFilters}>
             <PopoverTrigger asChild>
-              <Button variant="outline" size="sm">
+              <Button variant="outline" size="sm" disabled={loading}>
                 <Filter className="w-4 h-4 mr-2" />
                 Filters
                 {(statusFilter !== "all" || roleFilter !== "all") && (
@@ -267,7 +614,7 @@ export const UserManagement = ({ users, approveUser, rejectUser, addUser, update
               <div className="space-y-4">
                 <div>
                   <Label className="text-sm font-medium">Status</Label>
-                  <Select value={statusFilter} onValueChange={setStatusFilter}>
+                  <Select value={statusFilter} onValueChange={setStatusFilter} disabled={loading}>
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
@@ -282,7 +629,7 @@ export const UserManagement = ({ users, approveUser, rejectUser, addUser, update
                 </div>
                 <div>
                   <Label className="text-sm font-medium">Role</Label>
-                  <Select value={roleFilter} onValueChange={setRoleFilter}>
+                  <Select value={roleFilter} onValueChange={setRoleFilter} disabled={loading}>
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
@@ -301,10 +648,11 @@ export const UserManagement = ({ users, approveUser, rejectUser, addUser, update
                       setStatusFilter("all");
                       setRoleFilter("all");
                     }}
+                    disabled={loading}
                   >
                     Clear Filters
                   </Button>
-                  <Button size="sm" onClick={() => setShowFilters(false)}>
+                  <Button size="sm" onClick={() => setShowFilters(false)} disabled={loading}>
                     Apply
                   </Button>
                 </div>
@@ -313,85 +661,120 @@ export const UserManagement = ({ users, approveUser, rejectUser, addUser, update
           </Popover>
         </div>
       </CardHeader>
+      
       <CardContent>
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>User</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead>Role</TableHead>
-              <TableHead>Actions</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {filteredUsers.map((user) => (
-              <TableRow key={user.id}>
-                <TableCell>
-                  <div className="flex items-center space-x-3">
-                    <Avatar className="w-8 h-8">
-                      <AvatarImage src={user.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.username}`} />
-                      <AvatarFallback>{user.username.slice(0, 2).toUpperCase()}</AvatarFallback>
-                    </Avatar>
-                    <div>
-                      <p className="font-medium text-foreground">{user.username}</p>
-                    </div>
-                  </div>
-                </TableCell>
-                <TableCell>
-                  {user.status === "pending" && <Badge variant="secondary">Pending</Badge>}
-                  {user.status === "active" && <Badge variant="default">Active</Badge>}
-                  {user.status === "suspended" && <Badge variant="secondary">Suspended</Badge>}
-                  {user.status === "banned" && <Badge variant="destructive">Banned</Badge>}
-                </TableCell>
-                <TableCell>
-                  <Badge variant="outline">{user.role ? user.role.charAt(0).toUpperCase() + user.role.slice(1) : "User"}</Badge>
-                </TableCell>
-                <TableCell>
-                  <div className="flex gap-2 flex-wrap">
-                    {user.status === "pending" ? (
-                      <>
-                        <Button size="sm" variant="default" onClick={() => approveUser(user.id)}>Approve</Button>
-                        <Button size="sm" variant="destructive" onClick={() => rejectUser(user.id)}>Reject</Button>
-                      </>
-                    ) : (
-                      <span className="text-muted-foreground">—</span>
-                    )}
-                    <Button size="sm" variant="outline" onClick={() => handleEditUser(user)}>Edit</Button>
-                    <Button size="sm" variant="outline" onClick={() => setConfirmLogoutId(user.id)}>Force Logout</Button>
-                    <Button size="sm" variant="destructive" onClick={() => setConfirmDeleteId(user.id)}>Delete</Button>
-                  </div>
-                  {/* Force Logout Confirmation Dialog */}
-                  <Dialog open={confirmLogoutId === user.id} onOpenChange={open => !open && setConfirmLogoutId(null)}>
-                    <DialogContent>
-                      <DialogHeader>
-                        <DialogTitle>Force Logout</DialogTitle>
-                        <DialogDescription>Are you sure you want to forcefully log out <b>{user.username}</b>?</DialogDescription>
-                      </DialogHeader>
-                      <DialogFooter>
-                        <Button variant="outline" onClick={() => setConfirmLogoutId(null)}>Cancel</Button>
-                        <Button variant="destructive" onClick={() => { if (forceLogoutUser) forceLogoutUser(user.id); setConfirmLogoutId(null); }}>Force Logout</Button>
-                      </DialogFooter>
-                    </DialogContent>
-                  </Dialog>
-                  {/* Delete Confirmation Dialog */}
-                  <Dialog open={confirmDeleteId === user.id} onOpenChange={open => !open && setConfirmDeleteId(null)}>
-                    <DialogContent>
-                      <DialogHeader>
-                        <DialogTitle>Move to Trash</DialogTitle>
-                        <DialogDescription>Are you sure you want to move <b>{user.username}</b> to trash? The user can be restored later from the Trash tab.</DialogDescription>
-                      </DialogHeader>
-                      <DialogFooter>
-                        <Button variant="outline" onClick={() => setConfirmDeleteId(null)}>Cancel</Button>
-                        <Button variant="destructive" onClick={() => { if (deleteUser) deleteUser(user.id); setConfirmDeleteId(null); }}>Move to Trash</Button>
-                      </DialogFooter>
-                    </DialogContent>
-                  </Dialog>
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+        {loading ? (
+          <div className="text-center py-8">
+            <Loader2 className="h-8 w-8 animate-spin mx-auto mb-2 text-primary" />
+            <p className="text-muted-foreground">Loading users...</p>
+          </div>
+        ) : (
+          <>
+            <div className="max-h-[600px] overflow-y-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>User</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Role</TableHead>
+                    <TableHead>Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredUsers.map((user) => (
+                    <TableRow key={user.id}>
+                      <TableCell>
+                        <div className="flex items-center space-x-3">
+                          <Avatar className="w-8 h-8">
+                            <AvatarImage src={user.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.username}`} />
+                            <AvatarFallback>{user.username.slice(0, 2).toUpperCase()}</AvatarFallback>
+                          </Avatar>
+                          <div>
+                            <p className="font-medium text-foreground">{user.username}</p>
+                            <p className="text-sm text-muted-foreground">{user.email}</p>
+                          </div>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        {user.status === "pending" && <Badge variant="secondary">Pending</Badge>}
+                        {user.status === "active" && <Badge variant="default">Active</Badge>}
+                        {user.status === "suspended" && <Badge variant="secondary">Suspended</Badge>}
+                        {user.status === "banned" && <Badge variant="destructive">Banned</Badge>}
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="outline">{user.role ? user.role.charAt(0).toUpperCase() + user.role.slice(1) : "User"}</Badge>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex gap-2 flex-wrap">
+                          {user.status === "pending" ? (
+                            <>
+                              <Button 
+                                size="sm" 
+                                variant="default" 
+                                onClick={() => approveUserInternal(user.id)}
+                                disabled={actionLoading[user.id]}
+                              >
+                                {actionLoading[user.id] ? (
+                                  <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                                ) : null}
+                                Approve
+                              </Button>
+                              <Button 
+                                size="sm" 
+                                variant="destructive" 
+                                onClick={() => rejectUserInternal(user.id)}
+                                disabled={actionLoading[user.id]}
+                              >
+                                {actionLoading[user.id] ? (
+                                  <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                                ) : null}
+                                Reject
+                              </Button>
+                            </>
+                          ) : (
+                            <span className="text-muted-foreground">—</span>
+                          )}
+                          <Button 
+                            size="sm" 
+                            variant="outline" 
+                            onClick={() => handleEditUser(user)}
+                            disabled={loading || actionLoading[user.id]}
+                          >
+                            Edit
+                          </Button>
+                          <Button 
+                            size="sm" 
+                            variant="outline" 
+                            onClick={() => forceLogoutUserInternal(user.id)}
+                            disabled={actionLoading[user.id]}
+                          >
+                            Force Logout
+                          </Button>
+                          <Button 
+                            size="sm" 
+                            variant="destructive" 
+                            onClick={() => deleteUserInternal(user.id)}
+                            disabled={actionLoading[user.id]}
+                          >
+                            Delete
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+            
+            {filteredUsers.length === 0 && !loading && (
+              <div className="text-center py-8 text-muted-foreground">
+                <AlertCircle className="w-12 h-12 mx-auto mb-2 opacity-50" />
+                <p>No users found matching your filters.</p>
+              </div>
+            )}
+          </>
+        )}
       </CardContent>
     </Card>
   );
-};
+});

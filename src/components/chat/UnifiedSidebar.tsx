@@ -60,7 +60,7 @@ export const UnifiedSidebar = ({
       return conversation.groupName?.toLowerCase().includes(searchLower);
     } else {
       const otherUser = conversation.participants.find(p => p.id !== currentUser.id);
-      return otherUser?.username.toLowerCase().includes(searchLower);
+      return otherUser?.username?.toLowerCase().includes(searchLower);
     }
   });
 
@@ -141,7 +141,7 @@ export const UnifiedSidebar = ({
 
   const getConversationAvatarFallback = (conversation: Conversation) => {
     const title = getConversationTitle(conversation);
-    return title.slice(0, 2).toUpperCase();
+    return (title || '??').slice(0, 2).toUpperCase();
   };
 
   const handleDeleteConversation = (conversationId: string) => {
@@ -157,7 +157,7 @@ export const UnifiedSidebar = ({
           <Avatar className="h-10 w-10">
             <AvatarImage src={currentUser.avatar} />
             <AvatarFallback className="bg-primary text-primary-foreground">
-              {currentUser.username.slice(0, 2).toUpperCase()}
+              {(currentUser.username || '??').slice(0, 2).toUpperCase()}
             </AvatarFallback>
           </Avatar>
           <div className="flex-1">
@@ -251,18 +251,18 @@ export const UnifiedSidebar = ({
                       {getGroupIcon(conversation)}
                       {conversation.type === 'group' && (
                         <div className="flex -space-x-1">
-                          {conversation.participants.slice(0, 3).map((member) => (
+                          {(conversation.participants || []).slice(0, 3).map((member) => (
                             <Avatar key={member.id} className="h-4 w-4 border border-card">
                               <AvatarImage src={member.avatar} />
                               <AvatarFallback className="text-[8px]">
-                                {member.username.slice(0, 1)}
+                                {(member.username || '?').slice(0, 1)}
                               </AvatarFallback>
                             </Avatar>
                           ))}
                           {conversation.participants.length > 3 && (
                             <div className="h-4 w-4 rounded-full bg-muted border border-card flex items-center justify-center">
                               <span className="text-[8px]">
-                                +{conversation.participants.length - 3}
+                                +{(conversation.participants || []).length - 3}
                               </span>
                             </div>
                           )}

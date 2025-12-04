@@ -1,7 +1,8 @@
 import { useState, useEffect, useCallback } from "react";
 import { User, Group, GroupMessage, GroupMember, CreateGroupData, UpdateGroupData } from "@/types/group";
+import { apiService } from "@/lib/api";
 
-// Sample data for demonstration
+// Fallback sample data for when API fails
 const sampleUsers: User[] = [
   {
     id: "1",
@@ -42,8 +43,8 @@ const sampleGroups: Group[] = [
     description: "Frontend and backend developers working on the project",
     avatar: "https://api.dicebear.com/7.x/shapes/svg?seed=dev-team",
     createdBy: "1",
-    createdAt: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000), // 7 days ago
-    updatedAt: new Date(Date.now() - 2 * 60 * 60 * 1000), // 2 hours ago
+    createdAt: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000),
+    updatedAt: new Date(Date.now() - 2 * 60 * 60 * 1000),
     isPrivate: false,
     members: [
       {
@@ -71,92 +72,8 @@ const sampleGroups: Group[] = [
         status: "active"
       }
     ],
-    lastActivity: new Date(Date.now() - 30 * 60 * 1000), // 30 minutes ago
+    lastActivity: new Date(Date.now() - 30 * 60 * 1000),
     unreadCount: 2
-  },
-  {
-    id: "group-2",
-    name: "Project Planning",
-    description: "Weekly planning sessions and project discussions",
-    avatar: "https://api.dicebear.com/7.x/shapes/svg?seed=planning",
-    createdBy: "4",
-    createdAt: new Date(Date.now() - 14 * 24 * 60 * 60 * 1000), // 14 days ago
-    updatedAt: new Date(Date.now() - 4 * 60 * 60 * 1000), // 4 hours ago
-    isPrivate: true,
-    members: [
-      {
-        userId: "4",
-        username: "Diana Prince",
-        avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=diana",
-        role: "admin",
-        joinedAt: new Date(Date.now() - 14 * 24 * 60 * 60 * 1000),
-        status: "active"
-      },
-      {
-        userId: "1",
-        username: "Alice Johnson",
-        avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=alice",
-        role: "member",
-        joinedAt: new Date(Date.now() - 13 * 24 * 60 * 60 * 1000),
-        status: "active"
-      },
-      {
-        userId: "5",
-        username: "Eve Wilson",
-        avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=eve",
-        role: "member",
-        joinedAt: new Date(Date.now() - 12 * 24 * 60 * 60 * 1000),
-        status: "active"
-      }
-    ],
-    lastActivity: new Date(Date.now() - 2 * 60 * 60 * 1000), // 2 hours ago
-    unreadCount: 0
-  },
-  {
-    id: "group-3",
-    name: "Random Chat",
-    description: "Just for fun conversations",
-    avatar: "https://api.dicebear.com/7.x/shapes/svg?seed=random",
-    createdBy: "2",
-    createdAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000), // 3 days ago
-    updatedAt: new Date(Date.now() - 1 * 60 * 60 * 1000), // 1 hour ago
-    isPrivate: false,
-    members: [
-      {
-        userId: "2",
-        username: "Bob Smith",
-        avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=bob",
-        role: "admin",
-        joinedAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000),
-        status: "active"
-      },
-      {
-        userId: "3",
-        username: "Charlie Brown",
-        avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=charlie",
-        role: "member",
-        joinedAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000),
-        status: "active"
-      },
-      {
-        userId: "4",
-        username: "Diana Prince",
-        avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=diana",
-        role: "member",
-        joinedAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000),
-        status: "active"
-      },
-      {
-        userId: "5",
-        username: "Eve Wilson",
-        avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=eve",
-        role: "member",
-        joinedAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000),
-        status: "active"
-      }
-    ],
-    lastActivity: new Date(Date.now() - 15 * 60 * 1000), // 15 minutes ago
-    unreadCount: 5
   }
 ];
 
@@ -169,86 +86,128 @@ const sampleMessages: Record<string, GroupMessage[]> = {
       senderName: "Alice Johnson",
       timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000),
       groupId: "group-1"
-    },
-    {
-      id: "msg-2", 
-      content: "Absolutely! I've prepared the user stories.",
-      senderId: "2",
-      senderName: "Bob Smith",
-      timestamp: new Date(Date.now() - 90 * 60 * 1000),
-      groupId: "group-1"
-    },
-    {
-      id: "msg-3",
-      content: "Great! I can review the backend requirements.",
-      senderId: "3",
-      senderName: "Charlie Brown",
-      timestamp: new Date(Date.now() - 30 * 60 * 1000),
-      groupId: "group-1"
-    }
-  ],
-  "group-2": [
-    {
-      id: "msg-4",
-      content: "Let's discuss the Q1 roadmap",
-      senderId: "4",
-      senderName: "Diana Prince",
-      timestamp: new Date(Date.now() - 4 * 60 * 60 * 1000),
-      groupId: "group-2"
-    },
-    {
-      id: "msg-5",
-      content: "I've prepared the initial draft",
-      senderId: "1",
-      senderName: "Alice Johnson",
-      timestamp: new Date(Date.now() - 3 * 60 * 60 * 1000),
-      groupId: "group-2"
-    }
-  ],
-  "group-3": [
-    {
-      id: "msg-6",
-      content: "Anyone up for pizza tonight? 🍕",
-      senderId: "2",
-      senderName: "Bob Smith",
-      timestamp: new Date(Date.now() - 60 * 60 * 1000),
-      groupId: "group-3"
-    },
-    {
-      id: "msg-7",
-      content: "I'm in! What time?",
-      senderId: "3",
-      senderName: "Charlie Brown",
-      timestamp: new Date(Date.now() - 45 * 60 * 1000),
-      groupId: "group-3"
-    },
-    {
-      id: "msg-8",
-      content: "Count me in too!",
-      senderId: "4",
-      senderName: "Diana Prince",
-      timestamp: new Date(Date.now() - 30 * 60 * 1000),
-      groupId: "group-3"
-    },
-    {
-      id: "msg-9",
-      content: "Sorry, can't make it tonight. Maybe tomorrow?",
-      senderId: "5",
-      senderName: "Eve Wilson",
-      timestamp: new Date(Date.now() - 15 * 60 * 1000),
-      groupId: "group-3"
     }
   ]
 };
 
 export const useGroupChat = (currentUserId: string = "1") => {
-  const [groups, setGroups] = useState<Group[]>(sampleGroups);
-  const [currentGroupId, setCurrentGroupId] = useState<string>(sampleGroups[0].id);
-  const [messages, setMessages] = useState<Record<string, GroupMessage[]>>(sampleMessages);
+  const [groups, setGroups] = useState<Group[]>([]);
+  const [currentGroupId, setCurrentGroupId] = useState<string>("");
+  const [messages, setMessages] = useState<Record<string, GroupMessage[]>>({});
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [availableUsers, setAvailableUsers] = useState<User[]>([]);
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
 
-  const currentUser = sampleUsers.find(u => u.id === currentUserId) || sampleUsers[0];
-  const availableUsers = sampleUsers.filter(u => u.id !== currentUserId);
+  // Load groups and users from API on mount
+  useEffect(() => {
+    const loadData = async () => {
+      setLoading(true);
+      setError(null);
+      
+      try {
+        // Load users
+        const usersResponse = await apiService.getUsers();
+        if (usersResponse.success && Array.isArray(usersResponse.data)) {
+          const users = usersResponse.data.map((user: any) => ({
+            id: user.id,
+            username: user.username,
+            avatar: user.avatar,
+            status: (user.status === 'active' ? 'online' : user.status === 'away' ? 'away' : 'offline') as "online" | "away" | "offline"
+          }));
+          
+          const current = users.find((u: User) => u.id === currentUserId);
+          setCurrentUser(current || sampleUsers[0]);
+          setAvailableUsers(users.filter((u: User) => u.id !== currentUserId));
+        } else {
+          // Fallback to sample data
+          setCurrentUser(sampleUsers.find(u => u.id === currentUserId) || sampleUsers[0]);
+          setAvailableUsers(sampleUsers.filter(u => u.id !== currentUserId));
+        }
+
+        // Load group conversations
+        const conversationsResponse = await apiService.getConversations();
+        if (conversationsResponse.success && Array.isArray(conversationsResponse.data)) {
+          const groupConversations = conversationsResponse.data
+            .filter((conv: any) => conv.type === 'group')
+            .map((conv: any) => ({
+              id: conv.id,
+              name: conv.title,
+              description: conv.description || '',
+              avatar: conv.avatar,
+              createdBy: conv.createdBy || currentUserId,
+              createdAt: new Date(conv.createdAt),
+              updatedAt: new Date(conv.createdAt),
+              isPrivate: conv.isPrivate || false,
+              members: conv.participants?.map((p: any) => ({
+                userId: p.id,
+                username: p.username,
+                avatar: p.avatar,
+                role: p.role || 'member',
+                joinedAt: new Date(p.joinedAt || conv.createdAt),
+                status: 'active'
+              })) || [],
+              lastActivity: new Date(conv.createdAt),
+              unreadCount: 0
+            }));
+          
+          if (groupConversations.length > 0) {
+            setGroups(groupConversations);
+            setCurrentGroupId(groupConversations[0].id);
+            
+            // Load messages for each group
+            for (const group of groupConversations) {
+              const messagesResponse = await apiService.getMessages(group.id);
+              if (messagesResponse.success && Array.isArray(messagesResponse.data)) {
+                const groupMessages = messagesResponse.data.map((msg: any) => ({
+                  id: msg.id,
+                  content: msg.content,
+                  senderId: msg.sender,
+                  senderName: msg.senderName || 'Unknown',
+                  timestamp: new Date(msg.timestamp),
+                  groupId: group.id,
+                  attachments: msg.attachments,
+                  edited: msg.edited,
+                  editedAt: msg.editedAt ? new Date(msg.editedAt) : undefined,
+                  forwarded: msg.forwarded,
+                  originalSender: msg.originalSender
+                }));
+                
+                setMessages(prev => ({
+                  ...prev,
+                  [group.id]: groupMessages
+                }));
+              }
+            }
+          } else {
+            // Fallback to sample data
+            setGroups(sampleGroups);
+            setCurrentGroupId(sampleGroups[0].id);
+            setMessages(sampleMessages);
+          }
+        } else {
+          // Fallback to sample data
+          setGroups(sampleGroups);
+          setCurrentGroupId(sampleGroups[0].id);
+          setMessages(sampleMessages);
+        }
+      } catch (err) {
+        console.error('Failed to load group chat data:', err);
+        setError(err instanceof Error ? err.message : 'Failed to load data');
+        
+        // Fallback to sample data
+        setCurrentUser(sampleUsers.find(u => u.id === currentUserId) || sampleUsers[0]);
+        setAvailableUsers(sampleUsers.filter(u => u.id !== currentUserId));
+        setGroups(sampleGroups);
+        setCurrentGroupId(sampleGroups[0].id);
+        setMessages(sampleMessages);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadData();
+  }, [currentUserId]);
 
   const currentGroup = groups.find(g => g.id === currentGroupId);
   const currentGroupMessages = messages[currentGroupId] || [];
@@ -265,10 +224,60 @@ export const useGroupChat = (currentUserId: string = "1") => {
 
   const createGroup = useCallback(async (groupData: CreateGroupData) => {
     setLoading(true);
+    setError(null);
+    
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      // Try to create group via API
+      const response = await apiService.createConversation([...groupData.memberIds, currentUserId]);
       
+      if (response.success && response.data) {
+        const newGroup: Group = {
+          id: response.data.id,
+          name: groupData.name,
+          description: groupData.description,
+          avatar: groupData.avatar,
+          createdBy: currentUserId,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          isPrivate: groupData.isPrivate,
+          members: [
+            {
+              userId: currentUserId,
+              username: currentUser?.username || "Unknown",
+              avatar: currentUser?.avatar,
+              role: "admin",
+              joinedAt: new Date(),
+              status: "active"
+            },
+            ...groupData.memberIds.map(userId => {
+              const user = availableUsers.find(u => u.id === userId);
+              return {
+                userId,
+                username: user?.username || "Unknown User",
+                avatar: user?.avatar,
+                role: "member" as const,
+                joinedAt: new Date(),
+                status: "active" as const
+              };
+            })
+          ],
+          lastActivity: new Date(),
+          unreadCount: 0
+        };
+
+        setGroups(prev => [...prev, newGroup]);
+        setMessages(prev => ({ ...prev, [newGroup.id]: [] }));
+        setCurrentGroupId(newGroup.id);
+        
+        return newGroup;
+      } else {
+        throw new Error(response.error || 'Failed to create group');
+      }
+    } catch (err) {
+      console.error('Failed to create group:', err);
+      setError(err instanceof Error ? err.message : 'Failed to create group');
+      
+      // Fallback: create locally
       const newGroup: Group = {
         id: `group-${Date.now()}`,
         name: groupData.name,
@@ -281,8 +290,8 @@ export const useGroupChat = (currentUserId: string = "1") => {
         members: [
           {
             userId: currentUserId,
-            username: currentUser.username,
-            avatar: currentUser.avatar,
+            username: currentUser?.username || "Unknown",
+            avatar: currentUser?.avatar,
             role: "admin",
             joinedAt: new Date(),
             status: "active"
@@ -315,9 +324,10 @@ export const useGroupChat = (currentUserId: string = "1") => {
 
   const updateGroup = useCallback(async (groupId: string, updateData: UpdateGroupData) => {
     setLoading(true);
+    setError(null);
+    
     try {
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
+      // Update locally first for immediate feedback
       setGroups(prev => prev.map(group => 
         group.id === groupId 
           ? { 
@@ -327,6 +337,12 @@ export const useGroupChat = (currentUserId: string = "1") => {
             }
           : group
       ));
+      
+      // TODO: Add API call when endpoint is available
+      // await apiService.updateGroup(groupId, updateData);
+    } catch (err) {
+      console.error('Failed to update group:', err);
+      setError(err instanceof Error ? err.message : 'Failed to update group');
     } finally {
       setLoading(false);
     }
@@ -334,9 +350,10 @@ export const useGroupChat = (currentUserId: string = "1") => {
 
   const addMembers = useCallback(async (groupId: string, memberIds: string[]) => {
     setLoading(true);
+    setError(null);
+    
     try {
-      await new Promise(resolve => setTimeout(resolve, 800));
-      
+      // Update locally first
       setGroups(prev => prev.map(group => {
         if (group.id === groupId) {
           const newMembers = memberIds.map(userId => {
@@ -359,6 +376,12 @@ export const useGroupChat = (currentUserId: string = "1") => {
         }
         return group;
       }));
+      
+      // TODO: Add API call when endpoint is available
+      // await apiService.addGroupMembers(groupId, memberIds);
+    } catch (err) {
+      console.error('Failed to add members:', err);
+      setError(err instanceof Error ? err.message : 'Failed to add members');
     } finally {
       setLoading(false);
     }
@@ -366,9 +389,9 @@ export const useGroupChat = (currentUserId: string = "1") => {
 
   const removeMember = useCallback(async (groupId: string, userId: string) => {
     setLoading(true);
+    setError(null);
+    
     try {
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
       setGroups(prev => prev.map(group => 
         group.id === groupId 
           ? { 
@@ -378,6 +401,12 @@ export const useGroupChat = (currentUserId: string = "1") => {
             }
           : group
       ));
+      
+      // TODO: Add API call when endpoint is available
+      // await apiService.removeGroupMember(groupId, userId);
+    } catch (err) {
+      console.error('Failed to remove member:', err);
+      setError(err instanceof Error ? err.message : 'Failed to remove member');
     } finally {
       setLoading(false);
     }
@@ -385,9 +414,9 @@ export const useGroupChat = (currentUserId: string = "1") => {
 
   const leaveGroup = useCallback(async (groupId: string) => {
     setLoading(true);
+    setError(null);
+    
     try {
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
       setGroups(prev => prev.map(group => 
         group.id === groupId 
           ? { 
@@ -403,6 +432,12 @@ export const useGroupChat = (currentUserId: string = "1") => {
         const remainingGroups = groups.filter(g => g.id !== groupId);
         setCurrentGroupId(remainingGroups.length > 0 ? remainingGroups[0].id : "");
       }
+      
+      // TODO: Add API call when endpoint is available
+      // await apiService.leaveGroup(groupId);
+    } catch (err) {
+      console.error('Failed to leave group:', err);
+      setError(err instanceof Error ? err.message : 'Failed to leave group');
     } finally {
       setLoading(false);
     }
@@ -410,9 +445,9 @@ export const useGroupChat = (currentUserId: string = "1") => {
 
   const deleteGroup = useCallback(async (groupId: string) => {
     setLoading(true);
+    setError(null);
+    
     try {
-      await new Promise(resolve => setTimeout(resolve, 800));
-      
       setGroups(prev => prev.filter(group => group.id !== groupId));
       setMessages(prev => {
         const newMessages = { ...prev };
@@ -425,6 +460,12 @@ export const useGroupChat = (currentUserId: string = "1") => {
         const remainingGroups = groups.filter(g => g.id !== groupId);
         setCurrentGroupId(remainingGroups.length > 0 ? remainingGroups[0].id : "");
       }
+      
+      // TODO: Add API call when endpoint is available
+      // await apiService.deleteGroup(groupId);
+    } catch (err) {
+      console.error('Failed to delete group:', err);
+      setError(err instanceof Error ? err.message : 'Failed to delete group');
     } finally {
       setLoading(false);
     }
@@ -433,22 +474,51 @@ export const useGroupChat = (currentUserId: string = "1") => {
   const sendMessage = useCallback(async (groupId: string, content: string, attachments?: any[]) => {
     if (!content.trim() && (!attachments || attachments.length === 0)) return;
     
-    const newMessage: GroupMessage = {
-      id: `msg-${Date.now()}`,
-      content: content.trim(),
-      senderId: currentUserId,
-      senderName: currentUser.username,
-      timestamp: new Date(),
-      groupId,
-      attachments
-    };
+    setError(null);
+    
+    try {
+      // Try to send via API
+      const response = await apiService.sendMessage(groupId, content.trim());
+      
+      if (response.success && response.data) {
+        const newMessage: GroupMessage = {
+          id: response.data.id,
+          content: response.data.content,
+          senderId: currentUserId,
+          senderName: currentUser?.username || "Unknown",
+          timestamp: new Date(response.data.timestamp),
+          groupId,
+          attachments: response.data.attachments
+        };
 
-    setMessages(prev => ({
-      ...prev,
-      [groupId]: [...(prev[groupId] || []), newMessage]
-    }));
+        setMessages(prev => ({
+          ...prev,
+          [groupId]: [...(prev[groupId] || []), newMessage]
+        }));
+      } else {
+        throw new Error(response.error || 'Failed to send message');
+      }
+    } catch (err) {
+      console.error('Failed to send message via API, using local fallback:', err);
+      
+      // Fallback: create message locally
+      const newMessage: GroupMessage = {
+        id: `msg-${Date.now()}`,
+        content: content.trim(),
+        senderId: currentUserId,
+        senderName: currentUser?.username || "Unknown",
+        timestamp: new Date(),
+        groupId,
+        attachments
+      };
 
-    // Update group's last activity and unread counts for other members
+      setMessages(prev => ({
+        ...prev,
+        [groupId]: [...(prev[groupId] || []), newMessage]
+      }));
+    }
+
+    // Update group's last activity
     setGroups(prev => prev.map(group => {
       if (group.id === groupId) {
         return {
@@ -459,47 +529,78 @@ export const useGroupChat = (currentUserId: string = "1") => {
       }
       return group;
     }));
-  }, [currentUserId, currentUser.username]);
+  }, [currentUserId, currentUser]);
 
   const editMessage = useCallback(async (groupId: string, messageId: string, content: string) => {
-    setMessages(prev => ({
-      ...prev,
-      [groupId]: prev[groupId]?.map(msg => 
-        msg.id === messageId 
-          ? { 
-              ...msg, 
-              content: content.trim(),
-              edited: true,
-              editedAt: new Date()
-            }
-          : msg
-      ) || []
-    }));
+    setError(null);
+    
+    try {
+      // Update locally first
+      setMessages(prev => ({
+        ...prev,
+        [groupId]: prev[groupId]?.map(msg => 
+          msg.id === messageId 
+            ? { 
+                ...msg, 
+                content: content.trim(),
+                edited: true,
+                editedAt: new Date()
+              }
+            : msg
+        ) || []
+      }));
+      
+      // TODO: Add API call when endpoint is available
+      // await apiService.editMessage(groupId, messageId, content);
+    } catch (err) {
+      console.error('Failed to edit message:', err);
+      setError(err instanceof Error ? err.message : 'Failed to edit message');
+    }
   }, []);
 
   const deleteMessage = useCallback(async (groupId: string, messageId: string) => {
-    setMessages(prev => ({
-      ...prev,
-      [groupId]: prev[groupId]?.filter(msg => msg.id !== messageId) || []
-    }));
+    setError(null);
+    
+    try {
+      setMessages(prev => ({
+        ...prev,
+        [groupId]: prev[groupId]?.filter(msg => msg.id !== messageId) || []
+      }));
+      
+      // TODO: Add API call when endpoint is available
+      // await apiService.deleteMessage(groupId, messageId);
+    } catch (err) {
+      console.error('Failed to delete message:', err);
+      setError(err instanceof Error ? err.message : 'Failed to delete message');
+    }
   }, []);
 
   const forwardMessage = useCallback(async (groupId: string, message: GroupMessage) => {
-    const forwardedMessage: GroupMessage = {
-      ...message,
-      id: `msg-${Date.now()}`,
-      senderId: currentUserId,
-      senderName: currentUser.username,
-      timestamp: new Date(),
-      forwarded: true,
-      originalSender: message.senderName
-    };
+    setError(null);
+    
+    try {
+      const forwardedMessage: GroupMessage = {
+        ...message,
+        id: `msg-${Date.now()}`,
+        senderId: currentUserId,
+        senderName: currentUser?.username || "Unknown",
+        timestamp: new Date(),
+        forwarded: true,
+        originalSender: message.senderName
+      };
 
-    setMessages(prev => ({
-      ...prev,
-      [groupId]: [...(prev[groupId] || []), forwardedMessage]
-    }));
-  }, [currentUserId, currentUser.username]);
+      setMessages(prev => ({
+        ...prev,
+        [groupId]: [...(prev[groupId] || []), forwardedMessage]
+      }));
+      
+      // TODO: Add API call when endpoint is available
+      // await apiService.forwardMessage(groupId, message.id);
+    } catch (err) {
+      console.error('Failed to forward message:', err);
+      setError(err instanceof Error ? err.message : 'Failed to forward message');
+    }
+  }, [currentUserId, currentUser]);
 
   return {
     // Data
@@ -508,11 +609,12 @@ export const useGroupChat = (currentUserId: string = "1") => {
     currentGroup,
     currentGroupMessages,
     messages,
-    currentUser,
+    currentUser: currentUser || sampleUsers[0],
     availableUsers,
     
     // State
     loading,
+    error,
     
     // Actions
     selectGroup,

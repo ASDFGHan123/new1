@@ -13,15 +13,9 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Search, Users, UserCheck } from "lucide-react";
+import { User as ApiUser } from "@/lib/api";
 
-interface User {
-  id: string;
-  username: string;
-  email: string;
-  status: "active" | "suspended" | "banned";
-  role: string;
-  avatar?: string;
-}
+type User = ApiUser;
 
 interface UserSelectionDialogProps {
   isOpen: boolean;

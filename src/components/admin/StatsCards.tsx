@@ -1,35 +1,37 @@
-import { Users, MessageSquare, Activity, Shield, Printer } from "lucide-react";
+import { Users, MessageSquare, Activity, Shield, Printer, RefreshCw, AlertCircle } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { useState, useEffect } from "react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { useState, useEffect, useCallback } from "react";
 import { openPrintWindow, generateStatsCardsHTML } from "@/lib/printUtils";
+import { apiService } from "@/lib/api";
 
 const initialStats = [
   {
     title: "Total Users",
-    value: 12847,
-    change: 8.2,
+    value: 0,
+    change: 0,
     icon: Users,
     color: "admin-primary",
   },
   {
     title: "Active Conversations",
-    value: 3456,
-    change: 12.5,
+    value: 0,
+    change: 0,
     icon: MessageSquare,
     color: "admin-secondary",
   },
   {
     title: "Messages Today",
-    value: 89234,
-    change: 23.1,
+    value: 0,
+    change: 0,
     icon: Activity,
     color: "admin-warning",
   },
   {
     title: "Online Users",
-    value: 2847,
-    change: -2.4,
+    value: 0,
+    change: 0,
     icon: Shield,
     color: "admin-success",
   },
@@ -37,6 +39,77 @@ const initialStats = [
 
 export const StatsCards = () => {
   const [stats, setStats] = useState(initialStats);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const loadStats = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    
+    try {
+      const response = await apiService.getDashboardStats();
+      
+      if (response.success && response.data) {
+        setStats([
+          {
+            title: "Total Users",
+            value: response.data.totalUsers || 0,
+            change: response.data.userGrowth || 0,
+            icon: Users,
+            color: "admin-primary",
+          },
+          {
+            title: "Active Conversations",
+            value: response.data.activeConversations || 0,
+            change: response.data.conversationGrowth || 0,
+            icon: MessageSquare,
+            color: "admin-secondary",
+          },
+          {
+            title: "Messages Today",
+            value: response.data.messagesToday || 0,
+            change: response.data.messageGrowth || 0,
+            icon: Activity,
+            color: "admin-warning",
+          },
+          {
+            title: "Online Users",
+            value: response.data.onlineUsers || 0,
+            change: response.data.onlineGrowth || 0,
+            icon: Shield,
+            color: "admin-success",
+          },
+        ]);
+      } else {
+        // Fallback to sample data if API fails
+        setStats([
+          { title: "Total Users", value: 12847, change: 8.2, icon: Users, color: "admin-primary" },
+          { title: "Active Conversations", value: 3456, change: 12.5, icon: MessageSquare, color: "admin-secondary" },
+          { title: "Messages Today", value: 89234, change: 23.1, icon: Activity, color: "admin-warning" },
+          { title: "Online Users", value: 2847, change: -2.4, icon: Shield, color: "admin-success" },
+        ]);
+      }
+    } catch (err) {
+      console.error('Failed to load dashboard stats:', err);
+      setError(err instanceof Error ? err.message : 'Failed to load statistics');
+      
+      // Fallback to sample data
+      setStats([
+        { title: "Total Users", value: 12847, change: 8.2, icon: Users, color: "admin-primary" },
+        { title: "Active Conversations", value: 3456, change: 12.5, icon: MessageSquare, color: "admin-secondary" },
+        { title: "Messages Today", value: 89234, change: 23.1, icon: Activity, color: "admin-warning" },
+        { title: "Online Users", value: 2847, change: -2.4, icon: Shield, color: "admin-success" },
+      ]);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadStats();
+    // Removed auto-refresh to prevent repeated API calls
+    // Users can manually refresh using the refresh button
+  }, [loadStats]);
 
   const handlePrintStats = () => {
     const printData = generateStatsCardsHTML(stats);
@@ -46,29 +119,20 @@ export const StatsCards = () => {
     });
   };
 
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setStats(prevStats =>
-        prevStats.map(stat => {
-          // Randomly update values and changes
-          const valueChange = Math.floor(Math.random() * 21) - 10; // -10 to +10
-          const changeChange = (Math.random() * 2 - 1) * 0.5; // -0.5 to +0.5
-          return {
-            ...stat,
-            value: Math.max(0, stat.value + valueChange),
-            change: Math.max(-50, Math.min(50, stat.change + changeChange)),
-          };
-        })
-      );
-    }, 3000); // Update every 3 seconds
-
-    return () => clearInterval(interval);
-  }, []);
-
   return (
     <div className="space-y-4">
-      {/* Print Button */}
-      <div className="flex justify-end">
+      {/* Header with Print and Refresh Buttons */}
+      <div className="flex justify-end gap-2">
+        <Button 
+          onClick={loadStats}
+          variant="ghost"
+          size="sm"
+          disabled={loading}
+          className="text-gray-900 hover:text-gray-900 dark:text-gray-100 dark:hover:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-800"
+        >
+          <RefreshCw className={`w-4 h-4 mr-2 text-gray-900 hover:text-gray-900 dark:text-gray-100 dark:hover:text-gray-100 ${loading ? 'animate-spin' : ''}`} />
+          Refresh
+        </Button>
         <Button 
           onClick={handlePrintStats}
           variant="outline"
@@ -79,6 +143,13 @@ export const StatsCards = () => {
           Print Statistics
         </Button>
       </div>
+
+      {error && (
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         {stats.map((stat, index) => (
@@ -92,12 +163,21 @@ export const StatsCards = () => {
               </div>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-card-foreground">{stat.value.toLocaleString()}</div>
-              <p className={`text-xs ${
-                stat.change >= 0 ? 'text-admin-success' : 'text-admin-error'
-              }`}>
-                {stat.change >= 0 ? '+' : ''}{stat.change.toFixed(1)}% from last month
-              </p>
+              {loading ? (
+                <div className="animate-pulse">
+                  <div className="h-8 bg-gray-200 rounded w-24 mb-2"></div>
+                  <div className="h-4 bg-gray-200 rounded w-32"></div>
+                </div>
+              ) : (
+                <>
+                  <div className="text-2xl font-bold text-card-foreground">{stat.value.toLocaleString()}</div>
+                  <p className={`text-xs ${
+                    stat.change >= 0 ? 'text-admin-success' : 'text-admin-error'
+                  }`}>
+                    {stat.change >= 0 ? '+' : ''}{stat.change.toFixed(1)}% from last month
+                  </p>
+                </>
+              )}
             </CardContent>
           </Card>
         ))}
