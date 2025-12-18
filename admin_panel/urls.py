@@ -3,6 +3,7 @@ URL configuration for admin_panel app.
 """
 from django.urls import path
 from . import views
+from . import moderation_views
 
 urlpatterns = [
     # Audit log endpoints
@@ -31,7 +32,8 @@ urlpatterns = [
     path('backups/<uuid:backup_id>/download/', views.BackupDownloadView.as_view(), name='backup_download'),
     path('backups/<uuid:backup_id>/restore/', views.BackupRestoreView.as_view(), name='backup_restore'),
     
-    # System settings endpoints
+    # System settings endpoints - bulk update must come before detail
+    path('settings/bulk/update/', views.SystemSettingsBulkUpdateView.as_view(), name='system_settings_bulk_update'),
     path('settings/', views.SystemSettingsListView.as_view(), name='system_settings_list'),
     path('settings/<str:key>/', views.SystemSettingDetailView.as_view(), name='system_setting_detail'),
     path('settings/<str:key>/update/', views.SystemSettingUpdateView.as_view(), name='system_setting_update'),
@@ -42,4 +44,14 @@ urlpatterns = [
     
     # Analytics endpoint (delegates to analytics app)
     path('analytics/', views.GeneralAnalyticsProxyView.as_view(), name='general_analytics'),
+    
+    # User creation endpoint
+    path('users/create/', views.CreateUserView.as_view(), name='create_user'),
+    
+    # Conversations endpoint
+    path('conversations/', views.AdminConversationListView.as_view(), name='admin_conversations_list'),
+    
+    # Moderation endpoints
+    path('suspicious-activities/', moderation_views.suspicious_activities_list, name='suspicious_activities_list'),
+    path('suspicious-activities/<uuid:activity_id>/resolve/', moderation_views.resolve_suspicious_activity, name='resolve_suspicious_activity'),
 ]

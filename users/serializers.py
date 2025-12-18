@@ -25,7 +25,7 @@ class UserSerializer(serializers.ModelSerializer):
             'is_approved', 'is_online', 'created_at', 'updated_at'
         ]
         read_only_fields = [
-            'id', 'message_count', 'report_count', 'email_verified',
+            'id', 'message_count', 'report_count',
             'is_approved', 'is_online', 'created_at', 'updated_at'
         ]
 
@@ -35,12 +35,16 @@ class UserListSerializer(serializers.ModelSerializer):
     Serializer for User list view (reduced fields).
     """
     full_name = serializers.ReadOnlyField()
+    join_date = serializers.SerializerMethodField()
+    
+    def get_join_date(self, obj):
+        return obj.join_date or obj.created_at
     
     class Meta:
         model = User
         fields = [
             'id', 'username', 'email', 'first_name', 'last_name', 'full_name',
-            'avatar', 'role', 'status', 'online_status', 'last_seen',
+            'avatar', 'role', 'status', 'online_status', 'last_seen', 'join_date',
             'message_count', 'email_verified', 'created_at'
         ]
         read_only_fields = [

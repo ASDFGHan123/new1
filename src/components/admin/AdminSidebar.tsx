@@ -1,3 +1,4 @@
+import React, { useState } from "react";
 import {
   LayoutDashboard,
   Users,
@@ -14,6 +15,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { cn } from "@/lib/utils";
+import { ProfileImageUploadDialog } from "./ProfileImageUploadDialog";
 
 const sidebarItems = [
   { icon: LayoutDashboard, label: "Dashboard", value: "overview" },
@@ -33,9 +35,16 @@ interface AdminSidebarProps {
   activeTab?: string;
   onTabChange?: (tab: string) => void;
   onLogout?: () => void;
+  onImageUpdated?: () => void;
 }
 
-export const AdminSidebar = ({ user, activeTab = "overview", onTabChange, onLogout }: AdminSidebarProps) => {
+export const AdminSidebar = ({ user, activeTab = "overview", onTabChange, onLogout, onImageUpdated }: AdminSidebarProps) => {
+  const [showImageUpload, setShowImageUpload] = useState(false);
+
+  const handleImageUpdated = () => {
+    setShowImageUpload(false);
+  };
+
   return (
     <div className="w-64 bg-sidebar border-r border-sidebar-border flex flex-col">
       {/* Logo */}
@@ -68,10 +77,10 @@ export const AdminSidebar = ({ user, activeTab = "overview", onTabChange, onLogo
       <div className="p-4 border-t border-sidebar-border">
         <div
           className="flex items-center space-x-3 mb-3 cursor-pointer hover:bg-sidebar-accent/50 p-2 rounded"
-          onClick={() => onTabChange?.('profile')}
+          onClick={() => setShowImageUpload(true)}
         >
           <Avatar className="w-8 h-8">
-            <AvatarImage src={user?.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user?.username || 'admin'}`} />
+            <AvatarImage src={user?.avatar ? `${user.avatar}?t=${Date.now()}` : `https://api.dicebear.com/7.x/avataaars/svg?seed=${user?.username || 'admin'}`} />
             <AvatarFallback className="bg-admin-primary text-primary-foreground">
               {user?.username?.slice(0, 2).toUpperCase() || 'AD'}
             </AvatarFallback>
@@ -81,6 +90,13 @@ export const AdminSidebar = ({ user, activeTab = "overview", onTabChange, onLogo
             <p className="text-xs text-sidebar-foreground/60">{user?.username ? `${user.username}@offchat.com` : 'admin@offchat.com'}</p>
           </div>
         </div>
+        <ProfileImageUploadDialog
+          key={user?.avatar}
+          isOpen={showImageUpload}
+          onClose={() => setShowImageUpload(false)}
+          onImageUpdated={handleImageUpdated}
+          user={user}
+        />
         <Button
           variant="ghost"
           size="sm"

@@ -16,7 +16,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "@/components/ui/dialog";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { ImageUpload } from "@/components/ui/image-upload";
 import { Label } from "@/components/ui/label";
@@ -72,61 +72,48 @@ export const UnifiedChatInterface = () => {
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
   const [editMessageContent, setEditMessageContent] = useState("");
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
-  
-  // API Integration states
   const [sendingMessage, setSendingMessage] = useState(false);
   const [editMessageLoading, setEditMessageLoading] = useState<string | null>(null);
   const [deleteMessageLoading, setDeleteMessageLoading] = useState<string | null>(null);
   const [retryCount, setRetryCount] = useState(0);
-  const [retryingMessages, setRetryingMessages] = useState<string | null>(null);
-  
-  // Voice recording states
   const [isRecording, setIsRecording] = useState(false);
   const [recordingDuration, setRecordingDuration] = useState(0);
   const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
-  const [isPlaying, setIsPlaying] = useState<string | null>(null);
+  const [selectedImage, setSelectedImage] = useState<string | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const formRef = useRef<HTMLFormElement>(null);
 
-  // API Integration Functions
-  const sendMessageToApi = async (conversationId: string, content: string, attachments: File[]) => {
-    if (!conversationId || !authUser) return;
-    
-    setSendingMessage(true);
-    
-    try {
-      if (conversationId.startsWith('group-')) {
-        // Handle group message through group chat hook
-        const groupId = conversationId.replace('group-', '');
-        await chat.sendMessage(conversationId, content, 
-          attachments.map(file => ({
-            id: `attachment-${Date.now()}-${Math.random()}`,
-            name: file.name,
-            type: file.type,
-            size: file.size,
-            url: URL.createObjectURL(file),
-            uploadedAt: new Date().toISOString()
-          }))
-        );
-      } else {
-        // Handle individual message via API
-        const response = await apiService.sendMessage(conversationId, content, attachments);
-        
-        if (!response.success) {
-          throw new Error(response.error || 'Failed to send message');
-        }
-        
-        // Message sent successfully - the hook will handle UI updates
-      }
-    } catch (error) {
-      console.error('Error sending message:', error);
-      const errorMessage = error instanceof Error ? error.message : 'Failed to send message';
-      // Show error toast or alert here
-    } finally {
-      setSendingMessage(false);
+  const handleSendMessage = async (e?: React.FormEvent | React.KeyboardEvent) => {
+    if (e) {
+      e.preventDefault();
     }
+    if (!message.trim() && attachments.length === 0 && !audioBlob) return;
+    if (!chat.currentConversationId) return;
+
+    setSendingMessage(true);
+    const messageText = message.trim();
+    if (!messageText && attachments.length === 0 && !audioBlob) {
+      setSendingMessage(false);
+      return;
+    }
+
+    const filesToSend = [...attachments];
+    
+    if (audioBlob && audioUrl) {
+      const audioFile = new File([audioBlob], `voice-message-${Date.now()}.webm`, {
+        type: 'audio/webm'
+      });
+      filesToSend.push(audioFile);
+    }
+
+    await chat.sendMessage(chat.currentConversationId, messageText || "", filesToSend as any);
+
+    setMessage("");
+    setAttachments([]);
+    cancelRecording();
+    setSendingMessage(false);
   };
 
   const editMessageInApi = async (conversationId: string, messageId: string, content: string) => {
@@ -136,11 +123,8 @@ export const UnifiedChatInterface = () => {
     
     try {
       if (conversationId.startsWith('group-')) {
-        // Handle group message editing
-        const groupId = conversationId.replace('group-', '');
         await chat.editMessage(conversationId, messageId, content);
       } else {
-        // Handle individual message editing via API
         const response = await apiService.request(`/chat/messages/${messageId}/`, {
           method: 'PATCH',
           body: JSON.stringify({ content })
@@ -150,13 +134,10 @@ export const UnifiedChatInterface = () => {
           throw new Error(response.error || 'Failed to edit message');
         }
         
-        // Update local state
         chat.editMessage(conversationId, messageId, content);
       }
     } catch (error) {
       console.error('Error editing message:', error);
-      const errorMessage = error instanceof Error ? error.message : 'Failed to edit message';
-      // Show error toast or alert here
     } finally {
       setEditMessageLoading(null);
     }
@@ -169,11 +150,8 @@ export const UnifiedChatInterface = () => {
     
     try {
       if (conversationId.startsWith('group-')) {
-        // Handle group message deletion
-        const groupId = conversationId.replace('group-', '');
         chat.deleteMessage(conversationId, messageId);
       } else {
-        // Handle individual message deletion via API
         const response = await apiService.request(`/chat/messages/${messageId}/`, {
           method: 'DELETE'
         });
@@ -182,25 +160,13 @@ export const UnifiedChatInterface = () => {
           throw new Error(response.error || 'Failed to delete message');
         }
         
-        // Update local state
         chat.deleteMessage(conversationId, messageId);
       }
     } catch (error) {
       console.error('Error deleting message:', error);
-      const errorMessage = error instanceof Error ? error.message : 'Failed to delete message';
-      // Show error toast or alert here
     } finally {
       setDeleteMessageLoading(null);
     }
-  };
-
-  const handleRetryMessages = (conversationId: string) => {
-    setRetryingMessages(conversationId);
-    // Retry logic would be implemented in the hook
-    setTimeout(() => {
-      setRetryingMessages(null);
-      setRetryCount(0);
-    }, 2000);
   };
 
   if (!authUser) {
@@ -215,7 +181,6 @@ export const UnifiedChatInterface = () => {
     );
   }
 
-  // Sync avatar with user prop
   const currentConversation = chat.currentConversation;
 
   const addFiles = (files: FileList | null) => {
@@ -244,32 +209,6 @@ export const UnifiedChatInterface = () => {
     addFiles(e.dataTransfer.files);
   };
 
-  const handleSendMessage = async (e?: React.FormEvent | React.KeyboardEvent) => {
-    if (e) {
-      e.preventDefault();
-    }
-    if (!message.trim() && attachments.length === 0 && !audioBlob) return;
-    if (!chat.currentConversationId) return;
-
-    const messageText = message.trim();
-    const filesToSend = [...attachments];
-    
-    // Add audio blob to attachments if recording
-    if (audioBlob && audioUrl) {
-      const audioFile = new File([audioBlob], `voice-message-${Date.now()}.webm`, {
-        type: 'audio/webm'
-      });
-      filesToSend.push(audioFile);
-    }
-
-    // Use the new API integration
-    await sendMessageToApi(chat.currentConversationId, messageText, filesToSend);
-
-    setMessage("");
-    setAttachments([]);
-    cancelRecording();
-  };
-
   const startEditingMessage = (messageId: string, currentContent: string) => {
     setEditingMessageId(messageId);
     setEditMessageContent(currentContent);
@@ -278,12 +217,7 @@ export const UnifiedChatInterface = () => {
 
   const saveMessageEdit = async () => {
     if (!editingMessageId || !editMessageContent.trim() || !chat.currentConversationId) return;
-
-    const content = editMessageContent.trim();
-    
-    // Use the new API integration
-    await editMessageInApi(chat.currentConversationId, editingMessageId, content);
-
+    await editMessageInApi(chat.currentConversationId, editingMessageId, editMessageContent.trim());
     setEditingMessageId(null);
     setEditMessageContent("");
   };
@@ -332,21 +266,18 @@ export const UnifiedChatInterface = () => {
     return conversation.isGroupPrivate ? <Lock className="h-4 w-4" /> : <Globe className="h-4 w-4" />;
   };
 
-  const formatFileSize = (bytes: number) => {
-    if (bytes === 0) return '0 Bytes';
+  const formatFileSize = (bytes?: number) => {
+    if (!bytes) return '0 B';
     const k = 1024;
-    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const sizes = ['B', 'KB', 'MB', 'GB'];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
   };
 
-  const getFileIcon = (fileName: string, fileType: string) => {
-    if (fileType.startsWith('image/')) {
-      return <Image className="h-4 w-4" />;
-    }
-    if (fileType.startsWith('audio/')) {
-      return <Mic className="h-4 w-4" />;
-    }
+  const getFileIcon = (fileName: string, fileType?: string) => {
+    const type = fileType || '';
+    if (type.startsWith('image/')) return <Image className="h-4 w-4" />;
+    if (type.startsWith('audio/')) return <Mic className="h-4 w-4" />;
     return <FileText className="h-4 w-4" />;
   };
 
@@ -356,16 +287,13 @@ export const UnifiedChatInterface = () => {
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
-  // Voice recording functions (simplified for now)
   const startRecording = () => {
     setIsRecording(true);
     setRecordingDuration(0);
-    // In a real app, you'd implement actual recording logic
   };
 
   const stopRecording = () => {
     setIsRecording(false);
-    // In a real app, you'd stop the recording
   };
 
   const cancelRecording = () => {
@@ -388,6 +316,7 @@ export const UnifiedChatInterface = () => {
           groups={chat.groups}
           onCreateGroup={chat.createGroup}
           onCreateIndividualChat={chat.createIndividualConversation}
+          onDeleteConversation={chat.deleteConversation}
         />
         <div className="flex-1 flex items-center justify-center">
           <div className="text-center">
@@ -408,7 +337,6 @@ export const UnifiedChatInterface = () => {
 
   return (
     <div className="flex h-screen bg-gradient-to-br from-background to-muted">
-      {/* Sidebar */}
       <UnifiedSidebar 
         conversations={chat.conversations}
         currentConversationId={chat.currentConversationId}
@@ -419,11 +347,10 @@ export const UnifiedChatInterface = () => {
         groups={chat.groups}
         onCreateGroup={chat.createGroup}
         onCreateIndividualChat={chat.createIndividualConversation}
+        onDeleteConversation={chat.deleteConversation}
       />
 
-      {/* Main Chat Area */}
       <div className="flex-1 flex flex-col">
-        {/* Chat Header */}
         <div className="p-6 border-b border-border/50 bg-card/30 backdrop-blur-sm">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -451,11 +378,6 @@ export const UnifiedChatInterface = () => {
                     }
                   </h2>
                   {getGroupIcon(currentConversation)}
-                  {currentConversation.unreadCount > 0 && (
-                    <Badge variant="destructive" className="text-xs">
-                      {currentConversation.unreadCount}
-                    </Badge>
-                  )}
                 </div>
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
                   {currentConversation.type === 'group' ? (
@@ -476,36 +398,6 @@ export const UnifiedChatInterface = () => {
             </div>
 
             <div className="flex items-center gap-3">
-              {currentConversation.type === 'group' && (
-                <>
-                  {/* Online Members */}
-                  <div className="flex -space-x-2">
-                    {currentConversation.participants
-                      .filter(p => p.status === "online")
-                      .slice(0, 3)
-                      .map((member) => (
-                        <Avatar key={member.id} className="h-8 w-8 border-2 border-card">
-                          <AvatarImage src={member.avatar} />
-                          <AvatarFallback className="text-xs">
-                            {(member.username || '??').slice(0, 2).toUpperCase()}
-                          </AvatarFallback>
-                        </Avatar>
-                      ))}
-                    {currentConversation.participants.filter(p => p.status === "online").length > 3 && (
-                      <div className="h-8 w-8 rounded-full bg-muted border-2 border-card flex items-center justify-center">
-                        <span className="text-xs font-medium">
-                          +{currentConversation.participants.filter(p => p.status === "online").length - 3}
-                        </span>
-                      </div>
-                    )}
-                  </div>
-
-                  <Button variant="ghost" size="sm">
-                    <Info className="h-4 w-4" />
-                  </Button>
-                </>
-              )}
-
               <ThemeToggle />
               <Dialog open={settingsOpen} onOpenChange={setSettingsOpen}>
                 <DialogTrigger asChild>
@@ -516,6 +408,7 @@ export const UnifiedChatInterface = () => {
                 <DialogContent>
                   <DialogHeader>
                     <DialogTitle>Profile Settings</DialogTitle>
+                    <DialogDescription>Update your profile information</DialogDescription>
                   </DialogHeader>
                   <div className="space-y-4">
                     <div>
@@ -532,32 +425,17 @@ export const UnifiedChatInterface = () => {
           </div>
         </div>
 
-        {/* Messages */}
         <ScrollArea className="flex-1 p-6">
           <div className="space-y-4">
-            {/* Error Message */}
             {chat.error && (
               <Alert className="border-red-200 bg-red-50">
                 <AlertCircle className="h-4 w-4 text-red-600" />
                 <AlertDescription className="text-red-800">
-                  <div className="flex items-center justify-between">
-                    <span>{chat.error}</span>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleRetryMessages(chat.currentConversationId!)}
-                      disabled={retryCount >= 3}
-                      className="ml-2"
-                    >
-                      <RefreshCw className={`h-3 w-3 mr-1 ${retryCount > 0 ? 'animate-spin' : ''}`} />
-                      Retry ({retryCount}/3)
-                    </Button>
-                  </div>
+                  {chat.error}
                 </AlertDescription>
               </Alert>
             )}
             
-            {/* Loading State */}
             {chat.loading && (
               <div className="text-center py-8">
                 <Loader2 className="h-8 w-8 animate-spin mx-auto mb-2 text-primary" />
@@ -576,26 +454,22 @@ export const UnifiedChatInterface = () => {
                 </p>
               </div>
             ) : (
-              chat.currentMessages.map((msg) => {
+              chat.currentMessages.map((msg, index) => {
                 const isOwnMessage = msg.senderId === authUser.id;
                 const sender = currentConversation.participants.find(p => p.id === msg.senderId);
                 
                 return (
                   <div
-                    key={msg.id}
+                    key={`${msg.id}-${index}`}
                     className={`group flex ${isOwnMessage ? "justify-end" : "justify-start"}`}
                   >
                     {isOwnMessage ? (
-                      // Sender message: Blue dot + minimal content
                       <div className="flex items-end gap-2 max-w-xs">
                         <div className="flex flex-col items-end gap-1">
-                          {/* Blue dot indicator */}
                           <div className="w-3 h-3 bg-primary rounded-full"></div>
                           
-                          {/* Message content for sender */}
                           <div className="text-right">
                             {editingMessageId === msg.id ? (
-                              // Editing interface for sender
                               <div className="space-y-2">
                                 <Input
                                   value={editMessageContent}
@@ -623,43 +497,50 @@ export const UnifiedChatInterface = () => {
                                 </div>
                               </div>
                             ) : (
-                              // Normal sender message display
                               <div className="bg-primary/10 rounded-lg px-3 py-2">
-                                <p className="text-sm text-foreground">{msg.content}</p>
+                                {msg.content && <p className="text-sm text-foreground">{msg.content}</p>}
                                 {msg.attachments && msg.attachments.length > 0 && (
-                                  <div className="mt-2 space-y-2">
-                                    {msg.attachments.map((attachment) => (
-                                      <div key={attachment.id} className="flex items-center gap-2 p-2 bg-primary/20 rounded-lg">
-                                        {getFileIcon(attachment.name, attachment.type)}
-                                        <div className="flex-1 min-w-0">
-                                          <p className="text-xs font-medium truncate">{attachment.name}</p>
-                                          <div className="flex items-center gap-2 text-xs opacity-70">
-                                            <span>{formatFileSize(attachment.size)}</span>
-                                            {attachment.duration && (
-                                              <span>• {formatDuration(attachment.duration)}</span>
-                                            )}
-                                          </div>
-                                        </div>
-                                        
-                                        {attachment.type.startsWith('image/') && (
+                                  <div className={msg.content ? "mt-2 space-y-2" : "space-y-2"}>
+                                    {msg.attachments.map((attachment) => {
+                                      const attachmentType = attachment.type || '';
+                                      if (attachmentType.startsWith('image/')) {
+                                        return (
                                           <img
+                                            key={attachment.id}
                                             src={attachment.url}
                                             alt={attachment.name}
-                                            className="h-12 w-12 object-cover rounded"
+                                            className="max-w-xs rounded-lg cursor-pointer hover:opacity-80"
+                                            onClick={() => setSelectedImage(attachment.url)}
                                           />
-                                        )}
-                                      </div>
-                                    ))}
+                                        );
+                                      }
+                                      return (
+                                        <a
+                                          key={attachment.id}
+                                          href={attachment.url}
+                                          target="_blank"
+                                          rel="noopener noreferrer"
+                                          className="flex items-center gap-2 p-2 bg-primary/20 rounded-lg cursor-pointer hover:bg-primary/30"
+                                        >
+                                          {getFileIcon(attachment.name, attachmentType)}
+                                          <div className="flex-1 min-w-0">
+                                            <p className="text-xs font-medium truncate">{attachment.name}</p>
+                                            {attachment.size > 0 && <p className="text-xs opacity-70">{formatFileSize(attachment.size)}</p>}
+                                          </div>
+                                        </a>
+                                      );
+                                    })}
                                   </div>
                                 )}
                                 <div className="flex items-center justify-end gap-1 mt-1">
                                   <p className="text-xs opacity-70">
-                                    {msg.timestamp.toLocaleTimeString([], {
+                                    {msg.timestamp instanceof Date ? msg.timestamp.toLocaleTimeString([], {
+                                      hour: "2-digit",
+                                      minute: "2-digit",
+                                    }) : new Date(msg.timestamp).toLocaleTimeString([], {
                                       hour: "2-digit",
                                       minute: "2-digit",
                                     })}
-                                    {msg.edited && <span className="ml-2">• Edited</span>}
-                                    {msg.forwarded && <span className="ml-2">• Forwarded</span>}
                                   </p>
                                   
                                   <Button
@@ -682,18 +563,6 @@ export const UnifiedChatInterface = () => {
                                       </Button>
                                     </DropdownMenuTrigger>
                                     <DropdownMenuContent align="end" className="w-40">
-                                      <DropdownMenuItem>
-                                        <Copy className="h-4 w-4 mr-2" />
-                                        Copy
-                                      </DropdownMenuItem>
-                                      <DropdownMenuItem>
-                                        <Forward className="h-4 w-4 mr-2" />
-                                        Forward
-                                      </DropdownMenuItem>
-                                      <DropdownMenuItem>
-                                        <Share2 className="h-4 w-4 mr-2" />
-                                        Share
-                                      </DropdownMenuItem>
                                       <DropdownMenuItem 
                                         onClick={() => deleteMessageFromApi(chat.currentConversationId!, msg.id)}
                                         disabled={deleteMessageLoading === msg.id}
@@ -715,111 +584,58 @@ export const UnifiedChatInterface = () => {
                         </div>
                       </div>
                     ) : (
-                      // Other messages: Keep original gray box style
                       <div className="max-w-xs lg:max-w-md px-4 py-2 rounded-2xl bg-muted text-muted-foreground">
                         {currentConversation.type === 'group' && (
                           <div className="flex items-center gap-2 mb-1">
-                            {getRoleIcon(sender?.id ? 'member' : undefined)}
                             <span className="text-xs font-medium">{sender?.username}</span>
                           </div>
                         )}
                         
-                        {editingMessageId === msg.id ? (
-                          // Editing interface
-                          <div className="space-y-2">
-                            <Input
-                              value={editMessageContent}
-                              onChange={(e) => setEditMessageContent(e.target.value)}
-                              className="text-sm"
-                              onKeyDown={(e) => {
-                                if (e.key === 'Enter' && !e.shiftKey) {
-                                  e.preventDefault();
-                                  saveMessageEdit();
-                                }
-                                if (e.key === 'Escape') {
-                                  cancelMessageEdit();
-                                }
-                              }}
-                              autoFocus
-                            />
-                            <div className="flex gap-2">
-                              <Button size="sm" onClick={saveMessageEdit} disabled={!editMessageContent.trim()}>
-                                <Check className="h-3 w-3 mr-1" />
-                                Save
-                              </Button>
-                              <Button variant="outline" size="sm" onClick={cancelMessageEdit}>
-                                Cancel
-                              </Button>
-                            </div>
-                          </div>
-                        ) : (
-                          // Normal message display
-                          <>
-                            <p className="text-sm">{msg.content}</p>
-                            {msg.attachments && msg.attachments.length > 0 && (
-                              <div className="mt-2 space-y-2">
-                                {msg.attachments.map((attachment) => (
-                                  <div key={attachment.id} className="flex items-center gap-2 p-2 bg-black/10 rounded-lg">
-                                    {getFileIcon(attachment.name, attachment.type)}
-                                    <div className="flex-1 min-w-0">
-                                      <p className="text-xs font-medium truncate">{attachment.name}</p>
-                                      <div className="flex items-center gap-2 text-xs opacity-70">
-                                        <span>{formatFileSize(attachment.size)}</span>
-                                        {attachment.duration && (
-                                          <span>• {formatDuration(attachment.duration)}</span>
-                                        )}
-                                      </div>
-                                    </div>
-                                    
-                                    {attachment.type.startsWith('image/') && (
-                                      <img
-                                        src={attachment.url}
-                                        alt={attachment.name}
-                                        className="h-12 w-12 object-cover rounded"
-                                      />
-                                    )}
+                        {msg.content && <p className="text-sm">{msg.content}</p>}
+                        {msg.attachments && msg.attachments.length > 0 && (
+                          <div className={msg.content ? "mt-2 space-y-2" : "space-y-2"}>
+                            {msg.attachments.map((attachment) => {
+                              const attachmentType = attachment.type || '';
+                              if (attachmentType.startsWith('image/')) {
+                                return (
+                                  <img
+                                    key={attachment.id}
+                                    src={attachment.url}
+                                    alt={attachment.name}
+                                    className="max-w-xs rounded-lg cursor-pointer hover:opacity-80"
+                                    onClick={() => setSelectedImage(attachment.url)}
+                                  />
+                                );
+                              }
+                              return (
+                                <a
+                                  key={attachment.id}
+                                  href={attachment.url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="flex items-center gap-2 p-2 bg-black/10 rounded-lg cursor-pointer hover:bg-black/20"
+                                >
+                                  {getFileIcon(attachment.name, attachmentType)}
+                                  <div className="flex-1 min-w-0">
+                                    <p className="text-xs font-medium truncate">{attachment.name}</p>
+                                    {attachment.size > 0 && <p className="text-xs opacity-70">{formatFileSize(attachment.size)}</p>}
                                   </div>
-                                ))}
-                              </div>
-                            )}
-                          </>
+                                </a>
+                              );
+                            })}
+                          </div>
                         )}
                         
                         <div className="flex items-center justify-between mt-1">
                           <p className="text-xs opacity-70">
-                            {msg.timestamp.toLocaleTimeString([], {
+                            {msg.timestamp instanceof Date ? msg.timestamp.toLocaleTimeString([], {
+                              hour: "2-digit",
+                              minute: "2-digit",
+                            }) : new Date(msg.timestamp).toLocaleTimeString([], {
                               hour: "2-digit",
                               minute: "2-digit",
                             })}
-                            {msg.edited && <span className="ml-2">• Edited</span>}
-                            {msg.forwarded && <span className="ml-2">• Forwarded</span>}
                           </p>
-                          
-                          <DropdownMenu open={openMenuId === msg.id} onOpenChange={(open) => setOpenMenuId(open ? msg.id : null)}>
-                            <DropdownMenuTrigger asChild>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 hover:opacity-100"
-                              >
-                                <MoreHorizontal className="h-3 w-3" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end" className="w-40">
-                              <DropdownMenuItem>
-                                <Copy className="h-4 w-4 mr-2" />
-                                Copy
-                              </DropdownMenuItem>
-                              <DropdownMenuItem>
-                                <Forward className="h-4 w-4 mr-2" />
-                                Forward
-                              </DropdownMenuItem>
-                              <DropdownMenuItem>
-                                <Share2 className="h-4 w-4 mr-2" />
-                                Share
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
                         </div>
                       </div>
                     )}
@@ -830,9 +646,7 @@ export const UnifiedChatInterface = () => {
           </div>
         </ScrollArea>
 
-        {/* Message Input */}
         <div className="p-6 border-t border-border/50 bg-card/30 backdrop-blur-sm">
-          {/* Selected attachments preview */}
           {attachments.length > 0 && (
             <div className="mb-3 flex flex-wrap gap-2">
               {attachments.map((file, index) => (
@@ -863,73 +677,29 @@ export const UnifiedChatInterface = () => {
               onDragLeave={handleDragLeave}
               onDrop={handleDrop}
             >
-              {isRecording ? (
-                <div className="flex-1 flex items-center gap-3 bg-red-50 border border-red-200 rounded-lg px-4 py-2">
-                  <div className="flex items-center gap-2">
-                    <div className="w-3 h-3 bg-red-500 rounded-full animate-pulse"></div>
-                    <span className="text-red-700 font-medium">Recording</span>
-                    <span className="text-red-600">{formatDuration(recordingDuration)}</span>
-                  </div>
-                  <div className="flex gap-2 ml-auto">
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      onClick={cancelRecording}
-                      className="text-red-600 hover:text-red-700"
-                    >
-                      <X className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      onClick={stopRecording}
-                      className="text-red-600 hover:text-red-700"
-                    >
-                      <MicOff className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </div>
-              ) : (
-                <>
-                  <Input
-                    value={message}
-                    onChange={(e) => setMessage(e.target.value)}
-                    placeholder={`Message ${currentConversation.type === 'group' ? currentConversation.groupName : getOtherUser(currentConversation)?.username}...`}
-                    className="flex-1"
-                  />
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    multiple
-                    onChange={(e) => addFiles(e.target.files)}
-                    className="hidden"
-                    accept="image/*,application/pdf,.doc,.docx,.txt"
-                  />
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => fileInputRef.current?.click()}
-                    className="px-3"
-                  >
-                    <Paperclip className="h-4 w-4" />
-                  </Button>
-                </>
-              )}
-              
-              {!isRecording && (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  onClick={startRecording}
-                  className="px-3 text-red-600 hover:text-red-700"
-                >
-                  <Mic className="h-4 w-4" />
-                </Button>
-              )}
+              <Input
+                value={message}
+                onChange={(e) => setMessage(e.target.value)}
+                placeholder={`Message ${currentConversation.type === 'group' ? currentConversation.groupName : getOtherUser(currentConversation)?.username}...`}
+                className="flex-1"
+              />
+              <input
+                ref={fileInputRef}
+                type="file"
+                multiple
+                onChange={(e) => addFiles(e.target.files)}
+                className="hidden"
+                accept="image/*,application/pdf,.doc,.docx,.txt"
+              />
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => fileInputRef.current?.click()}
+                className="px-3"
+              >
+                <Paperclip className="h-4 w-4" />
+              </Button>
             </div>
             <Button
               type="submit"
@@ -945,7 +715,14 @@ export const UnifiedChatInterface = () => {
         </div>
       </div>
 
-      {/* Search Dialog */}
+      <Dialog open={!!selectedImage} onOpenChange={() => setSelectedImage(null)}>
+        <DialogContent className="max-w-2xl">
+          {selectedImage && (
+            <img src={selectedImage} alt="Full size" className="w-full rounded-lg" />
+          )}
+        </DialogContent>
+      </Dialog>
+
       <SearchDialog 
         open={showSearch}
         onOpenChange={setShowSearch}

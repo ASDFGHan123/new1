@@ -242,22 +242,10 @@ class User(AbstractBaseUser, PermissionsMixin):
         return super().has_module_perms(app_label)
     
     def save(self, *args, **kwargs):
-        """Override save method to handle avatar optimization."""
+        """Override save method."""
+        if not self.join_date and self.created_at:
+            self.join_date = self.created_at
         super().save(*args, **kwargs)
-        
-        # Optimize avatar image (only if PIL is available)
-        if PIL_AVAILABLE and self.avatar and Image:
-            try:
-                avatar = Image.open(self.avatar.path)
-                
-                # Resize if too large
-                max_size = (200, 200)
-                if avatar.size[0] > max_size[0] or avatar.size[1] > max_size[1]:
-                    avatar.thumbnail(max_size, Image.Resampling.LANCZOS)
-                    avatar.save(self.avatar.path, 'JPEG', quality=85)
-            except (AttributeError, FileNotFoundError, Exception):
-                # Skip if no avatar or file not found
-                pass
 
 
 class UserSession(models.Model):

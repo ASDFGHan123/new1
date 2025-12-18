@@ -22,6 +22,7 @@ import {
 import { openPrintWindow, generateUserListHTML } from "@/lib/printUtils";
 import { apiService, type User } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
+import { invalidateUsersCache } from "@/hooks/useApiData";
 
 interface UserManagementProps {
   users?: User[];
@@ -36,45 +37,31 @@ interface UserManagementProps {
 export const UserManagement = React.memo(({ users: propUsers = [], approveUser, rejectUser, addUser, updateUser, forceLogoutUser, deleteUser }: UserManagementProps) => {
   const { toast } = useToast();
   
-  // Component state
   const [users, setUsers] = useState<User[]>(propUsers);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [retryCount, setRetryCount] = useState(0);
-  
-  // Dialog states
   const [open, setOpen] = useState(false);
-  
-  // Form states
   const [newUsername, setNewUsername] = useState("");
+  const [newEmail, setNewEmail] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [newRole, setNewRole] = useState("user");
   const [newAvatar, setNewAvatar] = useState<string | undefined>(undefined);
   const [addLoading, setAddLoading] = useState(false);
   const [formError, setFormError] = useState("");
-  
-  // Edit states
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [editUsername, setEditUsername] = useState("");
   const [editEmail, setEditEmail] = useState("");
   const [editRole, setEditRole] = useState("user");
   const [editAvatar, setEditAvatar] = useState<string | undefined>(undefined);
   const [editLoading, setEditLoading] = useState(false);
-  
-  // Filter states
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [roleFilter, setRoleFilter] = useState<string>("all");
   const [showFilters, setShowFilters] = useState(false);
-  
-  // Action loading states
   const [actionLoading, setActionLoading] = useState<{[key: string]: boolean}>({});
 
-  // API Functions
   const loadUsers = useCallback(async (retryAttempt = 0) => {
-    // Prevent multiple simultaneous calls
-    if (loading) return;
-    
     setLoading(true);
     setError(null);
     
@@ -83,7 +70,7 @@ export const UserManagement = React.memo(({ users: propUsers = [], approveUser, 
       
       if (response.success && response.data) {
         setUsers(response.data);
-        setRetryCount(0); // Reset retry count on success
+        setRetryCount(0);
       } else {
         throw new Error(response.error || 'Failed to load users');
       }
@@ -92,12 +79,11 @@ export const UserManagement = React.memo(({ users: propUsers = [], approveUser, 
       const errorMessage = err instanceof Error ? err.message : 'Failed to load users';
       setError(errorMessage);
       
-      // Retry logic (up to 3 attempts)
       if (retryAttempt < 3) {
         setTimeout(() => {
           loadUsers(retryAttempt + 1);
           setRetryCount(retryAttempt + 1);
-        }, Math.pow(2, retryAttempt) * 1000); // Exponential backoff
+        }, Math.pow(2, retryAttempt) * 1000);
       }
     } finally {
       setLoading(false);
@@ -120,7 +106,6 @@ export const UserManagement = React.memo(({ users: propUsers = [], approveUser, 
       const response = await apiService.approveUser(userId);
       
       if (response.success) {
-        // Update local state
         setUsers(prev => prev.map(user => 
           user.id === userId ? { ...user, status: "active" } : user
         ));
@@ -156,8 +141,8 @@ export const UserManagement = React.memo(({ users: propUsers = [], approveUser, 
       const response = await apiService.deleteUser(userId);
       
       if (response.success) {
-        // Remove from local state
         setUsers(prev => prev.filter(user => user.id !== userId));
+        invalidateUsersCache();
         
         toast({
           title: "User Rejected",
@@ -221,8 +206,8 @@ export const UserManagement = React.memo(({ users: propUsers = [], approveUser, 
       const response = await apiService.deleteUser(userId);
       
       if (response.success) {
-        // Remove from local state
         setUsers(prev => prev.filter(user => user.id !== userId));
+        invalidateUsersCache();
         
         toast({
           title: "User Deleted",
@@ -251,16 +236,8 @@ export const UserManagement = React.memo(({ users: propUsers = [], approveUser, 
       return;
     }
     
-    // Check if username is unique
     if (users.some(u => u.username === newUsername)) {
       setFormError("Username already exists.");
-      return;
-    }
-    
-    // Check if email is unique (assuming @example.com domain)
-    const newEmail = `${newUsername}@example.com`;
-    if (users.some(u => u.email === newEmail)) {
-      setFormError("Email already exists.");
       return;
     }
     
@@ -268,12 +245,20 @@ export const UserManagement = React.memo(({ users: propUsers = [], approveUser, 
     setFormError("");
     
     try {
-      if (addUser) {
-        addUser(newUsername, newPassword, newRole, newAvatar);
-        
-        // Reset form
+      const response = await apiService.createUser({
+        username: newUsername,
+        email: newEmail || `${newUsername}@offchat.local`,
+        password: newPassword,
+        role: newRole,
+        status: 'active'
+      });
+      
+      if (response.success && response.data) {
+        setUsers(prev => [...prev, response.data]);
+        invalidateUsersCache();
         setOpen(false);
         setNewUsername("");
+        setNewEmail("");
         setNewPassword("");
         setNewRole("user");
         setNewAvatar(undefined);
@@ -283,32 +268,7 @@ export const UserManagement = React.memo(({ users: propUsers = [], approveUser, 
           description: "New user has been created successfully.",
         });
       } else {
-        // Note: The API service doesn't have a direct signup endpoint for admin creation
-        // This would need to be implemented in the backend
-        const response = await apiService.signup({
-          username: newUsername,
-          email: newEmail,
-          password: newPassword
-        });
-        
-        if (response.success) {
-          // Reload users to get the new one
-          await loadUsers();
-          
-          // Reset form
-          setOpen(false);
-          setNewUsername("");
-          setNewPassword("");
-          setNewRole("user");
-          setNewAvatar(undefined);
-          
-          toast({
-            title: "User Created",
-            description: "New user has been created successfully.",
-          });
-        } else {
-          throw new Error(response.error || 'Failed to create user');
-        }
+        throw new Error(response.error || 'Failed to create user');
       }
     } catch (err) {
       console.error('Failed to create user:', err);
@@ -331,13 +291,11 @@ export const UserManagement = React.memo(({ users: propUsers = [], approveUser, 
     
     if (!editingUser) return;
 
-    // Check if username is unique (excluding current user)
     if (editUsername !== editingUser.username && users.some(u => u.username === editUsername)) {
       setFormError("Username already exists.");
       return;
     }
 
-    // Check if email is unique (excluding current user)
     if (editEmail !== editingUser.email && users.some(u => u.email === editEmail)) {
       setFormError("Email already exists.");
       return;
@@ -370,12 +328,12 @@ export const UserManagement = React.memo(({ users: propUsers = [], approveUser, 
         });
         
         if (response.success) {
-          // Update local state
           setUsers(prev => prev.map(user => 
             user.id === editingUser.id 
               ? { ...user, username: editUsername, email: editEmail, role: editRole, avatar: editAvatar }
               : user
           ));
+          invalidateUsersCache();
           
           setEditingUser(null);
           
@@ -395,14 +353,10 @@ export const UserManagement = React.memo(({ users: propUsers = [], approveUser, 
     }
   };
 
-  // Load users on mount (prevent multiple calls)
   useEffect(() => {
-    if (propUsers.length === 0 && !loading && users.length === 0) {
-      loadUsers();
-    }
-  }, [propUsers, loading, users.length, loadUsers]);
+    loadUsers();
+  }, []);
 
-  // Filter users by search, status, and role
   const filteredUsers = users.filter(user => {
     const matchesSearch = user.username.toLowerCase().includes(search.toLowerCase()) ||
                          user.email.toLowerCase().includes(search.toLowerCase());
@@ -430,7 +384,6 @@ export const UserManagement = React.memo(({ users: propUsers = [], approveUser, 
             </CardDescription>
           </div>
           <div className="flex items-center space-x-2">
-            {/* Error Alert */}
             {error && (
               <Alert variant="destructive" className="mr-2">
                 <AlertCircle className="h-4 w-4" />
@@ -470,7 +423,7 @@ export const UserManagement = React.memo(({ users: propUsers = [], approveUser, 
               <DialogContent>
                 <DialogHeader>
                   <DialogTitle>Add User</DialogTitle>
-                  <DialogDescription>Add a new user with a role and password. User will be approved by default.</DialogDescription>
+                  <DialogDescription>Add a new user with a role and password.</DialogDescription>
                 </DialogHeader>
                 <form onSubmit={handleAddUser} className="space-y-4">
                   <div>
@@ -480,6 +433,17 @@ export const UserManagement = React.memo(({ users: propUsers = [], approveUser, 
                       value={newUsername} 
                       onChange={e => setNewUsername(e.target.value)} 
                       required 
+                      disabled={addLoading}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="email">Email (Optional)</Label>
+                    <Input 
+                      id="email" 
+                      type="email" 
+                      value={newEmail} 
+                      onChange={e => setNewEmail(e.target.value)} 
+                      placeholder={`${newUsername || 'username'}@offchat.local`}
                       disabled={addLoading}
                     />
                   </div>
@@ -508,9 +472,8 @@ export const UserManagement = React.memo(({ users: propUsers = [], approveUser, 
                     </select>
                   </div>
                   <div>
-                    <Label>Profile Image (optional)</Label>
-                    <ImageUpload value={newAvatar} onChange={setNewAvatar} />
-                    <p className="text-xs text-muted-foreground mt-1">Upload an image or leave empty for system-generated avatar</p>
+                    <Label>Profile Image (Optional)</Label>
+                    <ImageUpload value={newAvatar} onChange={setNewAvatar} disabled={addLoading} />
                   </div>
                   {formError && <div className="text-red-500 text-sm">{formError}</div>}
                   <DialogFooter>
@@ -526,7 +489,6 @@ export const UserManagement = React.memo(({ users: propUsers = [], approveUser, 
               </DialogContent>
             </Dialog>
 
-            {/* Edit User Dialog */}
             <Dialog open={!!editingUser} onOpenChange={open => !open && setEditingUser(null)}>
               <DialogContent>
                 <DialogHeader>
@@ -570,7 +532,7 @@ export const UserManagement = React.memo(({ users: propUsers = [], approveUser, 
                   </div>
                   <div>
                     <Label>Profile Image</Label>
-                    <ImageUpload value={editAvatar} onChange={setEditAvatar} />
+                    <ImageUpload value={editAvatar} onChange={setEditAvatar} disabled={editLoading} />
                   </div>
                   {formError && <div className="text-red-500 text-sm">{formError}</div>}
                   <DialogFooter>
@@ -588,7 +550,6 @@ export const UserManagement = React.memo(({ users: propUsers = [], approveUser, 
           </div>
         </div>
         
-        {/* Search and Filters */}
         <div className="flex items-center space-x-4 mt-4">
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
@@ -675,6 +636,8 @@ export const UserManagement = React.memo(({ users: propUsers = [], approveUser, 
                 <TableHeader>
                   <TableRow>
                     <TableHead>User</TableHead>
+                    <TableHead>Email</TableHead>
+                    <TableHead>Join Date</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Role</TableHead>
                     <TableHead>Actions</TableHead>
@@ -689,11 +652,14 @@ export const UserManagement = React.memo(({ users: propUsers = [], approveUser, 
                             <AvatarImage src={user.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.username}`} />
                             <AvatarFallback>{user.username.slice(0, 2).toUpperCase()}</AvatarFallback>
                           </Avatar>
-                          <div>
-                            <p className="font-medium text-foreground">{user.username}</p>
-                            <p className="text-sm text-muted-foreground">{user.email}</p>
-                          </div>
+                          <p className="font-medium text-foreground">{user.username}</p>
                         </div>
+                      </TableCell>
+                      <TableCell>
+                        <p className="text-sm text-muted-foreground">{user.email}</p>
+                      </TableCell>
+                      <TableCell>
+                        <p className="text-sm">{user.join_date ? new Date(user.join_date).toLocaleDateString() : user.created_at ? new Date(user.created_at).toLocaleDateString() : 'N/A'}</p>
                       </TableCell>
                       <TableCell>
                         {user.status === "pending" && <Badge variant="secondary">Pending</Badge>}
@@ -703,6 +669,11 @@ export const UserManagement = React.memo(({ users: propUsers = [], approveUser, 
                       </TableCell>
                       <TableCell>
                         <Badge variant="outline">{user.role ? user.role.charAt(0).toUpperCase() + user.role.slice(1) : "User"}</Badge>
+                        {user.online_status && (
+                          <Badge variant={user.online_status === 'online' ? 'default' : 'secondary'} className="ml-1">
+                            {user.online_status}
+                          </Badge>
+                        )}
                       </TableCell>
                       <TableCell>
                         <div className="flex gap-2 flex-wrap">

@@ -8,9 +8,15 @@ from rest_framework_simplejwt.views import (
     TokenVerifyView,
 )
 from . import views
-# from .views import user_management_views  # Temporarily commented out for migration
+from .views import user_management_views
+from .trash_views import TrashViewSet
+from admin_panel import moderation_views
+from rest_framework.routers import DefaultRouter
 
-urlpatterns = [
+router = DefaultRouter()
+router.register(r'trash', TrashViewSet, basename='trash')
+
+urlpatterns = router.urls + [
     # Authentication endpoints
     path('register/', views.RegisterView.as_view(), name='register'),
     path('login/', views.LoginView.as_view(), name='login'),
@@ -21,6 +27,7 @@ urlpatterns = [
     # User management endpoints
     path('profile/', views.UserProfileView.as_view(), name='user_profile'),
     path('profile/avatar/', views.UserAvatarView.as_view(), name='user_avatar'),
+    path('profile/upload-image/', user_management_views.upload_profile_image_view, name='upload_profile_image'),
     path('activity/', views.UserActivityView.as_view(), name='user_activity'),
     path('statistics/', views.UserStatisticsView.as_view(), name='user_statistics'),
     
@@ -43,10 +50,15 @@ urlpatterns = [
     
     # Legacy admin endpoints (for backward compatibility)
     path('admin/users/', views.AdminUserListView.as_view(), name='admin_user_list'),
-    path('admin/users/<uuid:user_id>/', views.AdminUserDetailView.as_view(), name='admin_user_detail'),
-    path('admin/users/<uuid:user_id>/approve/', views.AdminApproveUserView.as_view(), name='admin_approve_user'),
-    path('admin/users/<uuid:user_id>/suspend/', views.AdminSuspendUserView.as_view(), name='admin_suspend_user'),
-    path('admin/users/<uuid:user_id>/ban/', views.AdminBanUserView.as_view(), name='admin_ban_user'),
-    path('admin/users/<uuid:user_id>/activate/', views.AdminActivateUserView.as_view(), name='admin_activate_user'),
-    path('admin/users/<uuid:user_id>/force-logout/', views.AdminForceLogoutView.as_view(), name='admin_force_logout'),
+    path('admin/users/<int:user_id>/', views.AdminUserDetailView.as_view(), name='admin_user_detail'),
+    path('admin/users/<int:user_id>/approve/', views.AdminApproveUserView.as_view(), name='admin_approve_user'),
+    path('admin/users/<int:user_id>/suspend/', views.AdminSuspendUserView.as_view(), name='admin_suspend_user'),
+    path('admin/users/<int:user_id>/ban/', views.AdminBanUserView.as_view(), name='admin_ban_user'),
+    path('admin/users/<int:user_id>/activate/', views.AdminActivateUserView.as_view(), name='admin_activate_user'),
+    path('admin/users/<int:user_id>/force-logout/', views.AdminForceLogoutView.as_view(), name='admin_force_logout'),
+    
+    # Moderation endpoints
+    path('admin/users/<int:user_id>/warn/', moderation_views.warn_user, name='warn_user'),
+    path('admin/users/<int:user_id>/suspend/', moderation_views.suspend_user_view, name='suspend_user_moderation'),
+    path('admin/users/<int:user_id>/ban/', moderation_views.ban_user_view, name='ban_user_moderation'),
 ]

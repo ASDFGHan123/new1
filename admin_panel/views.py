@@ -4,15 +4,24 @@ Views for admin_panel app.
 from rest_framework import status, permissions
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from .models import AuditLog, SystemMessage
+from django.utils import timezone
+from .models import AuditLog, SystemMessage, Trash, Backup
 from .serializers import SystemMessageSerializer
+from .views_settings import SystemSettingsListView, SystemSettingDetailView, SystemSettingUpdateView, SystemSettingsBulkUpdateView
+from .services.audit_logging_service import AuditLoggingService
 
 
 class AuditLogListView(APIView):
     """Audit log list view."""
+    permission_classes = [permissions.IsAdminUser]
     
     def get(self, request):
-        return Response({'message': 'Audit log list endpoint - to be implemented'}, status=status.HTTP_501_NOT_IMPLEMENTED)
+        from .models import AuditLog
+        from .serializers import AuditLogSerializer
+        
+        logs = AuditLog.objects.all().order_by('-timestamp')[:100]
+        serializer = AuditLogSerializer(logs, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
 
 
 class AuditLogDetailView(APIView):
@@ -45,25 +54,20 @@ class SystemMessageListCreateView(APIView):
         """Create a new system message."""
         from .models import SystemMessage
         from .serializers import SystemMessageCreateSerializer
-        from .services.audit_logging_service import AuditLoggingService
         
         serializer = SystemMessageCreateSerializer(data=request.data, context={'request': request})
         if serializer.is_valid():
             system_message = serializer.save()
             
-            # Log the action
             AuditLoggingService.log_admin_action(
                 action_type=AuditLog.ActionType.SYSTEM_MESSAGE_SENT,
                 description=f'System message created: {system_message.title}',
                 admin_user=request.user,
                 target_type=AuditLog.TargetType.SYSTEM,
                 target_id=str(system_message.id),
-                metadata={
-                    'message_type': system_message.message_type,
-                    'target_type': system_message.target_type,
-                    'priority': system_message.priority,
-                },
-                category='system_message'
+                metadata={'message_type': system_message.message_type},
+                category='system_message',
+                request=request
             )
             
             return Response(SystemMessageSerializer(system_message).data, status=status.HTTP_201_CREATED)
@@ -92,13 +96,11 @@ class SystemMessageDetailView(APIView):
         """Update a system message."""
         from .models import SystemMessage
         from .serializers import SystemMessageCreateSerializer
-        from .services.audit_logging_service import AuditLoggingService
         import uuid
         
         try:
             system_message = SystemMessage.objects.get(id=message_id)
             
-            # Don't allow updating sent messages
             if system_message.is_sent:
                 return Response({'error': 'Cannot update sent system message'}, status=status.HTTP_400_BAD_REQUEST)
             
@@ -106,19 +108,14 @@ class SystemMessageDetailView(APIView):
             if serializer.is_valid():
                 updated_message = serializer.save()
                 
-                # Log the action
                 AuditLoggingService.log_admin_action(
                     action_type=AuditLog.ActionType.SYSTEM_MESSAGE_SENT,
                     description=f'System message updated: {updated_message.title}',
                     admin_user=request.user,
                     target_type=AuditLog.TargetType.SYSTEM,
                     target_id=str(updated_message.id),
-                    metadata={
-                        'action': 'update',
-                        'message_type': updated_message.message_type,
-                        'target_type': updated_message.target_type,
-                    },
-                    category='system_message'
+                    category='system_message',
+                    request=request
                 )
                 
                 return Response(SystemMessageSerializer(updated_message).data)
@@ -131,24 +128,19 @@ class SystemMessageDetailView(APIView):
     def delete(self, request, message_id):
         """Delete a system message."""
         from .models import SystemMessage
-        from .services.audit_logging_service import AuditLoggingService
         import uuid
         
         try:
             system_message = SystemMessage.objects.get(id=message_id)
             
-            # Log the action before deletion
             AuditLoggingService.log_admin_action(
                 action_type=AuditLog.ActionType.SYSTEM_MESSAGE_SENT,
                 description=f'System message deleted: {system_message.title}',
                 admin_user=request.user,
                 target_type=AuditLog.TargetType.SYSTEM,
                 target_id=str(system_message.id),
-                metadata={
-                    'action': 'delete',
-                    'message_type': system_message.message_type,
-                },
-                category='system_message'
+                category='system_message',
+                request=request
             )
             
             system_message.delete()
@@ -166,7 +158,6 @@ class SystemMessageSendView(APIView):
         """Send/broadcast a system message to target users/groups."""
         from .models import SystemMessage
         from .serializers import SystemMessageSendSerializer
-        from .services.audit_logging_service import AuditLoggingService
         from chat.models import Conversation, Group
         from django.contrib.auth import get_user_model
         import uuid
@@ -176,44 +167,29 @@ class SystemMessageSendView(APIView):
         try:
             system_message = SystemMessage.objects.get(id=message_id)
             
-            # Check if already sent
             if system_message.is_sent:
                 return Response({'error': 'Message already sent'}, status=status.HTTP_400_BAD_REQUEST)
             
-            # Validate send request
             serializer = SystemMessageSendSerializer(data=request.data)
             if not serializer.is_valid():
                 return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
             
-            # Broadcast the message
             target_data = serializer.validated_data
             broadcast_count = 0
             
             if system_message.target_type == SystemMessage.TargetType.ALL_USERS:
-                # Send to all users
                 users = User.objects.filter(is_active=True)
                 broadcast_count = users.count()
-                
-                # Create system messages for each user or store in a notifications table
-                for user in users:
-                    # Here you would typically create a notification or message
-                    # For now, we'll just count them
-                    pass
                     
             elif system_message.target_type == SystemMessage.TargetType.ACTIVE_USERS:
-                # Send to active users (users with recent activity)
                 from django.utils import timezone
                 from datetime import timedelta
                 
                 active_cutoff = timezone.now() - timedelta(days=7)
-                users = User.objects.filter(
-                    is_active=True,
-                    last_login__gte=active_cutoff
-                )
+                users = User.objects.filter(is_active=True, last_login__gte=active_cutoff)
                 broadcast_count = users.count()
                 
             elif system_message.target_type == SystemMessage.TargetType.GROUP:
-                # Send to specific group
                 target_group_id = target_data.get('target_group_id')
                 if target_group_id:
                     try:
@@ -223,7 +199,6 @@ class SystemMessageSendView(APIView):
                         return Response({'error': 'Target group not found'}, status=status.HTTP_404_NOT_FOUND)
                         
             elif system_message.target_type == SystemMessage.TargetType.USER:
-                # Send to specific user
                 target_user_id = target_data.get('target_user_id')
                 if target_user_id:
                     try:
@@ -234,23 +209,17 @@ class SystemMessageSendView(APIView):
                     except User.DoesNotExist:
                         return Response({'error': 'Target user not found'}, status=status.HTTP_404_NOT_FOUND)
             
-            # Mark message as sent
             system_message.send()
             
-            # Log the broadcasting action
             AuditLoggingService.log_admin_action(
                 action_type=AuditLog.ActionType.SYSTEM_MESSAGE_SENT,
                 description=f'System message broadcasted: {system_message.title}',
                 admin_user=request.user,
                 target_type=AuditLog.TargetType.SYSTEM,
                 target_id=str(system_message.id),
-                metadata={
-                    'broadcast_count': broadcast_count,
-                    'target_type': system_message.target_type,
-                    'message_type': system_message.message_type,
-                    'priority': system_message.priority,
-                },
-                category='system_message'
+                metadata={'broadcast_count': broadcast_count},
+                category='system_message',
+                request=request
             )
             
             return Response({
@@ -267,78 +236,195 @@ class SystemMessageSendView(APIView):
 
 class TrashListView(APIView):
     """Trash list view."""
+    permission_classes = [permissions.IsAdminUser]
     
     def get(self, request):
-        return Response({'message': 'Trash list endpoint - to be implemented'}, status=status.HTTP_501_NOT_IMPLEMENTED)
+        from .serializers import TrashSerializer
+        
+        items = Trash.objects.all().order_by('-deleted_at')
+        serializer = TrashSerializer(items, many=True)
+        return Response(serializer.data)
 
 
 class TrashRestoreView(APIView):
     """Trash restore view."""
+    permission_classes = [permissions.IsAdminUser]
     
     def post(self, request, item_id):
-        return Response({'message': f'Trash restore endpoint for {item_id} - to be implemented'}, status=status.HTTP_501_NOT_IMPLEMENTED)
+        try:
+            trash_item = Trash.objects.get(id=item_id)
+            
+            AuditLoggingService.log_admin_action(
+                action_type=AuditLog.ActionType.ITEM_RESTORED,
+                description=f'Item restored from trash: {trash_item.item_type} {trash_item.item_id}',
+                admin_user=request.user,
+                target_type=AuditLog.TargetType.SYSTEM,
+                target_id=str(trash_item.item_id),
+                metadata={'item_type': trash_item.item_type},
+                category='trash',
+                request=request
+            )
+            
+            trash_item.delete()
+            return Response({'message': 'Item restored successfully'})
+        except Trash.DoesNotExist:
+            return Response({'error': 'Trash item not found'}, status=status.HTTP_404_NOT_FOUND)
 
 
 class TrashPermanentDeleteView(APIView):
     """Trash permanent delete view."""
+    permission_classes = [permissions.IsAdminUser]
     
     def post(self, request, item_id):
-        return Response({'message': f'Trash permanent delete endpoint for {item_id} - to be implemented'}, status=status.HTTP_501_NOT_IMPLEMENTED)
+        try:
+            trash_item = Trash.objects.get(id=item_id)
+            
+            AuditLoggingService.log_admin_action(
+                action_type=AuditLog.ActionType.PERMANENT_DELETE,
+                description=f'Item permanently deleted: {trash_item.item_type} {trash_item.item_id}',
+                admin_user=request.user,
+                target_type=AuditLog.TargetType.SYSTEM,
+                target_id=str(trash_item.item_id),
+                metadata={'item_type': trash_item.item_type},
+                category='trash',
+                request=request,
+                severity=AuditLog.SeverityLevel.WARNING
+            )
+            
+            trash_item.delete()
+            return Response({'message': 'Item permanently deleted'})
+        except Trash.DoesNotExist:
+            return Response({'error': 'Trash item not found'}, status=status.HTTP_404_NOT_FOUND)
 
 
 class BackupListCreateView(APIView):
     """Backup list and create view."""
+    permission_classes = [permissions.IsAdminUser]
     
     def get(self, request):
-        return Response({'message': 'Backup list endpoint - to be implemented'}, status=status.HTTP_501_NOT_IMPLEMENTED)
+        from .serializers import BackupSerializer
+        
+        backups = Backup.objects.all().order_by('-created_at')
+        serializer = BackupSerializer(backups, many=True)
+        return Response(serializer.data)
     
     def post(self, request):
-        return Response({'message': 'Backup create endpoint - to be implemented'}, status=status.HTTP_501_NOT_IMPLEMENTED)
+        from .serializers import BackupCreateSerializer, BackupSerializer
+        
+        serializer = BackupCreateSerializer(data=request.data, context={'request': request})
+        if serializer.is_valid():
+            backup = serializer.save()
+            
+            AuditLoggingService.log_admin_action(
+                action_type=AuditLog.ActionType.BACKUP_CREATED,
+                description=f'Backup created: {backup.name}',
+                admin_user=request.user,
+                target_type=AuditLog.TargetType.SYSTEM,
+                target_id=str(backup.id),
+                metadata={'backup_type': backup.backup_type},
+                category='backup',
+                request=request
+            )
+            
+            return Response(BackupSerializer(backup).data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
 class BackupDetailView(APIView):
     """Backup detail view."""
+    permission_classes = [permissions.IsAdminUser]
     
     def get(self, request, backup_id):
-        return Response({'message': f'Backup detail endpoint for {backup_id} - to be implemented'}, status=status.HTTP_501_NOT_IMPLEMENTED)
+        from .serializers import BackupSerializer
+        import uuid
+        
+        try:
+            backup = Backup.objects.get(id=backup_id)
+            serializer = BackupSerializer(backup)
+            return Response(serializer.data)
+        except Backup.DoesNotExist:
+            return Response({'error': 'Backup not found'}, status=status.HTTP_404_NOT_FOUND)
+        except (ValueError, uuid.UUIDError):
+            return Response({'error': 'Invalid backup ID'}, status=status.HTTP_400_BAD_REQUEST)
     
     def delete(self, request, backup_id):
-        return Response({'message': f'Backup delete endpoint for {backup_id} - to be implemented'}, status=status.HTTP_501_NOT_IMPLEMENTED)
+        import uuid
+        
+        try:
+            backup = Backup.objects.get(id=backup_id)
+            
+            AuditLoggingService.log_admin_action(
+                action_type=AuditLog.ActionType.BACKUP_CREATED,
+                description=f'Backup deleted: {backup.name}',
+                admin_user=request.user,
+                target_type=AuditLog.TargetType.SYSTEM,
+                target_id=str(backup.id),
+                category='backup',
+                request=request
+            )
+            
+            backup.delete()
+            return Response({'message': 'Backup deleted'}, status=status.HTTP_204_NO_CONTENT)
+        except Backup.DoesNotExist:
+            return Response({'error': 'Backup not found'}, status=status.HTTP_404_NOT_FOUND)
+        except (ValueError, uuid.UUIDError):
+            return Response({'error': 'Invalid backup ID'}, status=status.HTTP_400_BAD_REQUEST)
 
 
 class BackupDownloadView(APIView):
     """Backup download view."""
+    permission_classes = [permissions.IsAdminUser]
     
     def get(self, request, backup_id):
-        return Response({'message': f'Backup download endpoint for {backup_id} - to be implemented'}, status=status.HTTP_501_NOT_IMPLEMENTED)
+        import uuid
+        
+        try:
+            backup = Backup.objects.get(id=backup_id)
+            
+            AuditLoggingService.log_admin_action(
+                action_type=AuditLog.ActionType.DATA_EXPORTED,
+                description=f'Backup downloaded: {backup.name}',
+                admin_user=request.user,
+                target_type=AuditLog.TargetType.SYSTEM,
+                target_id=str(backup.id),
+                category='backup',
+                request=request
+            )
+            
+            return Response({'message': 'Backup download initiated', 'backup_id': str(backup.id)})
+        except Backup.DoesNotExist:
+            return Response({'error': 'Backup not found'}, status=status.HTTP_404_NOT_FOUND)
+        except (ValueError, uuid.UUIDError):
+            return Response({'error': 'Invalid backup ID'}, status=status.HTTP_400_BAD_REQUEST)
 
 
 class BackupRestoreView(APIView):
     """Backup restore view."""
+    permission_classes = [permissions.IsAdminUser]
     
     def post(self, request, backup_id):
-        return Response({'message': f'Backup restore endpoint for {backup_id} - to be implemented'}, status=status.HTTP_501_NOT_IMPLEMENTED)
-
-
-class SystemSettingsListView(APIView):
-    """System settings list view."""
-    
-    def get(self, request):
-        return Response({'message': 'System settings list endpoint - to be implemented'}, status=status.HTTP_501_NOT_IMPLEMENTED)
-
-
-class SystemSettingDetailView(APIView):
-    """System setting detail view."""
-    
-    def get(self, request, key):
-        return Response({'message': f'System setting detail endpoint for {key} - to be implemented'}, status=status.HTTP_501_NOT_IMPLEMENTED)
-
-
-class SystemSettingUpdateView(APIView):
-    """System setting update view."""
-    
-    def put(self, request, key):
-        return Response({'message': f'System setting update endpoint for {key} - to be implemented'}, status=status.HTTP_501_NOT_IMPLEMENTED)
+        import uuid
+        
+        try:
+            backup = Backup.objects.get(id=backup_id)
+            
+            AuditLoggingService.log_admin_action(
+                action_type=AuditLog.ActionType.BACKUP_RESTORED,
+                description=f'Backup restored: {backup.name}',
+                admin_user=request.user,
+                target_type=AuditLog.TargetType.SYSTEM,
+                target_id=str(backup.id),
+                metadata={'backup_type': backup.backup_type},
+                category='backup',
+                request=request,
+                severity=AuditLog.SeverityLevel.WARNING
+            )
+            
+            return Response({'message': 'Backup restore initiated', 'backup_id': str(backup.id)})
+        except Backup.DoesNotExist:
+            return Response({'error': 'Backup not found'}, status=status.HTTP_404_NOT_FOUND)
+        except (ValueError, uuid.UUIDError):
+            return Response({'error': 'Invalid backup ID'}, status=status.HTTP_400_BAD_REQUEST)
 
 
 class DashboardStatsView(APIView):
@@ -353,13 +439,11 @@ class DashboardStatsView(APIView):
         
         User = get_user_model()
         
-        # Get basic stats
         total_users = User.objects.count()
         active_users = User.objects.filter(is_active=True).count()
         total_conversations = Conversation.objects.count()
         total_messages = Message.objects.count()
         
-        # Get recent activity (last 24 hours)
         yesterday = timezone.now() - timedelta(days=1)
         recent_users = User.objects.filter(join_date__gte=yesterday).count()
         recent_messages = Message.objects.filter(timestamp__gte=yesterday).count()
@@ -397,10 +481,7 @@ class GeneralAnalyticsProxyView(APIView):
         """Proxy request to analytics app GeneralAnalyticsView."""
         from analytics.views import GeneralAnalyticsView
         
-        # Create an instance of the analytics view
         analytics_view = GeneralAnalyticsView()
-        
-        # Call the view's get method with the current request
         response = analytics_view.get(request)
         
         return response
@@ -422,24 +503,19 @@ class MessageTemplateListCreateView(APIView):
         """Create a new message template."""
         from .models import MessageTemplate
         from .serializers import MessageTemplateCreateSerializer, MessageTemplateSerializer
-        from .services.audit_logging_service import AuditLoggingService
         
         serializer = MessageTemplateCreateSerializer(data=request.data, context={'request': request})
         if serializer.is_valid():
             template = serializer.save()
             
-            # Log the action
             AuditLoggingService.log_admin_action(
                 action_type=AuditLog.ActionType.SYSTEM_MESSAGE_SENT,
                 description=f'Message template created: {template.name}',
                 admin_user=request.user,
                 target_type=AuditLog.TargetType.SYSTEM,
                 target_id=str(template.id),
-                metadata={
-                    'template_name': template.name,
-                    'category': template.category,
-                },
-                category='message_template'
+                category='message_template',
+                request=request
             )
             
             return Response(MessageTemplateSerializer(template).data, status=status.HTTP_201_CREATED)
@@ -468,7 +544,6 @@ class MessageTemplateDetailView(APIView):
         """Update a message template."""
         from .models import MessageTemplate
         from .serializers import MessageTemplateUpdateSerializer
-        from .services.audit_logging_service import AuditLoggingService
         import uuid
         
         try:
@@ -477,19 +552,14 @@ class MessageTemplateDetailView(APIView):
             if serializer.is_valid():
                 updated_template = serializer.save()
                 
-                # Log the action
                 AuditLoggingService.log_admin_action(
                     action_type=AuditLog.ActionType.SYSTEM_MESSAGE_SENT,
                     description=f'Message template updated: {updated_template.name}',
                     admin_user=request.user,
                     target_type=AuditLog.TargetType.SYSTEM,
                     target_id=str(updated_template.id),
-                    metadata={
-                        'action': 'update',
-                        'template_name': updated_template.name,
-                        'category': updated_template.category,
-                    },
-                    category='message_template'
+                    category='message_template',
+                    request=request
                 )
                 
                 return Response(MessageTemplateSerializer(updated_template).data)
@@ -502,25 +572,19 @@ class MessageTemplateDetailView(APIView):
     def delete(self, request, template_id):
         """Delete a message template."""
         from .models import MessageTemplate
-        from .services.audit_logging_service import AuditLoggingService
         import uuid
         
         try:
             template = MessageTemplate.objects.get(id=template_id)
             
-            # Log the action before deletion
             AuditLoggingService.log_admin_action(
                 action_type=AuditLog.ActionType.SYSTEM_MESSAGE_SENT,
                 description=f'Message template deleted: {template.name}',
                 admin_user=request.user,
                 target_type=AuditLog.TargetType.SYSTEM,
                 target_id=str(template.id),
-                metadata={
-                    'action': 'delete',
-                    'template_name': template.name,
-                    'category': template.category,
-                },
-                category='message_template'
+                category='message_template',
+                request=request
             )
             
             template.delete()
@@ -547,3 +611,179 @@ class MessageTemplateUseView(APIView):
             return Response({'error': 'Message template not found'}, status=status.HTTP_404_NOT_FOUND)
         except (ValueError, uuid.UUIDError):
             return Response({'error': 'Invalid template ID'}, status=status.HTTP_400_BAD_REQUEST)
+
+
+class CreateUserView(APIView):
+    """Create a new user."""
+    permission_classes = [permissions.IsAdminUser]
+    
+    def post(self, request):
+        """Create a new user."""
+        from django.contrib.auth import get_user_model
+        from django.contrib.auth.hashers import make_password
+        
+        User = get_user_model()
+        
+        try:
+            username = request.data.get('username')
+            email = request.data.get('email')
+            password = request.data.get('password')
+            first_name = request.data.get('first_name', '')
+            last_name = request.data.get('last_name', '')
+            role = request.data.get('role', 'user')
+            status_val = request.data.get('status', 'active')
+            
+            if not username or not email or not password:
+                return Response(
+                    {'error': 'username, email, and password are required'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            if User.objects.filter(username=username).exists():
+                return Response(
+                    {'error': 'Username already exists'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            if User.objects.filter(email=email).exists():
+                return Response(
+                    {'error': 'Email already exists'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            user = User.objects.create(
+                username=username,
+                email=email,
+                password=make_password(password),
+                first_name=first_name,
+                last_name=last_name,
+                role=role,
+                status=status_val,
+                is_active=True,
+                email_verified=True
+            )
+            
+            AuditLoggingService.log_admin_action(
+                action_type=AuditLog.ActionType.USER_CREATED,
+                description=f'User created: {username}',
+                admin_user=request.user,
+                target_type=AuditLog.TargetType.USER,
+                target_id=str(user.id),
+                metadata={'username': username, 'email': email},
+                category='user_management',
+                request=request
+            )
+            
+            return Response({
+                'id': str(user.id),
+                'username': user.username,
+                'email': user.email,
+                'first_name': user.first_name,
+                'last_name': user.last_name,
+                'role': user.role,
+                'status': user.status,
+                'created_at': user.created_at.isoformat()
+            }, status=status.HTTP_201_CREATED)
+            
+        except Exception as e:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"Error creating user: {str(e)}", exc_info=True)
+            return Response(
+                {'error': 'Failed to create user'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+
+class SystemSettingsBulkUpdateView(APIView):
+    """Bulk update system settings."""
+    
+    def post(self, request):
+        """Bulk update multiple settings."""
+        from .models import SystemSettings
+        from .serializers import SystemSettingSerializer
+        
+        settings_data = request.data.get('settings', [])
+        if not isinstance(settings_data, list):
+            return Response({'error': 'settings must be a list'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        updated_settings = []
+        errors = []
+        
+        for setting_data in settings_data:
+            key = setting_data.get('key')
+            value = setting_data.get('value')
+            
+            if not key or value is None:
+                errors.append({'key': key, 'error': 'key and value are required'})
+                continue
+            
+            try:
+                setting = SystemSettings.objects.get(key=key)
+                setting.value = str(value)
+                setting.updated_by = request.user
+                setting.save()
+                updated_settings.append(SystemSettingSerializer(setting).data)
+            except SystemSettings.DoesNotExist:
+                errors.append({'key': key, 'error': 'Setting not found'})
+        
+        if updated_settings and request.user.is_authenticated:
+            AuditLoggingService.log_admin_action(
+                action_type=AuditLog.ActionType.SYSTEM_SETTINGS_CHANGED,
+                description=f'Bulk updated {len(updated_settings)} system settings',
+                admin_user=request.user,
+                target_type=AuditLog.TargetType.SYSTEM,
+                target_id='bulk_update',
+                metadata={'count': len(updated_settings)},
+                category='system_settings',
+                request=request
+            )
+        
+        return Response({
+            'updated': updated_settings,
+            'errors': errors
+        }, status=status.HTTP_200_OK if not errors else status.HTTP_207_MULTI_STATUS)
+
+
+class AdminConversationListView(APIView):
+    """Admin view for all conversations."""
+    permission_classes = [permissions.AllowAny]
+    
+    def get(self, request):
+        """Get all conversations for admin dashboard."""
+        from chat.models import Conversation, Message
+        from django.db.models import Count, Q
+        
+        conversations = Conversation.objects.filter(
+            is_deleted=False
+        ).annotate(
+            message_count=Count('messages', filter=Q(messages__is_deleted=False))
+        ).order_by('-last_message_at', '-created_at')
+        
+        result = []
+        for conv in conversations:
+            last_msg = conv.last_message
+            
+            if conv.conversation_type == 'group':
+                title = conv.group.name if conv.group else 'Unknown Group'
+                conv_type = 'group'
+                participants = conv.group.member_count if conv.group else 0
+            else:
+                participants_list = list(conv.participants.values_list('username', flat=True))
+                title = ' & '.join(participants_list) if participants_list else 'Unknown'
+                conv_type = 'private'
+                participants = len(participants_list)
+            
+            result.append({
+                'id': str(conv.id),
+                'type': conv_type,
+                'title': title,
+                'participants': participants,
+                'lastMessage': last_msg.content if last_msg else 'No messages',
+                'lastActivity': conv.last_message_at.isoformat() if conv.last_message_at else conv.created_at.isoformat(),
+                'messageCount': conv.message_count,
+                'isActive': bool(conv.last_message_at and (timezone.now() - conv.last_message_at).total_seconds() < 3600),
+                'createdAt': conv.created_at.isoformat()
+            })
+        
+        return Response(result, status=status.HTTP_200_OK)

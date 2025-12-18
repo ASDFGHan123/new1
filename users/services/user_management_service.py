@@ -39,8 +39,8 @@ class UserManagementService:
             Dict containing users list and pagination info
         """
         try:
-            # Build base query
-            queryset = User.objects.all().select_related()
+            # Build base query - exclude inactive users
+            queryset = User.objects.filter(is_active=True).select_related()
             
             # Apply search filter
             search = request_params.get('search', '').strip()
@@ -228,13 +228,13 @@ class UserManagementService:
             raise ValidationError("User not found")
     
     @classmethod
-    def delete_user(cls, user_id: int, permanent: bool = False) -> Dict[str, Any]:
+    def delete_user(cls, user_id: int, permanent: bool = True) -> Dict[str, Any]:
         """
         Delete or deactivate a user.
         
         Args:
             user_id: User ID
-            permanent: If True, permanently delete the user
+            permanent: If True, permanently delete the user (default True)
             
         Returns:
             Dict with deletion result

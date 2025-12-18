@@ -127,8 +127,8 @@ class AuditLog(models.Model):
     
     # Network information
     ip_address = models.GenericIPAddressField(null=True, blank=True)
-    user_agent = models.TextField(blank=True)
-    session_id = models.CharField(max_length=255, blank=True)
+    user_agent = models.TextField(null=True, blank=True)
+    session_id = models.CharField(max_length=255, blank=True, null=True)
     
     # Additional data
     metadata = models.JSONField(default=dict, blank=True)

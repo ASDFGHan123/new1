@@ -13,14 +13,22 @@ export interface User {
   id: string;
   username: string;
   email: string;
-  password?: string;
-  status: "active" | "suspended" | "banned" | "pending";
-  role: string;
-  joinDate: string;
-  lastActive: string;
-  messageCount: number;
-  reportCount: number;
+  first_name?: string;
+  last_name?: string;
   avatar?: string;
+  bio?: string;
+  status: "active" | "suspended" | "banned" | "pending";
+  role: "admin" | "user" | "moderator";
+  online_status: "online" | "away" | "offline";
+  last_seen: string;
+  join_date: string;
+  message_count: number;
+  report_count: number;
+  email_verified: boolean;
+  is_staff: boolean;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface Conversation {
@@ -40,7 +48,7 @@ export interface Attachment {
   size: number;
   url: string;
   uploadedAt: string;
-  duration?: number; // For audio/video attachments
+  duration?: number;
 }
 
 export interface Message {
@@ -73,7 +81,7 @@ export interface MessageTemplate {
 }
 
 export interface LoginCredentials {
-  username: string; // Django expects username
+  username: string;
   password: string;
 }
 
@@ -101,136 +109,37 @@ class ApiService {
   private isDevelopment = import.meta.env.DEV;
   private authToken: string | null = null;
   private refreshToken: string | null = null;
+  private isInitialized = false;
+  private lastRequestTime = 0;
+  private minRequestInterval = 1000;
   
-  // Get API base URL dynamically based on current host
   private getApiBaseUrl(): string {
     const envUrl = import.meta.env.VITE_API_URL;
     if (envUrl) {
       return envUrl;
     }
     
-    // Auto-detect based on current window location
     const hostname = window.location.hostname;
     const port = '8000';
     
-    // If accessing from localhost or same machine, use localhost
     if (hostname === 'localhost' || hostname === '127.0.0.1') {
       return `http://localhost:${port}/api`;
     }
     
-    // If accessing from network, use the current host
     return `http://${hostname}:${port}/api`;
   }
   
-  // Get auth token for WebSocket connections
   private isRefreshing = false;
   private refreshPromise: Promise<string> | null = null;
   private failedRequests: Array<{url: string, options: RequestInit, resolve: Function, reject: Function}> = [];
 
   constructor() {
-    // Initialize auth tokens from localStorage
-    this.initializeAuth();
+    if (typeof window !== 'undefined' && !this.isInitialized) {
+      this.initializeAuth();
+      this.isInitialized = true;
+    }
   }
 
-  // In-memory data storage (no localStorage)
-  private mockUsers: User[] = [
-    {
-      id: "admin",
-      username: "admin",
-      email: "admin@example.com",
-      password: "admin123",
-      status: "active",
-      role: "admin",
-      joinDate: "2024-01-01",
-      lastActive: "2 minutes ago",
-      messageCount: 0,
-      reportCount: 0,
-      avatar: undefined
-    },
-    {
-      id: "testuser_1764652403",
-      username: "testuser_1764652403",
-      email: "testuser_1764652403@example.com",
-      password: "password",
-      status: "pending",
-      role: "user",
-      joinDate: "2024-12-01",
-      lastActive: "Never",
-      messageCount: 0,
-      reportCount: 0,
-      avatar: undefined
-    },
-    {
-      id: "testuser123",
-      username: "testuser123",
-      email: "testuser123@example.com",
-      password: "password",
-      status: "pending",
-      role: "user",
-      joinDate: "2024-12-01",
-      lastActive: "Never",
-      messageCount: 0,
-      reportCount: 0,
-      avatar: undefined
-    },
-    {
-      id: "suspended_user",
-      username: "suspended_user",
-      email: "suspended@example.com",
-      password: "password",
-      status: "suspended",
-      role: "user",
-      joinDate: "2024-11-15",
-      lastActive: "5 days ago",
-      messageCount: 0,
-      reportCount: 0,
-      avatar: undefined
-    },
-    {
-      id: "bob_wilson",
-      username: "bob_wilson",
-      email: "bob@example.com",
-      password: "password",
-      status: "active",
-      role: "moderator",
-      joinDate: "2024-10-20",
-      lastActive: "1 hour ago",
-      messageCount: 0,
-      reportCount: 0,
-      avatar: undefined
-    },
-    {
-      id: "jane_smith",
-      username: "jane_smith",
-      email: "jane@example.com",
-      password: "password",
-      status: "active",
-      role: "user",
-      joinDate: "2024-09-10",
-      lastActive: "30 minutes ago",
-      messageCount: 0,
-      reportCount: 0,
-      avatar: undefined
-    },
-    {
-      id: "john_doe",
-      username: "john_doe",
-      email: "john@example.com",
-      password: "password",
-      status: "active",
-      role: "user",
-      joinDate: "2024-08-15",
-      lastActive: "2 hours ago",
-      messageCount: 0,
-      reportCount: 0,
-      avatar: undefined
-    }
-  ];
-
-  private mockCurrentUser: User | null = null;
-  private mockToken: string | null = null;
-
-  // Refresh token mechanism
   private async refreshAccessToken(): Promise<string> {
     if (this.refreshPromise) {
       return this.refreshPromise;
@@ -266,7 +175,19 @@ class ApiService {
     return this.refreshPromise;
   }
 
-  // Retry mechanism for failed requests
+  private async throttleRequest(): Promise<void> {
+    const now = Date.now();
+    const timeSinceLastRequest = now - this.lastRequestTime;
+    
+    if (timeSinceLastRequest < this.minRequestInterval) {
+      await new Promise(resolve => 
+        setTimeout(resolve, this.minRequestInterval - timeSinceLastRequest)
+      );
+    }
+    
+    this.lastRequestTime = Date.now();
+  }
+
   private async fetchWithRetry(
     url: string, 
     options: RequestInit, 
@@ -275,7 +196,6 @@ class ApiService {
     try {
       const response = await fetch(url, options);
       
-      // If we get a 401 and we have a refresh token, try to refresh
       if (response.status === 401 && this.refreshToken && !options.headers?.['Authorization']?.includes('refresh')) {
         try {
           const newToken = await this.refreshAccessToken();
@@ -288,7 +208,6 @@ class ApiService {
           };
           return this.fetchWithRetry(url, newOptions, retries - 1);
         } catch (refreshError) {
-          // If refresh fails, clear tokens and return a specific error
           this.authToken = null;
           this.refreshToken = null;
           localStorage.removeItem('access_token');
@@ -297,8 +216,11 @@ class ApiService {
         }
       }
       
+      if (response.status === 429) {
+        return response;
+      }
+      
       if (!response.ok && retries > 0) {
-        // Exponential backoff
         const delay = Math.pow(2, 3 - retries) * 1000;
         await new Promise(resolve => setTimeout(resolve, delay));
         return this.fetchWithRetry(url, options, retries - 1);
@@ -315,24 +237,12 @@ class ApiService {
     }
   }
 
-  // Enhanced request method with error handling and retry logic
   private async request<T>(
     endpoint: string,
     options: RequestInit = {}
   ): Promise<ApiResponse<T>> {
     try {
-      // Check if real data usage is explicitly enabled
-      const useRealData = import.meta.env.VITE_USE_REAL_DATA === 'true';
-      
-      // For authentication endpoints, always use real HTTP requests if enabled
-      // For other endpoints, use real HTTP requests only if we have a valid token
-      const isAuthEndpoint = endpoint.startsWith('/auth/');
-      
-      if (useRealData && (isAuthEndpoint || this.authToken)) {
-        return this.httpRequest<T>(endpoint, options);
-      } else {
-        return this.mockRequest<T>(endpoint, options);
-      }
+      return this.httpRequest<T>(endpoint, options);
     } catch (error) {
       console.error('API request failed:', error);
       return {
@@ -343,11 +253,12 @@ class ApiService {
     }
   }
 
-  // Real HTTP request implementation with retry logic
-  private async httpRequest<T>(
+  public async httpRequest<T>(
     endpoint: string,
     options: RequestInit = {}
   ): Promise<ApiResponse<T>> {
+    await this.throttleRequest();
+    
     const url = `${this.baseURL}${endpoint}`;
     
     const headers: HeadersInit = {
@@ -355,12 +266,21 @@ class ApiService {
       ...options.headers,
     };
 
-    // Add authorization header if token exists
+    if (!this.authToken && typeof window !== 'undefined') {
+      const accessToken = localStorage.getItem('access_token');
+      if (accessToken) {
+        this.authToken = accessToken;
+      }
+    }
+
     if (this.authToken) {
       headers['Authorization'] = `Bearer ${this.authToken}`;
+    } else {
+      console.warn(`No auth token available for ${endpoint}`);
     }
 
     try {
+      console.log(`Sending request to ${url}`);
       const response = await this.fetchWithRetry(url, {
         ...options,
         headers,
@@ -369,13 +289,18 @@ class ApiService {
       const data = await response.json();
 
       if (!response.ok) {
-        // Handle specific error cases
+        console.error('Backend error response:', data);
         if (response.status === 401) {
           throw new Error('Authentication required');
         } else if (response.status === 403) {
           throw new Error('Insufficient permissions');
         } else if (response.status === 404) {
           throw new Error('Resource not found');
+        } else if (response.status === 400) {
+          const errorMessage = Object.entries(data)
+            .map(([key, value]) => `${key}: ${Array.isArray(value) ? value.join(', ') : value}`)
+            .join('; ') || 'Bad request';
+          throw new Error(errorMessage);
         } else if (response.status >= 500) {
           throw new Error('Server error. Please try again later.');
         }
@@ -392,7 +317,6 @@ class ApiService {
     } catch (error) {
       console.error(`API request failed for ${endpoint}:`, error);
       
-      // Check if it's a network error (no internet, server down, etc.)
       if (error instanceof TypeError && error.message.includes('fetch')) {
         return {
           data: null as T,
@@ -401,7 +325,6 @@ class ApiService {
         };
       }
 
-      // Check if authentication expired
       if (error.message === 'AUTHENTICATION_EXPIRED') {
         return {
           data: null as T,
@@ -410,7 +333,6 @@ class ApiService {
         };
       }
       
-      // Return structured error response
       return {
         data: null as T,
         success: false,
@@ -419,110 +341,25 @@ class ApiService {
     }
   }
 
-  // Mock implementation for development
-  private async mockRequest<T>(
-    endpoint: string,
-    options: RequestInit = {}
-  ): Promise<ApiResponse<T>> {
-    // Simulate network delay
-    await new Promise(resolve => setTimeout(resolve, 500));
-
-    const method = options.method || 'GET';
-    
-    // Convert body to string if it exists
-    const bodyString = options.body ?
-      (typeof options.body === 'string' ? options.body : JSON.stringify(options.body)) :
-      null;
-
-    try {
-      switch (endpoint) {
-        case '/auth/login':
-          return this.mockLogin(bodyString!) as ApiResponse<T>;
-        case '/auth/signup':
-          return this.mockSignup(bodyString!) as ApiResponse<T>;
-        case '/auth/logout':
-          return this.mockLogout() as ApiResponse<T>;
-        case '/users':
-        case '/users/admin/users/':
-          return this.mockGetUsers() as ApiResponse<T>;
-        case '/users/profile':
-          return this.mockGetUserProfile() as ApiResponse<T>;
-        case '/conversations':
-          return this.mockGetConversations() as ApiResponse<T>;
-        case '/messages':
-          return this.mockGetMessages() as ApiResponse<T>;
-        default:
-          if (endpoint.startsWith('/users/') && method === 'PUT') {
-            return this.mockUpdateUser(endpoint.split('/')[2], bodyString!) as ApiResponse<T>;
-          }
-          if (endpoint.startsWith('/users/') && method === 'DELETE') {
-            return this.mockDeleteUser(endpoint.split('/')[2]) as ApiResponse<T>;
-          }
-          if (endpoint.includes('/admin/users/') && method === 'PUT') {
-            const userId = endpoint.split('/admin/users/')[1].replace('/', '');
-            return this.mockUpdateUser(userId, bodyString!) as ApiResponse<T>;
-          }
-          if (endpoint.includes('/admin/users/') && method === 'DELETE') {
-            const userId = endpoint.split('/admin/users/')[1].replace('/', '');
-            return this.mockDeleteUser(userId) as ApiResponse<T>;
-          }
-          if (endpoint.includes('/admin/users/') && method === 'POST') {
-            if (endpoint.includes('/approve/')) {
-              const userId = endpoint.split('/admin/users/')[1].split('/')[0];
-              return this.mockApproveUser(userId) as ApiResponse<T>;
-            }
-            if (endpoint.includes('/force-logout/')) {
-              const userId = endpoint.split('/admin/users/')[1].split('/')[0];
-              return this.mockForceLogoutUser(userId) as ApiResponse<T>;
-            }
-          }
-          throw new Error(`Mock endpoint not implemented: ${endpoint}`);
-      }
-    } catch (error) {
-      return {
-        data: null as T,
-        success: false,
-        error: error instanceof Error ? error.message : 'Mock error',
-      };
-    }
-  }
-
-  // Authentication methods
   async login(credentials: LoginCredentials): Promise<ApiResponse<{ user: User; access: string; refresh: string }>> {
     try {
-      console.log('=== API SERVICE LOGIN DEBUG ===');
-      console.log('Credentials:', credentials);
-      console.log('Base URL:', this.baseURL);
-      
       const response = await this.request<{ user: User; tokens: { access: string; refresh: string } }>('/auth/login/', {
         method: 'POST',
         body: JSON.stringify(credentials),
       });
       
-      console.log('API Response:', response);
-      
       if (response.success && response.data) {
-        console.log('=== SUCCESSFUL LOGIN ===');
-        console.log('Response data:', response.data);
-        
-        // Extract tokens from the nested structure
         const accessToken = response.data.tokens.access;
         const refreshToken = response.data.tokens.refresh;
         
-        console.log('Access token:', accessToken);
-        console.log('Refresh token:', refreshToken);
-        
-        // Store both tokens
         this.authToken = accessToken;
         this.refreshToken = refreshToken;
         
-        // Store tokens in localStorage for persistence
         if (typeof window !== 'undefined') {
           localStorage.setItem('access_token', accessToken);
           localStorage.setItem('refresh_token', refreshToken);
         }
         
-        // Return data in the expected format
         return {
           success: true,
           data: {
@@ -531,20 +368,14 @@ class ApiService {
             refresh: refreshToken
           }
         };
-      } else {
-        console.log('=== LOGIN FAILED ===');
-        console.log('Error:', response.error);
       }
       
-      // If the request failed, return a properly structured error response
       return {
         success: false,
         data: null as any,
         error: response.error || 'Login failed'
       };
     } catch (error) {
-      console.log('=== LOGIN EXCEPTION ===');
-      console.error('Exception:', error);
       return {
         success: false,
         data: null as any,
@@ -554,27 +385,52 @@ class ApiService {
   }
 
   async signup(data: SignupData): Promise<ApiResponse<{ user: User; token: string }>> {
-    return this.request('/auth/register/', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    });
+    try {
+      const response = await this.request<{ user: User; tokens: { access: string; refresh: string } }>('/auth/register/', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      });
+      
+      if (response.success && response.data) {
+        this.authToken = response.data.tokens.access;
+        this.refreshToken = response.data.tokens.refresh;
+        
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('access_token', response.data.tokens.access);
+          localStorage.setItem('refresh_token', response.data.tokens.refresh);
+        }
+        
+        return {
+          success: true,
+          data: {
+            user: response.data.user,
+            token: response.data.tokens.access
+          }
+        };
+      }
+      
+      return response as any;
+    } catch (error) {
+      return {
+        success: false,
+        data: null as any,
+        error: error instanceof Error ? error.message : 'Registration failed'
+      };
+    }
   }
 
   async logout(): Promise<ApiResponse<void>> {
     try {
-      // Try to logout on server
       await this.request('/auth/logout/', {
         method: 'POST',
       });
     } catch (error) {
       console.warn('Server logout failed, clearing tokens locally:', error);
     } finally {
-      // Clear tokens regardless of request success
       this.authToken = null;
       this.refreshToken = null;
       this.refreshPromise = null;
       
-      // Clear localStorage
       if (typeof window !== 'undefined') {
         localStorage.removeItem('access_token');
         localStorage.removeItem('refresh_token');
@@ -584,7 +440,6 @@ class ApiService {
     return { data: undefined, success: true };
   }
 
-  // Initialize tokens from localStorage (call on app start)
   initializeAuth() {
     if (typeof window !== 'undefined') {
       const accessToken = localStorage.getItem('access_token');
@@ -592,6 +447,7 @@ class ApiService {
       
       if (accessToken) {
         this.authToken = accessToken;
+        console.log('Auth token loaded from localStorage');
       }
       if (refreshToken) {
         this.refreshToken = refreshToken;
@@ -599,7 +455,6 @@ class ApiService {
     }
   }
 
-  // Helper method to set auth token manually
   setAuthToken(token: string) {
     this.authToken = token;
     if (typeof window !== 'undefined') {
@@ -607,17 +462,14 @@ class ApiService {
     }
   }
 
-  // Helper method to get current auth token
   getAuthToken(): string | null {
     return this.authToken;
   }
 
-  // Check if user is authenticated
   isAuthenticated(): boolean {
     return !!this.authToken;
   }
 
-  // Verify token validity
   async verifyToken(): Promise<boolean> {
     if (!this.authToken) return false;
     
@@ -633,15 +485,16 @@ class ApiService {
     }
   }
 
-  // User management
   async getUsers(): Promise<ApiResponse<User[]>> {
     try {
-      const response = await this.request<{count: number; next: string | null; previous: string | null; results: User[]}>('/users/admin/users/');
+      const response = await this.httpRequest<any>('/users/admin/users/');
       
       if (response.success && response.data) {
+        const users = Array.isArray(response.data) ? response.data : response.data.results || [];
+        console.log('Loaded users:', users);
         return {
           success: true,
-          data: response.data.results
+          data: users
         };
       }
       
@@ -651,6 +504,7 @@ class ApiService {
         error: response.error || 'Failed to load users'
       };
     } catch (error) {
+      console.error('Error loading users:', error);
       return {
         success: false,
         data: [],
@@ -665,9 +519,13 @@ class ApiService {
 
   async updateUser(userId: string, updates: Partial<User>): Promise<ApiResponse<User>> {
     try {
+      const filteredUpdates = { ...updates };
+      if (filteredUpdates.avatar && typeof filteredUpdates.avatar === 'string') {
+        delete filteredUpdates.avatar;
+      }
       return this.request(`/users/admin/users/${userId}/`, {
         method: 'PUT',
-        body: JSON.stringify(updates),
+        body: JSON.stringify(filteredUpdates),
       });
     } catch (error) {
       return {
@@ -748,24 +606,35 @@ class ApiService {
     }
   }
 
-  // Chat and conversations
   async getConversations(): Promise<ApiResponse<Conversation[]>> {
     try {
-      const response = await this.request<{count: number; next: string | null; previous: string | null; results: Conversation[]}>('/chat/conversations/');
+      const response = await this.request<any>('/chat/conversations/');
       
       if (response.success && response.data) {
+        let conversations = [];
+        if (Array.isArray(response.data)) {
+          conversations = response.data;
+        } else if (response.data.results && Array.isArray(response.data.results)) {
+          conversations = response.data.results;
+        } else if (response.data.data && Array.isArray(response.data.data)) {
+          conversations = response.data.data;
+        }
+        
+        console.log('Loaded conversations:', conversations);
         return {
           success: true,
-          data: response.data.results
+          data: conversations
         };
       }
       
+      console.warn('Failed to load conversations:', response.error);
       return {
         success: false,
         data: [],
         error: response.error || 'Failed to load conversations'
       };
     } catch (error) {
+      console.error('Error loading conversations:', error);
       return {
         data: [],
         success: false,
@@ -778,7 +647,7 @@ class ApiService {
     try {
       return this.request('/chat/conversations/', {
         method: 'POST',
-        body: JSON.stringify({ participants }),
+        body: JSON.stringify({ participant_ids: participants }),
       });
     } catch (error) {
       return {
@@ -789,23 +658,72 @@ class ApiService {
     }
   }
 
+  async deleteConversation(conversationId: string): Promise<ApiResponse<void>> {
+    try {
+      const endpoint = `/chat/conversations/${conversationId}/`;
+      return this.request(endpoint, {
+        method: 'DELETE',
+      });
+    } catch (error) {
+      return {
+        data: undefined,
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to delete conversation'
+      };
+    }
+  }
+
+  async createGroup(groupData: any): Promise<ApiResponse<any>> {
+    try {
+      const payload = {
+        name: groupData.name,
+        description: groupData.description || '',
+        avatar: groupData.avatar || null,
+        group_type: groupData.group_type || 'public',
+        member_ids: (groupData.member_ids || []).map((id: any) => String(id))
+      };
+      return this.request('/chat/groups/', {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      });
+    } catch (error) {
+      return {
+        data: null,
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to create group'
+      };
+    }
+  }
+
   async getMessages(conversationId: string): Promise<ApiResponse<Message[]>> {
     try {
-      const response = await this.request<{count: number; next: string | null; previous: string | null; results: Message[]}>(`/chat/conversations/${conversationId}/messages/`);
+      const response = await this.request<any>(`/chat/conversations/${conversationId}/messages/`);
       
       if (response.success && response.data) {
+        let messages = [];
+        if (Array.isArray(response.data)) {
+          messages = response.data;
+        } else if (response.data.results && Array.isArray(response.data.results)) {
+          messages = response.data.results;
+        } else if (response.data.data && Array.isArray(response.data.data)) {
+          messages = response.data.data;
+        }
+        
+        console.log('Loaded messages:', messages);
         return {
           success: true,
-          data: response.data.results
+          data: messages
         };
       }
       
+      console.warn('Failed to load messages:', response.error);
       return {
         success: false,
         data: [],
         error: response.error || 'Failed to load messages'
       };
     } catch (error) {
+      console.error('Error loading messages:', error);
       return {
         data: [],
         success: false,
@@ -816,24 +734,32 @@ class ApiService {
 
   async sendMessage(conversationId: string, content: string, attachments?: File[]): Promise<ApiResponse<Message>> {
     try {
-      // If there are attachments, we need to upload them first
-      let uploadedAttachments: Attachment[] = [];
+      await this.throttleRequest();
+      const url = `${this.baseURL}/chat/conversations/${conversationId}/messages/`;
+      const formData = new FormData();
+      formData.append('content', content);
       
       if (attachments && attachments.length > 0) {
-        const uploadPromises = attachments.map(file => this.uploadAttachment(file));
-        const uploadResults = await Promise.all(uploadPromises);
-        uploadedAttachments = uploadResults
-          .filter(result => result.success)
-          .map(result => result.data);
+        attachments.forEach(file => formData.append('attachments', file));
       }
-
-      return this.request(`/chat/conversations/${conversationId}/messages/`, {
+      
+      const headers: HeadersInit = {};
+      if (this.authToken) {
+        headers['Authorization'] = `Bearer ${this.authToken}`;
+      }
+      
+      const response = await this.fetchWithRetry(url, {
         method: 'POST',
-        body: JSON.stringify({ 
-          content, 
-          attachments: uploadedAttachments 
-        }),
+        headers,
+        body: formData,
       });
+      
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.detail || data.error || 'Failed to send message');
+      }
+      
+      return { data, success: true };
     } catch (error) {
       return {
         data: null as Message,
@@ -843,44 +769,6 @@ class ApiService {
     }
   }
 
-  async uploadAttachment(file: File): Promise<ApiResponse<Attachment>> {
-    try {
-      const formData = new FormData();
-      formData.append('file', file);
-      
-      const url = `${this.baseURL}/chat/upload/`;
-      const headers: HeadersInit = {};
-      
-      if (this.authToken) {
-        headers['Authorization'] = `Bearer ${this.authToken}`;
-      }
-
-      const response = await this.fetchWithRetry(url, {
-        method: 'POST',
-        headers,
-        body: formData,
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.detail || data.message || `Upload failed! status: ${response.status}`);
-      }
-
-      return {
-        data,
-        success: true,
-      };
-    } catch (error) {
-      return {
-        data: null as Attachment,
-        success: false,
-        error: error instanceof Error ? error.message : 'Failed to upload file'
-      };
-    }
-  }
-
-  // Admin dashboard methods
   async getDashboardStats(): Promise<ApiResponse<any>> {
     try {
       return this.request('/admin/dashboard/stats/');
@@ -921,7 +809,7 @@ class ApiService {
 
   async getAnalytics(): Promise<ApiResponse<any>> {
     try {
-      return this.request('/admin/analytics/');
+      return this.request('/analytics/data/');
     } catch (error) {
       return {
         data: null,
@@ -931,7 +819,6 @@ class ApiService {
     }
   }
 
-  // Message Templates
   async getMessageTemplates(): Promise<ApiResponse<MessageTemplate[]>> {
     try {
       const response = await this.request<MessageTemplate[]>('/admin/message-templates/');
@@ -1015,143 +902,71 @@ class ApiService {
     }
   }
 
-  // Mock implementations
-  private mockLogin(body: string): ApiResponse<{ user: User; token: string }> {
-    const { username, password } = JSON.parse(body);
+  async uploadProfileImage(file: File): Promise<ApiResponse<{avatar_url: string}>> {
+    try {
+      const formData = new FormData();
+      formData.append('image', file, file.name);
+      
+      const url = `${this.baseURL}/users/profile/upload-image/`;
+      const headers: HeadersInit = {};
+      
+      if (this.authToken) {
+        headers['Authorization'] = `Bearer ${this.authToken}`;
+      }
+      
+      const response = await fetch(url, {
+        method: 'POST',
+        headers,
+        body: formData,
+      });
 
-    const user = this.mockUsers.find(u =>
-      (u.username === username || u.email === username) &&
-      u.password === password &&
-      u.status === 'active'
-    );
+      const data = await response.json();
 
-    if (!user) {
-      throw new Error('Invalid credentials or account not approved');
+      if (!response.ok) {
+        throw new Error(data.error || `Upload failed! status: ${response.status}`);
+      }
+
+      return {
+        data,
+        success: true,
+      };
+    } catch (error) {
+      return {
+        data: null as any,
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to upload profile image'
+      };
     }
-
-    const token = `mock-jwt-${user.id}-${Date.now()}`;
-    this.mockToken = token;
-    this.mockCurrentUser = { ...user };
-
-    const { password: _, ...userWithoutPassword } = user;
-    return {
-      data: { user: userWithoutPassword, token },
-      success: true,
-    };
   }
 
-  private mockSignup(body: string): ApiResponse<{ user: User; token: string }> {
-    const { username, email, password } = JSON.parse(body);
-
-    if (this.mockUsers.some(u => u.username === username || u.email === email)) {
-      throw new Error('Username or email already exists');
+  async updateProfile(data: {current_password?: string; new_password?: string}): Promise<ApiResponse<User>> {
+    try {
+      return this.request('/users/profile/update/', {
+        method: 'PUT',
+        body: JSON.stringify(data),
+      });
+    } catch (error) {
+      return {
+        data: null as User,
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to update profile'
+      };
     }
-
-    const newUser: User = {
-      id: username,
-      username,
-      email,
-      password,
-      status: 'pending',
-      role: 'user',
-      joinDate: new Date().toISOString().split('T')[0],
-      lastActive: 'Never',
-      messageCount: 0,
-      reportCount: 0,
-    };
-
-    this.mockUsers.push(newUser);
-
-    const token = `mock-jwt-${newUser.id}-${Date.now()}`;
-    this.mockToken = token;
-    this.mockCurrentUser = null; // New users need approval
-
-    const { password: _, ...userWithoutPassword } = newUser;
-    return {
-      data: { user: userWithoutPassword, token },
-      success: true,
-    };
   }
 
-  private mockLogout(): ApiResponse<void> {
-    this.mockToken = null;
-    this.mockCurrentUser = null;
-    return { data: undefined, success: true };
-  }
-
-  private mockGetUsers(): ApiResponse<User[]> {
-    const users = this.mockUsers.map(({ password, ...user }) => user);
-    return { data: users, success: true };
-  }
-
-  private mockGetUserProfile(): ApiResponse<User> {
-    if (!this.mockCurrentUser) {
-      throw new Error('Not authenticated');
+  async createUser(userData: {username: string; email: string; password: string; first_name?: string; last_name?: string; role?: string; status?: string}): Promise<ApiResponse<User>> {
+    try {
+      return this.request('/admin/users/create/', {
+        method: 'POST',
+        body: JSON.stringify(userData),
+      });
+    } catch (error) {
+      return {
+        data: null as User,
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to create user'
+      };
     }
-
-    const { password, ...userWithoutPassword } = this.mockCurrentUser;
-    return { data: userWithoutPassword, success: true };
-  }
-
-  private mockUpdateUser(userId: string, body: string): ApiResponse<User> {
-    const updates = JSON.parse(body);
-    const userIndex = this.mockUsers.findIndex(u => u.id === userId);
-
-    if (userIndex === -1) throw new Error('User not found');
-
-    this.mockUsers[userIndex] = { ...this.mockUsers[userIndex], ...updates };
-
-    const { password, ...userWithoutPassword } = this.mockUsers[userIndex];
-    return { data: userWithoutPassword, success: true };
-  }
-
-  private mockDeleteUser(userId: string): ApiResponse<void> {
-    this.mockUsers = this.mockUsers.filter(u => u.id !== userId);
-    return { data: undefined, success: true };
-  }
-
-  private mockApproveUser(userId: string): ApiResponse<void> {
-    const userIndex = this.mockUsers.findIndex(u => u.id === userId);
-    if (userIndex === -1) {
-      throw new Error('User not found');
-    }
-    this.mockUsers[userIndex] = { ...this.mockUsers[userIndex], status: 'active' };
-    return { data: undefined, success: true };
-  }
-
-  private mockForceLogoutUser(userId: string): ApiResponse<void> {
-    // Mock force logout - just return success
-    return { data: undefined, success: true };
-  }
-
-  private mockGetConversations(): ApiResponse<Conversation[]> {
-    // Return mock conversations
-    return {
-      data: [
-        {
-          id: "general",
-          type: "group",
-          title: "General Chat",
-          participants: ["admin", "user1"],
-          messages: [
-            {
-              id: "1",
-              content: "Welcome to OffChat!",
-              sender: "system",
-              timestamp: new Date().toISOString(),
-              type: "system"
-            }
-          ],
-          createdAt: new Date().toISOString(),
-          isActive: true
-        }
-      ],
-      success: true
-    };
-  }
-
-  private mockGetMessages(): ApiResponse<Message[]> {
-    return { data: [], success: true };
   }
 }
 

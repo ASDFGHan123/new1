@@ -1,91 +1,34 @@
-import React from "react";
-import { Loader2 } from "lucide-react";
-import { cn } from "@/lib/utils";
+import React from 'react';
+import { Loader2 } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
-interface LoadingSpinnerProps {
-  size?: "sm" | "md" | "lg";
+interface LoadingProps {
   className?: string;
+  size?: 'sm' | 'md' | 'lg';
+  text?: string;
 }
 
-export const LoadingSpinner: React.FC<LoadingSpinnerProps> = ({
-  size = "md",
-  className
-}) => {
+export function Loading({ className, size = 'md', text }: LoadingProps) {
   const sizeClasses = {
-    sm: "w-4 h-4",
-    md: "w-6 h-6",
-    lg: "w-8 h-8"
+    sm: 'h-4 w-4',
+    md: 'h-6 w-6',
+    lg: 'h-8 w-8'
   };
 
   return (
-    <Loader2
-      className={cn("animate-spin text-muted-foreground", sizeClasses[size], className)}
-    />
-  );
-};
-
-interface LoadingOverlayProps {
-  message?: string;
-  className?: string;
-}
-
-export const LoadingOverlay: React.FC<LoadingOverlayProps> = ({
-  message = "Loading...",
-  className
-}) => {
-  return (
-    <div className={cn(
-      "flex flex-col items-center justify-center p-8 space-y-4",
-      className
-    )}>
-      <LoadingSpinner size="lg" />
-      <p className="text-sm text-muted-foreground">{message}</p>
+    <div className={cn('flex items-center justify-center p-4', className)}>
+      <div className="flex flex-col items-center space-y-2">
+        <Loader2 className={cn('animate-spin', sizeClasses[size])} />
+        {text && <p className="text-sm text-muted-foreground">{text}</p>}
+      </div>
     </div>
   );
-};
-
-interface LoadingPageProps {
-  message?: string;
-  className?: string;
 }
 
-export const LoadingPage: React.FC<LoadingPageProps> = ({
-  message = "Loading...",
-  className
-}) => {
+export function LoadingPage({ text = 'Loading...' }: { text?: string }) {
   return (
-    <div className={cn(
-      "min-h-screen flex items-center justify-center bg-background",
-      className
-    )}>
-      <LoadingOverlay message={message} />
+    <div className="flex items-center justify-center min-h-screen">
+      <Loading size="lg" text={text} />
     </div>
   );
-};
-
-interface LoadingButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
-  loading?: boolean;
-  loadingText?: string;
-  children: React.ReactNode;
 }
-
-export const LoadingButton = React.forwardRef<HTMLButtonElement, LoadingButtonProps>(
-  ({ loading = false, loadingText, children, disabled, className, ...props }, ref) => {
-    return (
-      <button
-        ref={ref}
-        disabled={loading || disabled}
-        className={cn(
-          "inline-flex items-center justify-center",
-          className
-        )}
-        {...props}
-      >
-        {loading && <LoadingSpinner size="sm" className="mr-2" />}
-        {loading && loadingText ? loadingText : children}
-      </button>
-    );
-  }
-);
-
-LoadingButton.displayName = "LoadingButton";

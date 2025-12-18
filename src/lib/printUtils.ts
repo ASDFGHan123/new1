@@ -248,8 +248,8 @@ export const generateUserListHTML = (users: any[]) => {
     email: user.email || 'N/A',
     status: user.status || 'N/A',
     role: user.role || 'N/A',
-    joindate: user.joinDate || user.createdAt || 'N/A',
-    messages: user.messageCount || 0
+    joindate: user.join_date ? new Date(user.join_date).toLocaleDateString() : (user.created_at ? new Date(user.created_at).toLocaleDateString() : 'N/A'),
+    messages: user.message_count || 0
   }));
   
   const content = generateTableHTML(

@@ -34,69 +34,7 @@ import {
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { useState, useEffect } from "react";
-import { openPrintWindow, generateAuditLogsHTML } from "@/lib/printUtils";
-
-const initialAuditLogs = [
-  {
-    id: 1,
-    action: "USER_LOGIN",
-    actor: "john_doe",
-    targetType: "USER",
-    targetId: 123,
-    timestamp: "2024-01-22 14:30:25",
-    ipAddress: "192.168.1.1",
-    description: "User successfully logged in",
-    severity: "info",
-  },
-  {
-    id: 2,
-    action: "MESSAGE_DELETE",
-    actor: "admin_user",
-    targetType: "MESSAGE",
-    targetId: 456,
-    timestamp: "2024-01-22 14:25:10",
-    ipAddress: "192.168.1.100",
-    description: "Message deleted by admin",
-    severity: "warning",
-  },
-  {
-    id: 3,
-    action: "USER_ROLE_CHANGE",
-    actor: "admin_user",
-    targetType: "USER",
-    targetId: 789,
-    timestamp: "2024-01-22 14:20:45",
-    ipAddress: "192.168.1.100",
-    description: "User role changed from USER to ADMIN",
-    severity: "high",
-  },
-  {
-    id: 4,
-    action: "GROUP_CREATE",
-    actor: "alice_smith",
-    targetType: "GROUP",
-    targetId: 101,
-    timestamp: "2024-01-22 14:15:30",
-    ipAddress: "192.168.1.50",
-    description: "New group 'Development Team' created",
-    severity: "info",
-  },
-  {
-    id: 5,
-    action: "USER_DEACTIVATE",
-    actor: "admin_user",
-    targetType: "USER",
-    targetId: 999,
-    timestamp: "2024-01-22 14:10:15",
-    ipAddress: "192.168.1.100",
-    description: "User account deactivated",
-    severity: "high",
-  },
-];
-
-const actions = ["USER_LOGIN", "MESSAGE_SEND", "USER_LOGOUT", "GROUP_JOIN", "MESSAGE_DELETE"];
-const actors = ["john_doe", "alice_smith", "admin_user", "bob_wilson"];
-const severities = ["info", "warning", "high"];
+import { Loader2 } from "lucide-react";
 
 const getSeverityColor = (severity: string) => {
   switch (severity) {
@@ -112,127 +50,65 @@ const getSeverityColor = (severity: string) => {
 const getSeverityBg = (severity: string) => {
   switch (severity) {
     case 'high':
-      return 'bg-admin-error/10';
+      return 'dark:bg-red-950/30 bg-red-50';
     case 'warning':
-      return 'bg-admin-warning/10';
+      return 'dark:bg-yellow-950/30 bg-yellow-50';
     default:
-      return 'bg-admin-primary/10';
+      return 'dark:bg-blue-950/30 bg-blue-50';
   }
 };
 
 export const AuditLogs = () => {
-  const [auditLogs, setAuditLogs] = useState(initialAuditLogs);
+  const [auditLogs, setAuditLogs] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
-  const [actionFilter, setActionFilter] = useState<"all" | string>("all");
-  const [severityFilter, setSeverityFilter] = useState<"all" | string>("all");
-  const [sortBy, setSortBy] = useState<"timestamp" | "action" | "actor" | "severity">("timestamp");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
   const [currentPage, setCurrentPage] = useState(1);
-  const [selectedLog, setSelectedLog] = useState<typeof initialAuditLogs[0] | null>(null);
+  const [selectedLog, setSelectedLog] = useState<any | null>(null);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const itemsPerPage = 10;
 
   useEffect(() => {
-    const interval = setInterval(() => {
-      const newLog = {
-        id: Date.now(),
-        action: actions[Math.floor(Math.random() * actions.length)],
-        actor: actors[Math.floor(Math.random() * actors.length)],
-        targetType: "USER",
-        targetId: Math.floor(Math.random() * 1000),
-        timestamp: new Date().toISOString().slice(0, 19).replace('T', ' '),
-        ipAddress: `192.168.1.${Math.floor(Math.random() * 255)}`,
-        description: "System action performed",
-        severity: severities[Math.floor(Math.random() * severities.length)],
-      };
-      setAuditLogs(prev => [newLog, ...prev.slice(0, 49)]); // Keep up to 50 logs
-    }, 8000); // Add new log every 8 seconds
-
-    return () => clearInterval(interval);
+    fetchAuditLogs();
   }, []);
 
-  // Filter and sort logs
-  const filteredAndSortedLogs = auditLogs
-    .filter(log => {
-      const matchesSearch = log.action.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                           log.actor.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                           log.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                           log.ipAddress.includes(searchTerm);
-      const matchesAction = actionFilter === "all" || log.action === actionFilter;
-      const matchesSeverity = severityFilter === "all" || log.severity === severityFilter;
-      return matchesSearch && matchesAction && matchesSeverity;
-    })
-    .sort((a, b) => {
-      let aValue: any, bValue: any;
+  const fetchAuditLogs = async () => {
+    setLoading(true);
+    try {
+      const token = localStorage.getItem('access_token');
+      const response = await fetch('http://localhost:8000/api/admin/audit-logs/', {
+        headers: token ? { 'Authorization': `Bearer ${token}` } : {}
+      });
+      if (!response.ok) throw new Error('Failed to fetch');
+      const data = await response.json();
+      setAuditLogs(Array.isArray(data) ? data : data.results || []);
+      setCurrentPage(1);
+    } catch (error) {
+      console.error('Failed to load audit logs:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
-      switch (sortBy) {
-        case "timestamp":
-          aValue = new Date(a.timestamp).getTime();
-          bValue = new Date(b.timestamp).getTime();
-          break;
-        case "action":
-          aValue = a.action.toLowerCase();
-          bValue = b.action.toLowerCase();
-          break;
-        case "actor":
-          aValue = a.actor.toLowerCase();
-          bValue = b.actor.toLowerCase();
-          break;
-        case "severity":
-          const severityOrder = { high: 3, warning: 2, info: 1 };
-          aValue = severityOrder[a.severity as keyof typeof severityOrder] || 0;
-          bValue = severityOrder[b.severity as keyof typeof severityOrder] || 0;
-          break;
-        default:
-          return 0;
-      }
+  const filteredLogs = auditLogs.filter(log =>
+    log.action_type?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    log.actor?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    log.description?.toLowerCase().includes(searchTerm.toLowerCase())
+  );
 
-      if (sortOrder === "asc") {
-        return aValue > bValue ? 1 : -1;
-      } else {
-        return aValue < bValue ? 1 : -1;
-      }
-    });
+  const sortedLogs = [...filteredLogs].sort((a, b) => {
+    const aTime = new Date(a.timestamp).getTime();
+    const bTime = new Date(b.timestamp).getTime();
+    return sortOrder === 'desc' ? bTime - aTime : aTime - bTime;
+  });
 
-  // Pagination
-  const totalPages = Math.ceil(filteredAndSortedLogs.length / itemsPerPage);
-  const paginatedLogs = filteredAndSortedLogs.slice(
+  const totalPages = Math.ceil(sortedLogs.length / itemsPerPage);
+  const paginatedLogs = sortedLogs.slice(
     (currentPage - 1) * itemsPerPage,
     currentPage * itemsPerPage
   );
 
-  const handleSort = (column: typeof sortBy) => {
-    if (sortBy === column) {
-      setSortOrder(sortOrder === "asc" ? "desc" : "asc");
-    } else {
-      setSortBy(column);
-      setSortOrder("desc");
-    }
-    setCurrentPage(1);
-  };
-
-  const handleViewDetails = (log: typeof initialAuditLogs[0]) => {
-    setSelectedLog(log);
-    setShowDetailsModal(true);
-  };
-
-  const handleExport = () => {
-    const dataStr = JSON.stringify(filteredAndSortedLogs, null, 2);
-    const dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr);
-    const exportFileDefaultName = `audit-logs-export-${new Date().toISOString().split('T')[0]}.json`;
-    const linkElement = document.createElement('a');
-    linkElement.setAttribute('href', dataUri);
-    linkElement.setAttribute('download', exportFileDefaultName);
-    linkElement.click();
-  };
-
-  const handlePrintLogs = () => {
-    const printData = generateAuditLogsHTML(filteredAndSortedLogs);
-    openPrintWindow({
-      ...printData,
-      subtitle: `Filtered Results: ${filteredAndSortedLogs.length} of ${auditLogs.length} audit logs`
-    });
-  };
+  if (loading) return <div className="flex justify-center p-8"><Loader2 className="animate-spin" /></div>;
 
   return (
     <Card className="bg-gradient-card border-border/50">
@@ -244,204 +120,100 @@ export const AuditLogs = () => {
               Track all system actions and changes
             </CardDescription>
           </div>
-          <div className="flex items-center space-x-2">
-            <Button 
-              onClick={handlePrintLogs}
-              variant="outline"
-              size="sm"
-              className="bg-blue-50 hover:bg-blue-100 border-blue-200 text-blue-700"
-            >
-              <Printer className="w-4 h-4 mr-2" />
-              Print Logs
-            </Button>
-            <Button variant="outline" size="sm" onClick={handleExport}>
-              <Download className="w-4 h-4 mr-2" />
-              Export Logs
-            </Button>
-          </div>
+          <Button variant="outline" size="sm" onClick={fetchAuditLogs}>
+            Refresh
+          </Button>
         </div>
         
-        {/* Search and Filters */}
-        <div className="flex flex-col sm:flex-row gap-4 mt-4">
+        <div className="flex gap-4 mt-4">
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
             <Input
               placeholder="Search audit logs..."
-              className="pl-10 bg-input border-border"
+              className="pl-10"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
-          <div className="flex gap-2">
-            <Select value={actionFilter} onValueChange={(value: any) => setActionFilter(value)}>
-              <SelectTrigger className="w-40">
-                <SelectValue placeholder="Action" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Actions</SelectItem>
-                {actions.map(action => (
-                  <SelectItem key={action} value={action}>{action.replace('_', ' ')}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Select value={severityFilter} onValueChange={(value: any) => setSeverityFilter(value)}>
-              <SelectTrigger className="w-32">
-                <SelectValue placeholder="Severity" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Levels</SelectItem>
-                <SelectItem value="info">Info</SelectItem>
-                <SelectItem value="warning">Warning</SelectItem>
-                <SelectItem value="high">High</SelectItem>
-              </SelectContent>
-            </Select>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                setSearchTerm("");
-                setActionFilter("all");
-                setSeverityFilter("all");
-                setSortBy("timestamp");
-                setSortOrder("desc");
-                setCurrentPage(1);
-              }}
-            >
-              Clear Filters
-            </Button>
-          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
+          >
+            {sortOrder === 'asc' ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+          </Button>
         </div>
       </CardHeader>
       
       <CardContent>
-        <div className="max-h-[600px] overflow-y-auto">
+        <div className="max-h-[600px] overflow-y-auto scroll-smooth" style={{
+          scrollBehavior: 'smooth',
+          scrollbarWidth: 'thin',
+          scrollbarColor: '#cbd5e1 #f1f5f9'
+        }}>
           <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead
-                className="cursor-pointer hover:bg-muted/50 select-none"
-                onClick={() => handleSort("timestamp")}
-              >
-                <div className="flex items-center space-x-1">
-                  <span>Timestamp</span>
-                  {sortBy === "timestamp" && (
-                    sortOrder === "asc" ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />
-                  )}
-                </div>
-              </TableHead>
-              <TableHead
-                className="cursor-pointer hover:bg-muted/50 select-none"
-                onClick={() => handleSort("action")}
-              >
-                <div className="flex items-center space-x-1">
-                  <span>Action</span>
-                  {sortBy === "action" && (
-                    sortOrder === "asc" ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />
-                  )}
-                </div>
-              </TableHead>
-              <TableHead
-                className="cursor-pointer hover:bg-muted/50 select-none"
-                onClick={() => handleSort("actor")}
-              >
-                <div className="flex items-center space-x-1">
-                  <span>Actor</span>
-                  {sortBy === "actor" && (
-                    sortOrder === "asc" ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />
-                  )}
-                </div>
-              </TableHead>
-              <TableHead>Target</TableHead>
-              <TableHead>Description</TableHead>
-              <TableHead
-                className="cursor-pointer hover:bg-muted/50 select-none"
-                onClick={() => handleSort("severity")}
-              >
-                <div className="flex items-center space-x-1">
-                  <span>Severity</span>
-                  {sortBy === "severity" && (
-                    sortOrder === "asc" ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />
-                  )}
-                </div>
-              </TableHead>
-              <TableHead>IP Address</TableHead>
-              <TableHead>Actions</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {paginatedLogs.length === 0 ? (
+            <TableHeader>
               <TableRow>
-                <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
-                  No audit logs found matching your criteria.
-                </TableCell>
+                <TableHead>Timestamp</TableHead>
+                <TableHead>Action</TableHead>
+                <TableHead>Actor</TableHead>
+                <TableHead>Description</TableHead>
+                <TableHead>Severity</TableHead>
+                <TableHead>Actions</TableHead>
               </TableRow>
-            ) : (
-              paginatedLogs.map((log) => (
-                <TableRow key={log.id} className={`hover:bg-muted/50 ${getSeverityBg(log.severity)}`}>
-                  <TableCell>
-                    <div className="flex items-center space-x-2">
-                      <Clock className="w-4 h-4 text-muted-foreground" />
-                      <span className="text-sm font-mono">{log.timestamp}</span>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant="outline" className="font-mono">
-                      {log.action}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center space-x-2">
-                      <User className="w-4 h-4 text-muted-foreground" />
-                      <span className="font-medium">{log.actor}</span>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <span className="text-sm text-muted-foreground">
-                      {log.targetType}:{log.targetId}
-                    </span>
-                  </TableCell>
-                  <TableCell>
-                    <span className="text-sm">{log.description}</span>
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant={getSeverityColor(log.severity)}>
-                      {log.severity.toUpperCase()}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    <span className="text-sm font-mono text-muted-foreground">
-                      {log.ipAddress}
-                    </span>
-                  </TableCell>
-                  <TableCell>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="sm">
-                          <MoreHorizontal className="w-4 h-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => handleViewDetails(log)}>
-                          <Eye className="w-4 h-4 mr-2" />
-                          View Details
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
+            </TableHeader>
+            <TableBody>
+              {paginatedLogs.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                    No audit logs found.
                   </TableCell>
                 </TableRow>
-              ))
-            )}
+              ) : (
+                paginatedLogs.map((log) => (
+                  <TableRow key={log.id} className={getSeverityBg(log.severity || 'info')}>
+                    <TableCell>
+                      <span className="text-sm font-mono">{new Date(log.timestamp).toLocaleString()}</span>
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant="outline">{log.action_type}</Badge>
+                    </TableCell>
+                    <TableCell>
+                      <span className="font-medium">{log.actor || 'System'}</span>
+                    </TableCell>
+                    <TableCell>
+                      <span className="text-sm">{log.description}</span>
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant={getSeverityColor(log.severity || 'info')}>
+                        {(log.severity || 'info').toUpperCase()}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          setSelectedLog(log);
+                          setShowDetailsModal(true);
+                        }}
+                      >
+                        <Eye className="w-4 h-4" />
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
             </TableBody>
           </Table>
         </div>
 
-        {/* Pagination */}
         {totalPages > 1 && (
           <div className="flex items-center justify-between mt-4">
             <div className="text-sm text-muted-foreground">
-              Showing {((currentPage - 1) * itemsPerPage) + 1} to {Math.min(currentPage * itemsPerPage, filteredAndSortedLogs.length)} of {filteredAndSortedLogs.length} audit logs
+              Page {currentPage} of {totalPages}
             </div>
-            <div className="flex items-center space-x-2">
+            <div className="flex gap-2">
               <Button
                 variant="outline"
                 size="sm"
@@ -450,23 +222,6 @@ export const AuditLogs = () => {
               >
                 Previous
               </Button>
-              <div className="flex items-center space-x-1">
-                {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                  const pageNum = Math.max(1, Math.min(totalPages - 4, currentPage - 2)) + i;
-                  if (pageNum > totalPages) return null;
-                  return (
-                    <Button
-                      key={pageNum}
-                      variant={currentPage === pageNum ? "default" : "outline"}
-                      size="sm"
-                      onClick={() => setCurrentPage(pageNum)}
-                      className="w-8 h-8 p-0"
-                    >
-                      {pageNum}
-                    </Button>
-                  );
-                })}
-              </div>
               <Button
                 variant="outline"
                 size="sm"
@@ -478,97 +233,61 @@ export const AuditLogs = () => {
             </div>
           </div>
         )}
+        <style>{`
+          div::-webkit-scrollbar {
+            width: 8px;
+          }
+          div::-webkit-scrollbar-track {
+            background: #f1f5f9;
+          }
+          div::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 4px;
+          }
+          div::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+          }
+          @media (prefers-color-scheme: dark) {
+            div::-webkit-scrollbar-track {
+              background: #1e293b;
+            }
+            div::-webkit-scrollbar-thumb {
+              background: #475569;
+            }
+            div::-webkit-scrollbar-thumb:hover {
+              background: #64748b;
+            }
+          }
+        `}</style>
       </CardContent>
 
-      {/* Audit Log Details Modal */}
       <Dialog open={showDetailsModal} onOpenChange={setShowDetailsModal}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent>
           <DialogHeader>
-            <DialogTitle className="flex items-center space-x-3">
-              <Activity className="w-6 h-6" />
-              <span>Audit Log Details</span>
-              <Badge variant={getSeverityColor(selectedLog?.severity || 'info')}>
-                {selectedLog?.severity.toUpperCase()}
-              </Badge>
-            </DialogTitle>
-            <DialogDescription>
-              Detailed information about this audit log entry
-            </DialogDescription>
+            <DialogTitle>Audit Log Details</DialogTitle>
           </DialogHeader>
-
           {selectedLog && (
-            <div className="space-y-6">
-              {/* Basic Information */}
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label className="text-sm font-medium">Log ID</Label>
-                  <p className="text-sm font-mono text-muted-foreground">{selectedLog.id}</p>
-                </div>
-                <div className="space-y-2">
-                  <Label className="text-sm font-medium">Timestamp</Label>
-                  <p className="text-sm font-mono">{selectedLog.timestamp}</p>
-                </div>
+            <div className="space-y-4">
+              <div>
+                <Label className="text-sm font-medium">Timestamp</Label>
+                <p className="text-sm">{new Date(selectedLog.timestamp).toLocaleString()}</p>
               </div>
-
-              {/* Action Details */}
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label className="text-sm font-medium">Action</Label>
-                  <Badge variant="outline" className="font-mono">{selectedLog.action}</Badge>
-                </div>
-                <div className="space-y-2">
-                  <Label className="text-sm font-medium">Actor</Label>
-                  <div className="flex items-center space-x-2">
-                    <User className="w-4 h-4 text-muted-foreground" />
-                    <span className="font-medium">{selectedLog.actor}</span>
-                  </div>
-                </div>
+              <div>
+                <Label className="text-sm font-medium">Action</Label>
+                <p className="text-sm">{selectedLog.action_type}</p>
               </div>
-
-              {/* Target Information */}
-              <div className="space-y-2">
-                <Label className="text-sm font-medium">Target</Label>
-                <Card>
-                  <CardContent className="p-4">
-                    <div className="flex items-center space-x-2">
-                      <span className="text-sm font-medium">Type:</span>
-                      <Badge variant="secondary">{selectedLog.targetType}</Badge>
-                      <span className="text-sm font-medium">ID:</span>
-                      <span className="text-sm font-mono">{selectedLog.targetId}</span>
-                    </div>
-                  </CardContent>
-                </Card>
+              <div>
+                <Label className="text-sm font-medium">Actor</Label>
+                <p className="text-sm">{selectedLog.actor || 'System'}</p>
               </div>
-
-              {/* Description */}
-              <div className="space-y-2">
+              <div>
                 <Label className="text-sm font-medium">Description</Label>
-                <Card>
-                  <CardContent className="p-4">
-                    <p className="text-sm">{selectedLog.description}</p>
-                  </CardContent>
-                </Card>
-              </div>
-
-              {/* Network Information */}
-              <div className="space-y-2">
-                <Label className="text-sm font-medium">Network Information</Label>
-                <Card>
-                  <CardContent className="p-4">
-                    <div className="flex items-center space-x-2">
-                      <span className="text-sm font-medium">IP Address:</span>
-                      <span className="text-sm font-mono">{selectedLog.ipAddress}</span>
-                    </div>
-                  </CardContent>
-                </Card>
+                <p className="text-sm">{selectedLog.description}</p>
               </div>
             </div>
           )}
-
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowDetailsModal(false)}>
-              Close
-            </Button>
+            <Button onClick={() => setShowDetailsModal(false)}>Close</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

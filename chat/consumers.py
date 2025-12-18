@@ -198,7 +198,13 @@ class IndividualChatConsumer(AsyncWebsocketConsumer):
             )
             
             if conversations.exists():
-                return conversations.first()
+                conversation = conversations.first()
+                # Ensure both participants are in the conversation
+                if not conversation.participants.filter(id=self.user.id).exists():
+                    conversation.participants.add(self.user)
+                if not conversation.participants.filter(id=other_user.id).exists():
+                    conversation.participants.add(other_user)
+                return conversation
             
             # Create new conversation
             conversation = Conversation.objects.create(

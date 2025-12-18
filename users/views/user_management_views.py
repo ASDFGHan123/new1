@@ -2,12 +2,14 @@
 Comprehensive user management API views.
 """
 import logging
+import os
 from django.http import JsonResponse
 from rest_framework import status, permissions
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated, IsAdminUser
 from rest_framework.response import Response
 from django.core.exceptions import ValidationError
+from django.conf import settings
 
 from users.services.user_management_service import UserManagementService
 
@@ -379,5 +381,75 @@ def user_statuses_view(request):
         logger.error(f"Error getting user statuses: {str(e)}")
         return Response(
             {'error': 'Failed to retrieve user statuses'},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def upload_profile_image_view(request):
+    """
+    Upload profile image for current user.
+    """
+    try:
+        if 'image' not in request.FILES:
+            return Response(
+                {'error': 'No image file provided'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        image_file = request.FILES['image']
+        logger.info(f"Received file: name={image_file.name}, size={image_file.size}, type={image_file.content_type}")
+        
+        # Validate file type
+        allowed_types = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif']
+        if image_file.content_type not in allowed_types:
+            return Response(
+                {'error': 'Invalid file type. Only JPEG, PNG, and GIF are allowed'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Validate file size (5MB max)
+        if image_file.size > 5 * 1024 * 1024:
+            return Response(
+                {'error': 'File too large. Maximum size is 5MB'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Update user's avatar
+        user = request.user
+        if user.avatar:
+            user.avatar.delete(save=False)
+        
+        # Write file directly to disk
+        avatar_dir = os.path.join(settings.MEDIA_ROOT, 'avatars')
+        os.makedirs(avatar_dir, exist_ok=True)
+        
+        # Sanitize filename
+        filename = image_file.name.replace(' ', '_')
+        file_path = os.path.join(avatar_dir, filename)
+        
+        # Read and write file
+        image_file.seek(0)
+        file_content = image_file.read()
+        with open(file_path, 'wb') as f:
+            f.write(file_content)
+        
+        logger.info(f"Wrote {len(file_content)} bytes to {file_path}")
+        
+        # Update user model with explicit field update
+        from django.db.models import F
+        from users.models import User
+        User.objects.filter(pk=user.pk).update(avatar=f'avatars/{filename}')
+        user.refresh_from_db()
+        
+        return Response({
+            'avatar_url': user.avatar.url if user.avatar else None
+        }, status=status.HTTP_200_OK)
+        
+    except Exception as e:
+        logger.error(f"Error uploading profile image: {str(e)}", exc_info=True)
+        return Response(
+            {'error': 'Failed to upload profile image'},
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )

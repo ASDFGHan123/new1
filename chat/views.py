@@ -14,7 +14,7 @@ from .serializers import (
     ConversationSerializer, ConversationCreateSerializer,
     MessageSerializer, MessageCreateSerializer, MessageUpdateSerializer,
     GroupSerializer, GroupCreateSerializer, GroupMemberSerializer,
-    AttachmentSerializer, AttachmentCreateSerializer, SearchSerializer
+    AttachmentSerializer, SearchSerializer
 )
 from users.models import UserActivity, User
 
@@ -26,7 +26,7 @@ class IsConversationParticipant(permissions.BasePermission):
     
     def has_object_permission(self, request, view, obj):
         if request.user.is_authenticated:
-            return obj.is_participant(request.user)
+            return obj.is_participant(request.user) or request.user.is_staff
         return False
 
 
@@ -107,12 +107,16 @@ class ConversationListCreateView(APIView):
 
 class ConversationDetailView(APIView):
     """Conversation detail view."""
-    permission_classes = [permissions.IsAuthenticated, IsConversationParticipant]
+    permission_classes = [permissions.IsAuthenticated]
     
     def get(self, request, conversation_id):
         try:
             conversation = Conversation.objects.get(id=conversation_id)
-            self.check_object_permissions(request, conversation)
+            # Check if user is participant for GET
+            if not conversation.is_participant(request.user) and not request.user.is_staff:
+                return Response({
+                    'error': 'Permission denied'
+                }, status=status.HTTP_403_FORBIDDEN)
             
             serializer = ConversationSerializer(conversation, context={'request': request})
             return Response(serializer.data)
@@ -125,7 +129,11 @@ class ConversationDetailView(APIView):
     def put(self, request, conversation_id):
         try:
             conversation = Conversation.objects.get(id=conversation_id)
-            self.check_object_permissions(request, conversation)
+            # Check if user is participant for PUT
+            if not conversation.is_participant(request.user) and not request.user.is_staff:
+                return Response({
+                    'error': 'Permission denied'
+                }, status=status.HTTP_403_FORBIDDEN)
             
             # Only allow updating title and description for group conversations
             if conversation.conversation_type == 'group' and conversation.group.can_manage(request.user):
@@ -147,7 +155,11 @@ class ConversationDetailView(APIView):
     def delete(self, request, conversation_id):
         try:
             conversation = Conversation.objects.get(id=conversation_id)
-            self.check_object_permissions(request, conversation)
+            # Allow deletion if user is staff/admin or participant
+            if not (request.user.is_staff or conversation.is_participant(request.user)):
+                return Response({
+                    'error': 'Permission denied'
+                }, status=status.HTTP_403_FORBIDDEN)
             
             conversation.soft_delete()
             
@@ -168,6 +180,18 @@ class ConversationDetailView(APIView):
             return Response({
                 'error': 'Conversation not found'
             }, status=status.HTTP_404_NOT_FOUND)
+        except Exception as e:
+            return Response({
+                'error': f'Failed to delete conversation: {str(e)}'
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    
+    def get_client_ip(self, request):
+        x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
+        if x_forwarded_for:
+            ip = x_forwarded_for.split(',')[0]
+        else:
+            ip = request.META.get('REMOTE_ADDR')
+        return ip
 
 
 class MessageListCreateView(APIView):
@@ -719,36 +743,33 @@ class FileUploadView(APIView):
     def post(self, request):
         if 'file' not in request.FILES:
             return Response({
-                'error': 'No file provided'
+                'file': ['No file provided']
             }, status=status.HTTP_400_BAD_REQUEST)
         
-        message_id = request.data.get('message_id')
+        message_id = request.POST.get('message_id') or request.data.get('message_id')
         if not message_id:
             return Response({
-                'error': 'Message ID is required'
+                'file': ['Message ID is required']
             }, status=status.HTTP_400_BAD_REQUEST)
         
         try:
             message = Message.objects.get(id=message_id)
-            # Check if user can upload to this message's conversation
             if not message.conversation.is_participant(request.user):
                 return Response({
-                    'error': 'Permission denied'
+                    'file': ['Permission denied']
                 }, status=status.HTTP_403_FORBIDDEN)
         except Message.DoesNotExist:
             return Response({
-                'error': 'Message not found'
+                'file': ['Message not found']
             }, status=status.HTTP_404_NOT_FOUND)
         
         file = request.FILES['file']
         
-        # Validate file size (10MB limit)
         if file.size > 10 * 1024 * 1024:
             return Response({
-                'error': 'File size cannot exceed 10MB'
+                'file': ['File size cannot exceed 10MB']
             }, status=status.HTTP_400_BAD_REQUEST)
         
-        # Validate file type
         allowed_types = [
             'image/jpeg', 'image/png', 'image/gif', 'image/webp',
             'audio/mpeg', 'audio/wav', 'audio/ogg',
@@ -761,30 +782,33 @@ class FileUploadView(APIView):
         
         if file.content_type not in allowed_types:
             return Response({
-                'error': 'File type not allowed'
+                'file': ['File type not allowed']
             }, status=status.HTTP_400_BAD_REQUEST)
         
-        serializer = AttachmentCreateSerializer(
-            data={'file': file},
-            context={'message_id': message_id}
+        file_type = 'image' if file.content_type.startswith('image/') else \
+                    'video' if file.content_type.startswith('video/') else \
+                    'audio' if file.content_type.startswith('audio/') else \
+                    'document' if file.content_type in ['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'] else 'other'
+        
+        attachment = Attachment.objects.create(
+            message_id=message_id,
+            file=file,
+            file_name=file.name,
+            file_type=file_type,
+            file_size=file.size,
+            mime_type=file.content_type
         )
         
-        if serializer.is_valid():
-            attachment = serializer.save()
-            
-            # Log user activity
-            UserActivity.objects.create(
-                user=request.user,
-                action='file_uploaded',
-                description=f'Uploaded file {attachment.file_name}',
-                ip_address=self.get_client_ip(request),
-                user_agent=request.META.get('HTTP_USER_AGENT', '')
-            )
-            
-            serializer = AttachmentSerializer(attachment)
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        UserActivity.objects.create(
+            user=request.user,
+            action='file_uploaded',
+            description=f'Uploaded file {attachment.file_name}',
+            ip_address=self.get_client_ip(request),
+            user_agent=request.META.get('HTTP_USER_AGENT', '')
+        )
         
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        serializer = AttachmentSerializer(attachment)
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
     
     def get_client_ip(self, request):
         x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')

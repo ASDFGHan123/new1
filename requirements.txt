@@ -1,81 +1,42 @@
+# Production Requirements
 # Django Core
 Django==4.2.7
-
-# Django REST Framework
 djangorestframework==3.14.0
 djangorestframework-simplejwt==5.3.0
 
-# Django Channels for WebSocket support
+# Real-time Features
 channels==4.0.0
 channels-redis==4.1.0
 redis==5.0.1
 
-# CORS and Security
+# Security & CORS
 django-cors-headers==4.3.1
 django-filter==23.3
+django-ratelimit==4.1.0
+cryptography==41.0.7
 
 # File Handling
 Pillow==10.1.0
-
-# Development and Testing
-django-debug-toolbar==4.2.0
-pytest==7.4.3
-pytest-django==4.7.0
-factory-boy==3.3.0
+django-imagekit==4.1.0
 
 # Database
-psycopg2-binary==2.9.9  # For PostgreSQL (production)
-# SQLite3 is built into Python, no need to install separately
-
-# Email and Notifications
-django-email==1.0.1
+psycopg2-binary==2.9.9
 
 # Background Tasks
 celery==5.3.4
 django-celery-beat==2.5.0
 
-# Environment Configuration
+# Environment & Configuration
 python-decouple==3.8
 python-dotenv==1.0.0
 
 # API Documentation
 drf-spectacular==0.26.5
 
-# Rate Limiting
-django-ratelimit==4.1.0
-
-# Logging and Monitoring
-django-silk==5.0.4
-
-# Data Export/Import
-django-import-export==3.3.7
-
-# Image Processing
-django-imagekit==4.1.0
-
-# Security
-cryptography==41.0.7
-
-# Validation
+# Utilities
 email-validator==2.1.0
-
-# Async Support
+requests==2.31.0
+pytz==2023.3
 asgiref==3.7.2
 
-# Development Server
-django-extensions==3.2.3
-
-# JWT Token Management
-PyJWT==2.8.0
-
-# HTTP Client for external APIs
-requests==2.31.0
-
-# API Testing
-httpx==0.25.2
-
-# Timezone Support
-pytz==2023.3
-
-# Response Compression
-django-compressor==4.4
+# Development Dependencies (install with: pip install -r requirements-dev.txt)

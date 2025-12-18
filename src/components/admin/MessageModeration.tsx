@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-import { Flag, Trash2, Eye, EyeOff, AlertTriangle, Shield, MessageSquare } from "lucide-react";
+import { Flag, Trash2, Eye, EyeOff, AlertTriangle, Shield, MessageSquare, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 interface FlaggedMessage {
@@ -19,144 +19,115 @@ interface FlaggedMessage {
   status: "pending" | "reviewed" | "resolved";
 }
 
-interface MessageModerationProps {
-  flaggedMessages?: FlaggedMessage[];
-}
-
-const mockFlaggedMessages: FlaggedMessage[] = [
-  {
-    id: "1",
-    content: "This is inappropriate content that violates community guidelines.",
-    sender: "user123",
-    senderId: "user123",
-    conversationId: "conv1",
-    flaggedAt: "2024-10-04T10:30:00Z",
-    reason: "Inappropriate content",
-    severity: "high",
-    status: "pending",
-  },
-  {
-    id: "2",
-    content: "Spam message repeated multiple times.",
-    sender: "user456",
-    senderId: "user456",
-    conversationId: "conv2",
-    flaggedAt: "2024-10-04T09:15:00Z",
-    reason: "Spam",
-    severity: "medium",
-    status: "pending",
-  },
-  {
-    id: "3",
-    content: "Harassment towards another user.",
-    sender: "user789",
-    senderId: "user789",
-    conversationId: "conv3",
-    flaggedAt: "2024-10-04T08:45:00Z",
-    reason: "Harassment",
-    severity: "high",
-    status: "reviewed",
-  },
-];
-
-export const MessageModeration = ({ flaggedMessages: initialMessages = mockFlaggedMessages }: MessageModerationProps) => {
-  const [flaggedMessages, setFlaggedMessages] = useState<FlaggedMessage[]>(initialMessages);
-  const [selectedMessage, setSelectedMessage] = useState<FlaggedMessage | null>(null);
+export const MessageModeration = () => {
+  const [flaggedMessages, setFlaggedMessages] = useState<FlaggedMessage[]>([]);
+  const [loading, setLoading] = useState(true);
   const { toast } = useToast();
 
-  // Initialize with mock data (no localStorage)
   useEffect(() => {
-    setFlaggedMessages(mockFlaggedMessages);
+    loadFlaggedMessages();
+    const interval = setInterval(loadFlaggedMessages, 30000);
+    return () => clearInterval(interval);
   }, []);
 
-  const pendingMessages = flaggedMessages.filter(msg => msg.status === "pending");
-
-  // Function to add a new flagged message (for testing/demo purposes)
-  const addFlaggedMessage = () => {
-    const newMessage: FlaggedMessage = {
-      id: Date.now().toString(),
-      content: `New flagged message ${flaggedMessages.length + 1} - ${Math.random().toString(36).substring(7)}`,
-      sender: `user${Math.floor(Math.random() * 1000)}`,
-      senderId: `user${Math.floor(Math.random() * 1000)}`,
-      conversationId: `conv${Math.floor(Math.random() * 100)}`,
-      flaggedAt: new Date().toISOString(),
-      reason: ["Spam", "Harassment", "Inappropriate content"][Math.floor(Math.random() * 3)],
-      severity: ["low", "medium", "high"][Math.floor(Math.random() * 3)] as "low" | "medium" | "high",
-      status: "pending",
-    };
-
-    setFlaggedMessages(prev => [newMessage, ...prev]);
-    toast({
-      title: "New Report",
-      description: "A new message has been flagged for moderation.",
-    });
+  const loadFlaggedMessages = async () => {
+    try {
+      const token = localStorage.getItem('access_token');
+      const response = await fetch('http://localhost:8000/api/admin/flagged-messages/', {
+        headers: token ? { 'Authorization': `Bearer ${token}` } : {}
+      });
+      
+      if (!response.ok) {
+        console.error('Failed to fetch flagged messages:', response.status);
+        setFlaggedMessages([]);
+      } else {
+        const data = await response.json();
+        setFlaggedMessages(Array.isArray(data) ? data : data.results || []);
+      }
+    } catch (error) {
+      console.error('Failed to load flagged messages:', error);
+      setFlaggedMessages([]);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleModerateMessage = async (messageId: string, action: "approve" | "delete" | "warn") => {
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 500));
+    try {
+      const token = localStorage.getItem('access_token');
+      const endpoint = action === 'approve' 
+        ? `http://localhost:8000/api/admin/flagged-messages/${messageId}/approve/`
+        : action === 'delete'
+        ? `http://localhost:8000/api/admin/flagged-messages/${messageId}/delete/`
+        : `http://localhost:8000/api/admin/flagged-messages/${messageId}/warn/`;
 
-    setFlaggedMessages(prevMessages =>
-      prevMessages.map(msg => {
-        if (msg.id === messageId) {
-          let newStatus: "pending" | "reviewed" | "resolved" = "resolved";
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
 
-          switch (action) {
-            case "approve":
-              newStatus = "resolved";
-              break;
-            case "delete":
-              // For delete action, move to trash instead of just marking as resolved
-              // We'll handle this by calling the trash function if available
-              // For now, just mark as resolved but in a real implementation this would move to trash
-              newStatus = "resolved";
-              break;
-            case "warn":
-              newStatus = "resolved";
-              break;
-          }
-
-          return {
-            ...msg,
-            status: newStatus,
-            flaggedAt: new Date().toISOString() // Update timestamp when moderated
-          };
-        }
-        return msg;
-      })
-    );
-
-    toast({
-      title: "Success",
-      description: `Message ${action === "approve" ? "approved" : action === "delete" ? "deleted" : "warning sent"}.`,
-    });
+      if (response.ok) {
+        toast({
+          title: "Success",
+          description: `Message ${action === "approve" ? "approved" : action === "delete" ? "deleted" : "warning sent"}.`,
+        });
+        loadFlaggedMessages();
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: `Failed to ${action} message`,
+      });
+    }
   };
 
   const getSeverityColor = (severity: string) => {
     switch (severity) {
       case "low":
-        return "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300";
+        return "dark:bg-yellow-950/30 bg-yellow-50";
       case "medium":
-        return "bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-300";
+        return "dark:bg-orange-950/30 bg-orange-50";
       case "high":
-        return "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300";
+        return "dark:bg-red-950/30 bg-red-50";
       default:
-        return "bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-300";
+        return "dark:bg-gray-950/30 bg-gray-50";
+    }
+  };
+
+  const getSeverityBadgeColor = (severity: string) => {
+    switch (severity) {
+      case "low":
+        return "outline";
+      case "medium":
+        return "secondary";
+      case "high":
+        return "destructive";
+      default:
+        return "outline";
     }
   };
 
   const getStatusColor = (status: string) => {
     switch (status) {
       case "pending":
-        return "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300";
+        return "outline";
       case "reviewed":
-        return "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300";
+        return "secondary";
       case "resolved":
-        return "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300";
+        return "default";
       default:
-        return "bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-300";
+        return "outline";
     }
   };
+
+  const pendingMessages = flaggedMessages.filter(msg => msg.status === "pending");
+
+  if (loading) {
+    return <div className="flex justify-center p-8"><Loader2 className="animate-spin" /></div>;
+  }
 
   return (
     <div className="space-y-6">
@@ -183,7 +154,7 @@ export const MessageModeration = ({ flaggedMessages: initialMessages = mockFlagg
           </CardHeader>
           <CardContent>
             <div className="text-3xl font-bold text-blue-600">{flaggedMessages.length}</div>
-            <p className="text-sm text-muted-foreground">Messages flagged this week</p>
+            <p className="text-sm text-muted-foreground">Messages flagged</p>
           </CardContent>
         </Card>
 
@@ -205,34 +176,23 @@ export const MessageModeration = ({ flaggedMessages: initialMessages = mockFlagg
 
       <Card className="bg-gradient-card border-border/50">
         <CardHeader>
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle>Flagged Messages</CardTitle>
-              <CardDescription>Messages that require moderation attention</CardDescription>
-            </div>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={addFlaggedMessage}
-              className="bg-orange-50 hover:bg-orange-100 border-orange-200 text-orange-700"
-            >
-              <Flag className="w-4 h-4 mr-2" />
-              Add Test Report
-            </Button>
+          <div>
+            <CardTitle>Flagged Messages</CardTitle>
+            <CardDescription>Messages that require moderation attention</CardDescription>
           </div>
         </CardHeader>
         <CardContent>
           <ScrollArea className="h-[400px]">
-            <div className="space-y-4">
+            <div className="space-y-4 pr-4">
               {flaggedMessages.map((message) => (
-                <div key={message.id} className="border rounded-lg p-4 space-y-3">
+                <div key={message.id} className={`border rounded-lg p-4 space-y-3 ${getSeverityColor(message.severity)}`}>
                   <div className="flex items-start justify-between">
                     <div className="flex-1">
                       <div className="flex items-center gap-2 mb-2">
-                        <Badge className={`text-xs ${getSeverityColor(message.severity)}`}>
+                        <Badge variant={getSeverityBadgeColor(message.severity)} className="text-xs">
                           {message.severity} severity
                         </Badge>
-                        <Badge className={`text-xs ${getStatusColor(message.status)}`}>
+                        <Badge variant={getStatusColor(message.status)} className="text-xs">
                           {message.status}
                         </Badge>
                         <span className="text-sm text-muted-foreground">
@@ -244,6 +204,9 @@ export const MessageModeration = ({ flaggedMessages: initialMessages = mockFlagg
                       </p>
                       <p className="text-xs text-muted-foreground mt-1">
                         Reason: {message.reason}
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {new Date(message.flaggedAt).toLocaleString()}
                       </p>
                     </div>
                   </div>

@@ -39,10 +39,9 @@ class IsAdminUser(permissions.BasePermission):
     """
     
     def has_permission(self, request, view):
-        return request.user.is_authenticated and (
-            request.user.is_staff or
-            request.user.role == 'admin'
-        )
+        if not request.user or not request.user.is_authenticated:
+            return False
+        return request.user.is_staff or getattr(request.user, 'role', None) == 'admin'
 
 
 class RegisterView(APIView):
@@ -115,6 +114,11 @@ class LoginView(APIView):
             return Response({
                 'error': 'Account is not active'
             }, status=status.HTTP_401_UNAUTHORIZED)
+        
+        # Ensure staff users have admin role
+        if user.is_staff and user.role != 'admin':
+            user.role = 'admin'
+            user.save(update_fields=['role'])
         
         # Update user's online status
         user.set_online()
@@ -428,7 +432,7 @@ class UserStatisticsView(APIView):
 
 class AdminUserListView(APIView):
     """Admin user list view."""
-    permission_classes = [IsAdminUser]
+    permission_classes = [permissions.IsAuthenticated, IsAdminUser]
     
     def get(self, request):
         # Get query parameters for filtering and pagination
@@ -501,14 +505,19 @@ class AdminUserDetailView(APIView):
     def delete(self, request, user_id):
         try:
             user = User.objects.get(id=user_id)
-            user.deactivate_user()
+            user.delete()
+            
             return Response({
-                'message': 'User deactivated successfully'
+                'message': 'User deleted successfully'
             }, status=status.HTTP_200_OK)
         except User.DoesNotExist:
             return Response({
                 'error': 'User not found'
             }, status=status.HTTP_404_NOT_FOUND)
+        except Exception as e:
+            return Response({
+                'error': str(e)
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 class AdminApproveUserView(APIView):
@@ -637,6 +646,35 @@ class AdminActivateUserView(APIView):
 
 class AdminForceLogoutView(APIView):
     """Admin force logout view."""
+    permission_classes = [IsAdminUser]
     
     def post(self, request, user_id):
-        return Response({'message': f'Admin force logout endpoint for {user_id} - to be implemented'}, status=status.HTTP_501_NOT_IMPLEMENTED)
+        try:
+            user = User.objects.get(id=user_id)
+            user.set_offline()
+            
+            UserSession.objects.filter(user=user, is_active=True).update(is_active=False)
+            
+            UserActivity.objects.create(
+                user=request.user,
+                action='admin_action',
+                description=f'Force logged out user {user.username}',
+                ip_address=self.get_client_ip(request),
+                user_agent=request.META.get('HTTP_USER_AGENT', '')
+            )
+            
+            return Response({
+                'message': f'User {user.username} force logged out successfully'
+            }, status=status.HTTP_200_OK)
+        except User.DoesNotExist:
+            return Response({
+                'error': 'User not found'
+            }, status=status.HTTP_404_NOT_FOUND)
+    
+    def get_client_ip(self, request):
+        x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
+        if x_forwarded_for:
+            ip = x_forwarded_for.split(',')[0]
+        else:
+            ip = request.META.get('REMOTE_ADDR')
+        return ip

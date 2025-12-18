@@ -16,23 +16,29 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// Note: Using real API authentication now, no longer using mock sample users
-
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Load user from localStorage on mount
   useEffect(() => {
+    apiService.initializeAuth();
     const savedUser = localStorage.getItem("offchat_user");
-    if (savedUser) {
+    const accessToken = localStorage.getItem("access_token");
+    
+    if (savedUser && accessToken) {
       try {
         setUser(JSON.parse(savedUser));
       } catch (error) {
         console.error("Error parsing saved user:", error);
         localStorage.removeItem("offchat_user");
+        localStorage.removeItem("access_token");
+        localStorage.removeItem("refresh_token");
       }
+    } else if (savedUser || accessToken) {
+      localStorage.removeItem("offchat_user");
+      localStorage.removeItem("access_token");
+      localStorage.removeItem("refresh_token");
     }
     setIsLoading(false);
   }, []);
@@ -46,7 +52,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setError(null);
     
     try {
-      // Use the real API service
+      if (!credentials.identifier?.trim() || !credentials.password?.trim()) {
+        throw new Error('Email/username and password are required');
+      }
+      
       const response = await apiService.login({
         username: credentials.identifier,
         password: credentials.password
@@ -60,8 +69,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         
         setUser(authUser);
         localStorage.setItem("offchat_user", JSON.stringify(authUser));
-        setIsLoading(false);
-        
         return authUser;
       } else {
         const errorMessage = response.error || 'Login failed';
@@ -71,8 +78,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Login failed';
       setError(errorMessage);
-      setIsLoading(false);
       throw error;
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -81,7 +89,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setError(null);
     
     try {
-      // Use the real API service
+      if (!credentials.username?.trim() || !credentials.email?.trim() || !credentials.password?.trim()) {
+        throw new Error('All fields are required');
+      }
+      
       const response = await apiService.signup({
         username: credentials.username,
         email: credentials.email,
@@ -89,8 +100,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       });
       
       if (response.success && response.data) {
-        // For new users, they might need approval or automatic login
-        // We'll determine this based on the API response
         const authUser: AuthUser = {
           ...response.data.user,
           status: "online"
@@ -98,8 +107,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         
         setUser(authUser);
         localStorage.setItem("offchat_user", JSON.stringify(authUser));
-        setIsLoading(false);
-        
         return authUser;
       } else {
         const errorMessage = response.error || 'Signup failed';
@@ -109,22 +116,23 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Signup failed';
       setError(errorMessage);
-      setIsLoading(false);
       throw error;
+    } finally {
+      setIsLoading(false);
     }
   };
 
   const logout = async () => {
     try {
-      // Call logout API
       await apiService.logout();
     } catch (error) {
       console.error('Logout API call failed:', error);
     } finally {
-      // Clear local state regardless of API call success
       setUser(null);
       setError(null);
       localStorage.removeItem("offchat_user");
+      localStorage.removeItem("access_token");
+      localStorage.removeItem("refresh_token");
     }
   };
 

@@ -27,7 +27,7 @@ class Group(models.Model):
         PUBLIC = 'public', 'Public'
     
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    name = models.CharField(max_length=100, unique=True)
+    name = models.CharField(max_length=100)
     description = models.TextField(max_length=500, blank=True)
     avatar = models.ImageField(upload_to='group_avatars/', blank=True, null=True)
     group_type = models.CharField(
@@ -319,12 +319,11 @@ class Conversation(models.Model):
     
     def soft_delete(self):
         """Soft delete the conversation."""
+        now = timezone.now()
+        self.messages.update(is_deleted=True, deleted_at=now)
         self.is_deleted = True
-        self.deleted_at = timezone.now()
+        self.deleted_at = now
         self.save(update_fields=['is_deleted', 'deleted_at'])
-        
-        # Soft delete all messages in the conversation
-        self.messages.update(is_deleted=True, deleted_at=timezone.now())
 
 
 class ConversationParticipant(models.Model):

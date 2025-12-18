@@ -34,58 +34,13 @@ interface MessageHistoryProps {
   initialMessages?: SentMessage[];
 }
 
-const mockMessages: SentMessage[] = [
-  {
-    id: "1",
-    type: "broadcast",
-    content: "Scheduled maintenance will begin at 2 AM UTC. The system will be unavailable for 30 minutes.",
-    recipients: ["all"],
-    recipientCount: 1250,
-    sentBy: "admin",
-    sentAt: "2024-10-04T10:30:00Z",
-    status: "sent",
-    priority: "high",
-  },
-  {
-    id: "2",
-    type: "system",
-    content: "Welcome to OffChat! Please review our community guidelines.",
-    recipients: ["new-users"],
-    recipientCount: 45,
-    sentBy: "admin",
-    sentAt: "2024-10-04T09:15:00Z",
-    status: "delivered",
-    priority: "normal",
-  },
-  {
-    id: "3",
-    type: "targeted",
-    content: "Your account has been flagged for suspicious activity. Please verify your identity.",
-    recipients: ["user123", "user456", "user789"],
-    recipientCount: 3,
-    sentBy: "moderator",
-    sentAt: "2024-10-04T08:45:00Z",
-    status: "sent",
-    priority: "urgent",
-  },
-  {
-    id: "4",
-    type: "broadcast",
-    content: "New feature: Dark mode is now available! Check your settings to enable it.",
-    recipients: ["all"],
-    recipientCount: 1250,
-    sentBy: "admin",
-    sentAt: "2024-10-03T16:20:00Z",
-    status: "delivered",
-    priority: "low",
-  },
-];
+// No mock data - all data must come from backend API
 
 export const MessageHistory = ({ initialMessages = [] }: MessageHistoryProps) => {
   const { toast } = useToast();
   
   // Component state
-  const [messages, setMessages] = useState<SentMessage[]>(initialMessages.length > 0 ? initialMessages : mockMessages);
+  const [messages, setMessages] = useState<SentMessage[]>(initialMessages);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [retryCount, setRetryCount] = useState(0);
@@ -158,9 +113,11 @@ export const MessageHistory = ({ initialMessages = [] }: MessageHistoryProps) =>
     loadMessageHistory();
   };
 
-  // Initialize with mock data (no localStorage)
+  // Load message history from API
   useEffect(() => {
-    setMessages(mockMessages);
+    if (initialMessages.length === 0) {
+      loadMessageHistory();
+    }
   }, []);
 
   // Close backup options when clicking outside

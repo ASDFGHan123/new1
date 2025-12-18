@@ -149,18 +149,20 @@ TEMPLATES = [
     },
 ]
 
-# Django Channels Configuration (Disabled for development without Redis)
-# ASGI_APPLICATION = 'offchat_backend.asgi.application'  # Commented out for development
+# Django Channels Configuration
+ASGI_APPLICATION = 'offchat_backend.asgi.application'
 
-# WebSocket channel layer configuration (Disabled for development)
-# CHANNEL_LAYERS = {
-#     'default': {
-#         'BACKEND': 'channels_redis.core.RedisChannelLayer',
-#         'CONFIG': {
-#             "hosts": [("127.0.0.1", 6379)],
-#         },
-#     },
-# }
+# WebSocket channel layer configuration
+CHANNEL_LAYERS = {
+    'default': {
+        'BACKEND': 'channels_redis.core.RedisChannelLayer',
+        'CONFIG': {
+            "hosts": [("127.0.0.1", 6379)],
+        },
+    } if not DEBUG else {
+        'BACKEND': 'channels.layers.InMemoryChannelLayer',
+    },
+}
 
 WSGI_APPLICATION = 'offchat_backend.wsgi.application'
 
@@ -281,14 +283,15 @@ DEFAULT_FROM_EMAIL = config('DEFAULT_FROM_EMAIL', default='noreply@offchat.com')
 # Redis Configuration
 REDIS_URL = config('REDIS_URL', default='redis://localhost:6379/0')
 
-# Celery Configuration (Disabled for development without Redis)
-# CELERY_BROKER_URL = REDIS_URL
-# CELERY_RESULT_BACKEND = REDIS_URL
-# CELERY_ACCEPT_CONTENT = ['json']
-# CELERY_TASK_SERIALIZER = 'json'
-# CELERY_RESULT_SERIALIZER = 'json'
-# CELERY_TIMEZONE = TIME_ZONE
-# CELERY_BEAT_SCHEDULER = 'django_celery_beat.schedulers:DatabaseScheduler'
+# Celery Configuration
+CELERY_BROKER_URL = REDIS_URL if not DEBUG else 'memory://'
+CELERY_RESULT_BACKEND = REDIS_URL if not DEBUG else 'cache+memory://'
+CELERY_ACCEPT_CONTENT = ['json']
+CELERY_TASK_SERIALIZER = 'json'
+CELERY_RESULT_SERIALIZER = 'json'
+CELERY_TIMEZONE = TIME_ZONE
+CELERY_BEAT_SCHEDULER = 'django_celery_beat.schedulers:DatabaseScheduler'
+CELERY_TASK_ALWAYS_EAGER = DEBUG  # Execute tasks synchronously in development
 
 # Logging Configuration
 LOGGING = {
@@ -351,10 +354,17 @@ LOGGING = {
     },
 }
 
-# Cache Configuration (Disabled for development without Redis)
+# Cache Configuration
 CACHES = {
     'default': {
-        'BACKEND': 'django.core.cache.backends.dummy.DummyCache',
+        'BACKEND': 'django_redis.cache.RedisCache',
+        'LOCATION': REDIS_URL,
+        'OPTIONS': {
+            'CLIENT_CLASS': 'django_redis.client.DefaultClient',
+        }
+    } if not DEBUG else {
+        'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
+        'LOCATION': 'unique-snowflake',
     }
 }
 

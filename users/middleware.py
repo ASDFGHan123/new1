@@ -4,10 +4,8 @@ Custom middleware for JWT token validation and security.
 import re
 import json
 import ipaddress
-import traceback
 import logging
 import time
-from urllib.parse import urlparse
 from django.utils import timezone
 from django.core.cache import cache
 from django.conf import settings
@@ -53,9 +51,6 @@ class RateLimitMiddleware:
         self.get_response = get_response
         self.rate_limit_cache_key = 'rate_limit_{}'
         self.abuse_cache_key = 'abuse_{}'
-        
-        # Load configuration from Django settings
-        from django.conf import settings
         
         # Rate limiting rules
         self.rate_limits = getattr(settings, 'RATE_LIMIT_CONFIG', {
@@ -224,7 +219,6 @@ class RateLimitMiddleware:
         
         # Log the blocking action
         try:
-            from users.models import SuspiciousActivity
             SuspiciousActivity.objects.create(
                 ip_address=client_ip,
                 activity_type='rapid_requests',
@@ -260,7 +254,6 @@ class RateLimitMiddleware:
         if current_count >= threshold:
             # Log suspicious activity
             try:
-                from users.models import SuspiciousActivity
                 SuspiciousActivity.objects.create(
                     ip_address=client_ip,
                     activity_type='rapid_requests',
@@ -296,7 +289,6 @@ class RateLimitMiddleware:
         if is_bot:
             # Log suspicious activity
             try:
-                from users.models import SuspiciousActivity
                 SuspiciousActivity.objects.create(
                     ip_address=client_ip,
                     activity_type='bot_activity',
@@ -314,7 +306,6 @@ class RateLimitMiddleware:
         
         if any(suspicious in path for suspicious in suspicious_paths):
             try:
-                from users.models import SuspiciousActivity
                 SuspiciousActivity.objects.create(
                     ip_address=client_ip,
                     activity_type='unusual_location',
@@ -326,7 +317,6 @@ class RateLimitMiddleware:
     
     def track_successful_request(self, client_ip, category):
         """Track successful requests for analytics."""
-        # Could be used for analytics or gradual rate limit increases
         pass
     
     def track_error_request(self, client_ip, category):
@@ -340,7 +330,6 @@ class RateLimitMiddleware:
         if current_errors >= threshold:
             # Log suspicious activity
             try:
-                from users.models import SuspiciousActivity
                 SuspiciousActivity.objects.create(
                     ip_address=client_ip,
                     activity_type='rapid_requests',
@@ -356,7 +345,6 @@ class RateLimitMiddleware:
     def log_abuse_attempt(self, client_ip, request, category, reason):
         """Log abuse attempt for security monitoring."""
         try:
-            from users.models import SuspiciousActivity
             SuspiciousActivity.objects.create(
                 ip_address=client_ip,
                 activity_type='rapid_requests',
@@ -375,162 +363,6 @@ class RateLimitMiddleware:
     def get_client_ip(self, request):
         """Get the client IP address."""
         return get_client_ip(request)
-
-
-class ErrorHandlingMiddleware:
-    """
-    Comprehensive error handling and logging middleware.
-    """
-    
-    def __init__(self, get_response):
-        self.get_response = get_response
-        self.logger = logging.getLogger(__name__)
-    
-    def __call__(self, request):
-        # Add request start time for performance tracking
-        request._start_time = time.time()
-        
-        response = None
-        exception = None
-        
-        try:
-            response = self.get_response(request)
-            
-        except Exception as e:
-            exception = e
-            response = self.handle_exception(request, e)
-        
-        finally:
-            # Log request completion
-            self.log_request_completion(request, response, exception)
-        
-        return response
-    
-    def handle_exception(self, request, exception):
-        """Handle exceptions and return appropriate response."""
-        try:
-            # Log the exception
-            error_context = get_error_context(request, exception)
-            self.logger.error(
-                f"Unhandled exception: {str(exception)}",
-                extra={'error_context': error_context},
-                exc_info=True
-            )
-            
-            # Log security event if it's a security-related exception
-            if self.is_security_exception(exception):
-                log_security_event(
-                    request=request,
-                    event_type='security_exception',
-                    description=f"Security exception: {str(exception)}",
-                    severity='ERROR',
-                    extra_data={'exception_type': exception.__class__.__name__}
-                )
-            
-            # Return appropriate error response
-            from rest_framework.response import Response
-            from rest_framework import status
-            
-            if hasattr(exception, 'status_code'):
-                status_code = exception.status_code
-            elif hasattr(exception, 'status'):
-                status_code = exception.status
-            else:
-                status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
-            
-            # Create user-friendly error message
-            if status_code >= 500:
-                message = "Internal server error. Please try again later."
-            elif status_code >= 400:
-                message = str(exception)
-            else:
-                message = "An error occurred processing your request."
-            
-            error_response = {
-                'error': True,
-                'message': message,
-                'timestamp': timezone.now().isoformat(),
-                'exception_type': exception.__class__.__name__,
-            }
-            
-            # Don't expose internal errors in production
-            from django.conf import settings
-            if not settings.DEBUG and status_code >= 500:
-                error_response['message'] = "Internal server error. Please try again later."
-            
-            return Response(error_response, status=status_code)
-            
-        except Exception as logging_error:
-            # Fallback error handling
-            self.logger.error(f"Error in exception handling: {str(logging_error)}")
-            from rest_framework.response import Response
-            from rest_framework import status
-            return Response({
-                'error': True,
-                'message': 'An unexpected error occurred.',
-                'timestamp': timezone.now().isoformat(),
-            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-    
-    def is_security_exception(self, exception):
-        """Check if exception is security-related."""
-        security_exceptions = [
-            'PermissionDenied',
-            'SecurityError',
-            'SuspiciousOperation',
-            'DisallowedHost',
-            'DisallowedUserAgent',
-        ]
-        
-        exception_name = exception.__class__.__name__
-        return (exception_name in security_exceptions or 
-                'security' in exception_name.lower() or
-                'permission' in str(exception).lower())
-    
-    def log_request_completion(self, request, response, exception):
-        """Log request completion with timing and error information."""
-        try:
-            # Calculate request duration
-            duration = None
-            if hasattr(request, '_start_time'):
-                import time
-                duration = time.time() - request._start_time
-            
-            # Prepare log data
-            log_data = {
-                'method': request.method,
-                'path': request.path,
-                'status_code': response.status_code if response else None,
-                'duration': duration,
-                'client_ip': get_client_ip(request),
-                'user_agent': request.META.get('HTTP_USER_AGENT', ''),
-                'user_id': request.user.id if request.user.is_authenticated else None,
-            }
-            
-            # Add user info if authenticated
-            if request.user.is_authenticated:
-                log_data['username'] = request.user.username
-            
-            # Add exception info if there was an error
-            if exception:
-                log_data['exception'] = str(exception)
-                log_data['exception_type'] = exception.__class__.__name__
-            
-            # Sanitize sensitive data
-            log_data = sanitize_log_data(log_data)
-            
-            # Log at appropriate level
-            if exception:
-                self.logger.error(f"REQUEST ERROR: {json.dumps(log_data)}")
-            elif response.status_code >= 500:
-                self.logger.error(f"SERVER ERROR: {json.dumps(log_data)}")
-            elif response.status_code >= 400:
-                self.logger.warning(f"CLIENT ERROR: {json.dumps(log_data)}")
-            else:
-                self.logger.info(f"REQUEST: {json.dumps(log_data)}")
-                
-        except Exception as e:
-            # Don't let logging errors break the request
-            self.logger.error(f"Error logging request completion: {str(e)}")
 
 
 class SecurityHeadersMiddleware:
@@ -552,223 +384,10 @@ class SecurityHeadersMiddleware:
         response['Permissions-Policy'] = 'geolocation=(), microphone=(), camera=()'
         
         # Only add HSTS header in production
-        from django.conf import settings
         if not settings.DEBUG:
             response['Strict-Transport-Security'] = 'max-age=31536000; includeSubDomains'
         
         return response
-
-
-class SessionManagementMiddleware:
-    """
-    Enhanced session management and security.
-    """
-    
-    def __init__(self, get_response):
-        self.get_response = get_response
-    
-    def __call__(self, request):
-        # Handle session security
-        self.handle_session_security(request)
-        
-        response = self.get_response(request)
-        
-        # Update session security
-        self.update_session_security(request, response)
-        
-        return response
-    
-    def handle_session_security(self, request):
-        """Handle session security checks."""
-        if request.user.is_authenticated:
-            session_key = request.session.session_key
-            
-            # Check for session fixation
-            if not session_key:
-                request.session.cycle_key()
-            
-            # Store additional security info
-            request.session['last_activity'] = timezone.now().isoformat()
-            request.session['ip_address'] = self.get_client_ip(request)
-            request.session['user_agent'] = request.META.get('HTTP_USER_AGENT', '')
-    
-    def update_session_security(self, request, response):
-        """Update session security settings."""
-        if hasattr(request, 'session') and request.session.get('last_activity'):
-            # Update last activity
-            request.session['last_activity'] = timezone.now().isoformat()
-            
-            # Set secure cookie settings for production
-            from django.conf import settings
-            if not settings.DEBUG:
-                response.set_cookie(
-                    'sessionid',
-                    request.session.session_key,
-                    max_age=settings.SESSION_COOKIE_AGE,
-                    secure=True,
-                    httponly=True,
-                    samesite='Lax'
-                )
-    
-    def get_client_ip(self, request):
-        """Get the client IP address."""
-        return get_client_ip(request)
-
-
-class ErrorHandlingMiddleware:
-    """
-    Comprehensive error handling and logging middleware.
-    """
-    
-    def __init__(self, get_response):
-        self.get_response = get_response
-        self.logger = logging.getLogger(__name__)
-    
-    def __call__(self, request):
-        # Add request start time for performance tracking
-        request._start_time = time.time()
-        
-        response = None
-        exception = None
-        
-        try:
-            response = self.get_response(request)
-            
-        except Exception as e:
-            exception = e
-            response = self.handle_exception(request, e)
-        
-        finally:
-            # Log request completion
-            self.log_request_completion(request, response, exception)
-        
-        return response
-    
-    def handle_exception(self, request, exception):
-        """Handle exceptions and return appropriate response."""
-        try:
-            # Log the exception
-            error_context = get_error_context(request, exception)
-            self.logger.error(
-                f"Unhandled exception: {str(exception)}",
-                extra={'error_context': error_context},
-                exc_info=True
-            )
-            
-            # Log security event if it's a security-related exception
-            if self.is_security_exception(exception):
-                log_security_event(
-                    request=request,
-                    event_type='security_exception',
-                    description=f"Security exception: {str(exception)}",
-                    severity='ERROR',
-                    extra_data={'exception_type': exception.__class__.__name__}
-                )
-            
-            # Return appropriate error response
-            from rest_framework.response import Response
-            from rest_framework import status
-            
-            if hasattr(exception, 'status_code'):
-                status_code = exception.status_code
-            elif hasattr(exception, 'status'):
-                status_code = exception.status
-            else:
-                status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
-            
-            # Create user-friendly error message
-            if status_code >= 500:
-                message = "Internal server error. Please try again later."
-            elif status_code >= 400:
-                message = str(exception)
-            else:
-                message = "An error occurred processing your request."
-            
-            error_response = {
-                'error': True,
-                'message': message,
-                'timestamp': timezone.now().isoformat(),
-                'exception_type': exception.__class__.__name__,
-            }
-            
-            # Don't expose internal errors in production
-            from django.conf import settings
-            if not settings.DEBUG and status_code >= 500:
-                error_response['message'] = "Internal server error. Please try again later."
-            
-            return Response(error_response, status=status_code)
-            
-        except Exception as logging_error:
-            # Fallback error handling
-            self.logger.error(f"Error in exception handling: {str(logging_error)}")
-            from rest_framework.response import Response
-            from rest_framework import status
-            return Response({
-                'error': True,
-                'message': 'An unexpected error occurred.',
-                'timestamp': timezone.now().isoformat(),
-            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-    
-    def is_security_exception(self, exception):
-        """Check if exception is security-related."""
-        security_exceptions = [
-            'PermissionDenied',
-            'SecurityError',
-            'SuspiciousOperation',
-            'DisallowedHost',
-            'DisallowedUserAgent',
-        ]
-        
-        exception_name = exception.__class__.__name__
-        return (exception_name in security_exceptions or 
-                'security' in exception_name.lower() or
-                'permission' in str(exception).lower())
-    
-    def log_request_completion(self, request, response, exception):
-        """Log request completion with timing and error information."""
-        try:
-            # Calculate request duration
-            duration = None
-            if hasattr(request, '_start_time'):
-                import time
-                duration = time.time() - request._start_time
-            
-            # Prepare log data
-            log_data = {
-                'method': request.method,
-                'path': request.path,
-                'status_code': response.status_code if response else None,
-                'duration': duration,
-                'client_ip': get_client_ip(request),
-                'user_agent': request.META.get('HTTP_USER_AGENT', ''),
-                'user_id': request.user.id if request.user.is_authenticated else None,
-            }
-            
-            # Add user info if authenticated
-            if request.user.is_authenticated:
-                log_data['username'] = request.user.username
-            
-            # Add exception info if there was an error
-            if exception:
-                log_data['exception'] = str(exception)
-                log_data['exception_type'] = exception.__class__.__name__
-            
-            # Sanitize sensitive data
-            log_data = sanitize_log_data(log_data)
-            
-            # Log at appropriate level
-            if exception:
-                self.logger.error(f"REQUEST ERROR: {json.dumps(log_data)}")
-            elif response.status_code >= 500:
-                self.logger.error(f"SERVER ERROR: {json.dumps(log_data)}")
-            elif response.status_code >= 400:
-                self.logger.warning(f"CLIENT ERROR: {json.dumps(log_data)}")
-            else:
-                self.logger.info(f"REQUEST: {json.dumps(log_data)}")
-                
-        except Exception as e:
-            # Don't let logging errors break the request
-            self.logger.error(f"Error logging request completion: {str(e)}")
 
 
 class IPTrackingMiddleware:
@@ -798,13 +417,12 @@ class IPTrackingMiddleware:
         
         self.path_traversal_patterns = [
             r'\.\./',
-            r'\.\.\\',
+            r'\.\.\\\',
             r'%2e%2e%2f',
             r'%2e%2e%5c',
         ]
     
     def __call__(self, request):
-        import time
         start_time = time.time()
         
         # Get client IP and check if blocked
@@ -914,7 +532,6 @@ class IPTrackingMiddleware:
                     
             except Exception as e:
                 # Log error but don't break the request
-                import logging
                 logger = logging.getLogger(__name__)
                 logger.error(f"Error logging IP access: {e}")
         
@@ -964,7 +581,6 @@ class IPTrackingMiddleware:
                 self.check_failed_logins(client_ip)
                 
         except Exception as e:
-            import logging
             logger = logging.getLogger(__name__)
             logger.error(f"Error checking suspicious activity: {e}")
     
@@ -1125,11 +741,6 @@ class ActivityTrackingMiddleware:
                     description=f'{request.method} {request.path}',
                     ip_address=self.get_client_ip(request),
                     user_agent=request.META.get('HTTP_USER_AGENT', ''),
-                    metadata={
-                        'method': request.method,
-                        'path': request.path,
-                        'status_code': getattr(response, 'status_code', None),
-                    }
                 )
             except Exception:
                 pass  # Don't let logging errors break the request
@@ -1138,6 +749,61 @@ class ActivityTrackingMiddleware:
         thread = threading.Thread(target=log_activity)
         thread.daemon = True
         thread.start()
+    
+    def get_client_ip(self, request):
+        """Get the client IP address."""
+        return get_client_ip(request)
+
+
+class SessionManagementMiddleware:
+    """
+    Enhanced session management and security.
+    """
+    
+    def __init__(self, get_response):
+        self.get_response = get_response
+    
+    def __call__(self, request):
+        # Handle session security
+        self.handle_session_security(request)
+        
+        response = self.get_response(request)
+        
+        # Update session security
+        self.update_session_security(request, response)
+        
+        return response
+    
+    def handle_session_security(self, request):
+        """Handle session security checks."""
+        if request.user.is_authenticated:
+            session_key = request.session.session_key
+            
+            # Check for session fixation
+            if not session_key:
+                request.session.cycle_key()
+            
+            # Store additional security info
+            request.session['last_activity'] = timezone.now().isoformat()
+            request.session['ip_address'] = self.get_client_ip(request)
+            request.session['user_agent'] = request.META.get('HTTP_USER_AGENT', '')
+    
+    def update_session_security(self, request, response):
+        """Update session security settings."""
+        if hasattr(request, 'session') and request.session.get('last_activity'):
+            # Update last activity
+            request.session['last_activity'] = timezone.now().isoformat()
+            
+            # Set secure cookie settings for production
+            if not settings.DEBUG:
+                response.set_cookie(
+                    'sessionid',
+                    request.session.session_key,
+                    max_age=settings.SESSION_COOKIE_AGE,
+                    secure=True,
+                    httponly=True,
+                    samesite='Lax'
+                )
     
     def get_client_ip(self, request):
         """Get the client IP address."""
@@ -1221,7 +887,6 @@ class ErrorHandlingMiddleware:
             }
             
             # Don't expose internal errors in production
-            from django.conf import settings
             if not settings.DEBUG and status_code >= 500:
                 error_response['message'] = "Internal server error. Please try again later."
             
@@ -1259,7 +924,6 @@ class ErrorHandlingMiddleware:
             # Calculate request duration
             duration = None
             if hasattr(request, '_start_time'):
-                import time
                 duration = time.time() - request._start_time
             
             # Prepare log data

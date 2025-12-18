@@ -24,12 +24,17 @@ export const LoginForm = ({ onToggleMode, onLogin, error }: LoginFormProps) => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    if (!identifier.trim() || !password.trim()) {
+      setLocalError('Email/username and password are required');
+      return;
+    }
+    
     setIsLoading(true);
     setLocalError(null);
     
     try {
       await onLogin(identifier, password);
-      // Navigation is handled by parent component based on authentication state
     } catch (err) {
       setLocalError(err instanceof Error ? err.message : 'Login failed');
     } finally {
@@ -75,6 +80,7 @@ export const LoginForm = ({ onToggleMode, onLogin, error }: LoginFormProps) => {
                 placeholder="Enter your email or username"
                 value={identifier}
                 onChange={(e) => setIdentifier(e.target.value)}
+                disabled={isLoading}
                 required
                 className="transition-all duration-300 focus:shadow-glow"
               />
@@ -88,6 +94,7 @@ export const LoginForm = ({ onToggleMode, onLogin, error }: LoginFormProps) => {
                   placeholder="Enter your password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
+                  disabled={isLoading}
                   required
                   className="pr-10 transition-all duration-300 focus:shadow-glow"
                 />
@@ -95,6 +102,7 @@ export const LoginForm = ({ onToggleMode, onLogin, error }: LoginFormProps) => {
                   type="button"
                   variant="ghost"
                   size="sm"
+                  disabled={isLoading}
                   className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
                   onClick={() => setShowPassword(!showPassword)}
                 >

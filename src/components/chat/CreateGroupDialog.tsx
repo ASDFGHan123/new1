@@ -12,6 +12,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
+  DialogDescription,
 } from "@/components/ui/dialog";
 import { ImageUpload } from "@/components/ui/image-upload";
 import { 
@@ -152,6 +153,7 @@ export const CreateGroupDialog = ({
             <Users className="h-5 w-5" />
             Create New Group
           </DialogTitle>
+          <DialogDescription>Create a new group and invite members to chat</DialogDescription>
         </DialogHeader>
 
         <div className="flex-1 overflow-y-auto space-y-6 pr-2">

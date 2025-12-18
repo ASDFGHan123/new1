@@ -9,6 +9,9 @@ import { LoadingPage } from "@/components/ui/loading";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { apiService, User, Conversation, MessageTemplate, Role } from "@/lib/api";
 
+// Initialize auth tokens from localStorage on app start
+apiService.initializeAuth();
+
 // Type definitions to match AdminDashboard interfaces
 interface AppUser {
   id: string;
@@ -110,7 +113,9 @@ const App = () => {
     // Try to restore user from localStorage on app start
     try {
       const savedUser = localStorage.getItem('offchat_user');
-      return savedUser ? JSON.parse(savedUser) : null;
+      const accessToken = localStorage.getItem('access_token');
+      // Only restore user if we have a valid token
+      return (savedUser && accessToken) ? JSON.parse(savedUser) : null;
     } catch {
       return null;
     }
@@ -202,21 +207,8 @@ const App = () => {
         // Check if we have an auth token and are authenticated
         const authToken = apiService.getAuthToken();
         if (!authToken) {
-          // Not authenticated yet, use mock data
-          setUsers([
-            {
-              id: "admin",
-              username: "admin",
-              email: "admin@offchat.com",
-              status: "active" as const,
-              role: "admin",
-              joinDate: "2024-01-01",
-              lastActive: "Just now",
-              messageCount: 0,
-              reportCount: 0,
-              avatar: undefined
-            }
-          ]);
+          // Not authenticated yet, no data
+          setUsers([]);
           setLoading(false);
           return;
         }
@@ -225,41 +217,25 @@ const App = () => {
         if (response.success && response.data) {
           setUsers(response.data as AppUser[]);
         } else if (response.error === 'Authentication failed. Please log in again.') {
-          // Authentication expired, clear tokens and use mock data
+          // Authentication expired, clear tokens
           apiService.logout();
-          setUsers([
-            {
-              id: "admin",
-              username: "admin",
-              email: "admin@offchat.com",
-              status: "active" as const,
-              role: "admin",
-              joinDate: "2024-01-01",
-              lastActive: "Just now",
-              messageCount: 0,
-              reportCount: 0,
-              avatar: undefined
-            }
-          ]);
+          setUsers([]);
           setError('Session expired. Please log in again.');
         } else {
           setError('Failed to load users: ' + (response.error || 'Unknown error'));
-          // Fallback to empty array if API fails
           setUsers([]);
         }
       } catch (err) {
         console.error('Error loading users:', err);
         setError('Failed to connect to server');
-        // Fallback to empty array if API fails
         setUsers([]);
       } finally {
         setLoading(false);
       }
     };
 
-    // Load users when component mounts or when auth token becomes available
-    const authToken = apiService.getAuthToken();
-    if (authToken || !user) {
+    // Only load users if we have a logged in admin user
+    if (user && user.role === 'admin') {
       loadUsers();
     } else {
       setLoading(false);
@@ -351,45 +327,40 @@ const App = () => {
   };
 
   const handleLogout = () => {
-    updateUserState(null);
+    localStorage.removeItem('access_token');
+    localStorage.removeItem('refresh_token');
+    localStorage.removeItem('offchat_user');
+    setUser(null);
   };
 
   // Admin login handler
   const handleAdminLogin = async (identifier: string, password: string): Promise<boolean> => {
     try {
-      console.log('=== APP LOGIN HANDLER DEBUG ===');
-      console.log('Identifier:', identifier);
-      console.log('Password:', password);
-      
       const response = await apiService.login({ username: identifier, password });
-      console.log('App received response:', response);
       
       if (response.success && response.data) {
         const userData = response.data;
-        const tokens = response.data;
+        console.log('Login response user:', userData.user);
         
-        console.log('User data:', userData);
-        console.log('Tokens:', tokens);
-        
-        // Check if user is admin
-        if (userData.user.role !== "admin") {
+        if (userData.user.role !== "admin" && !userData.user.is_staff) {
           alert("Access denied. Admin privileges required.");
           return false;
         }
         
-        // Set authenticated user
-        setUser({ 
+        localStorage.setItem('access_token', userData.access);
+        localStorage.setItem('refresh_token', userData.refresh);
+        apiService.setAuthToken(userData.access);
+        
+        const userObj = { 
           id: userData.user.id, 
           username: userData.user.username, 
-          status: "online", 
+          status: "online" as const, 
           role: userData.user.role,
           avatar: userData.user.avatar 
-        });
+        };
+        setUser(userObj);
+        localStorage.setItem('offchat_user', JSON.stringify(userObj));
         
-        // Store token for future requests
-        apiService.setAuthToken(tokens.access);
-        
-        // Reload users after successful login
         const usersResponse = await apiService.getUsers();
         if (usersResponse.success && usersResponse.data) {
           setUsers(usersResponse.data as AppUser[]);
@@ -397,7 +368,6 @@ const App = () => {
         
         return true;
       } else {
-        console.log('Login failed in app handler:', response.error);
         alert("Login failed. Please check your credentials.");
         return false;
       }

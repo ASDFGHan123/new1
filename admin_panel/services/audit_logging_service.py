@@ -60,7 +60,7 @@ class AuditLoggingService:
             
             if request:
                 ip_address = cls._get_client_ip(request)
-                user_agent = request.META.get('HTTP_USER_AGENT', '')
+                user_agent = request.META.get('HTTP_USER_AGENT', None)
                 session_key = request.session.session_key
                 if session_key:
                     session_id = session_key
@@ -456,10 +456,7 @@ class AuditLoggingService:
                     'id': str(log.id),
                     'action_type': log.action_type,
                     'description': log.description,
-                    'actor': {
-                        'id': log.actor.id if log.actor else None,
-                        'username': log.actor.username if log.actor else 'System',
-                    } if log.actor else {'id': None, 'username': 'System'},
+                    'actor': log.actor.username if log.actor else 'System',
                     'target_type': log.target_type,
                     'target_id': log.target_id,
                     'severity': log.severity,
@@ -593,7 +590,7 @@ class AuditLoggingService:
                         'timestamp': log['timestamp'],
                         'action_type': log['action_type'],
                         'description': log['description'],
-                        'actor': log['actor']['username'],
+                        'actor': log['actor'],
                         'severity': log['severity'],
                         'ip_address': log['ip_address'],
                     })

@@ -57,9 +57,10 @@ class GroupCreateSerializer(serializers.ModelSerializer):
     Serializer for creating groups.
     """
     member_ids = serializers.ListField(
-        child=serializers.UUIDField(),
+        child=serializers.CharField(),
         required=False,
-        write_only=True
+        write_only=True,
+        allow_empty=True
     )
     
     class Meta:
@@ -68,18 +69,29 @@ class GroupCreateSerializer(serializers.ModelSerializer):
     
     def create(self, validated_data):
         member_ids = validated_data.pop('member_ids', [])
-        group = Group.objects.create(**validated_data)
+        validated_data['created_by'] = self.context['request'].user
         
-        # Add creator as owner
+        try:
+            group = Group.objects.create(**validated_data)
+        except Exception as e:
+            raise serializers.ValidationError(f"Failed to create group: {str(e)}")
+        
         group.add_member(self.context['request'].user, 'owner')
         
-        # Add other members if provided
-        for member_id in member_ids:
-            try:
-                user = User.objects.get(id=member_id)
-                group.add_member(user)
-            except User.DoesNotExist:
-                continue
+        if member_ids:
+            for member_id in member_ids:
+                try:
+                    user = User.objects.get(id=member_id)
+                    group.add_member(user)
+                except User.DoesNotExist:
+                    continue
+        
+        Conversation.objects.create(
+            conversation_type='group',
+            group=group,
+            title=group.name,
+            description=group.description
+        )
         
         return group
 
@@ -98,6 +110,40 @@ class ConversationParticipantSerializer(serializers.ModelSerializer):
         read_only_fields = ['id', 'joined_at']
 
 
+class AttachmentSerializer(serializers.ModelSerializer):
+    """
+    Serializer for Attachment model.
+    """
+    message = serializers.StringRelatedField()
+    file_size_mb = serializers.ReadOnlyField()
+    is_image = serializers.ReadOnlyField()
+    is_audio = serializers.ReadOnlyField()
+    is_video = serializers.ReadOnlyField()
+    is_document = serializers.ReadOnlyField()
+    url = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = Attachment
+        fields = [
+            'id', 'message', 'file', 'file_name', 'file_type', 'file_size',
+            'mime_type', 'duration', 'uploaded_at', 'file_size_mb',
+            'is_image', 'is_audio', 'is_video', 'is_document', 'url'
+        ]
+        read_only_fields = [
+            'id', 'uploaded_at', 'file_size_mb', 'is_image', 'is_audio',
+            'is_video', 'is_document', 'url'
+        ]
+    
+    def get_url(self, obj):
+        request = self.context.get('request')
+        if obj.file and hasattr(obj.file, 'url'):
+            url = obj.file.url
+            if request:
+                return request.build_absolute_uri(url)
+            return url
+        return None
+
+
 class MessageSerializer(serializers.ModelSerializer):
     """
     Serializer for Message model.
@@ -105,33 +151,52 @@ class MessageSerializer(serializers.ModelSerializer):
     sender = serializers.StringRelatedField()
     reply_to = serializers.StringRelatedField()
     forwarded_from = serializers.StringRelatedField()
+    attachments = AttachmentSerializer(many=True, read_only=True)
     
     class Meta:
         model = Message
         fields = [
             'id', 'conversation', 'sender', 'content', 'message_type',
             'reply_to', 'forwarded_from', 'is_edited', 'edited_at',
-            'is_deleted', 'deleted_at', 'timestamp'
+            'is_deleted', 'deleted_at', 'timestamp', 'attachments'
         ]
         read_only_fields = [
             'id', 'sender', 'is_edited', 'edited_at', 'is_deleted',
-            'deleted_at', 'timestamp'
+            'deleted_at', 'timestamp', 'attachments'
         ]
 
 
 class MessageCreateSerializer(serializers.ModelSerializer):
     """
-    Serializer for creating messages.
+    Serializer for creating messages with attachments.
     """
+    attachments = serializers.ListField(child=serializers.FileField(), required=False, write_only=True)
+    content = serializers.CharField(required=False, allow_blank=True)
     
     class Meta:
         model = Message
-        fields = ['content', 'message_type', 'reply_to', 'forwarded_from']
+        fields = ['content', 'message_type', 'reply_to', 'forwarded_from', 'attachments']
     
     def create(self, validated_data):
+        attachments = validated_data.pop('attachments', [])
         validated_data['sender'] = self.context['request'].user
         validated_data['conversation_id'] = self.context['conversation_id']
-        return super().create(validated_data)
+        message = super().create(validated_data)
+        
+        for file in attachments:
+            file_type = 'image' if file.content_type.startswith('image/') else 'document'
+            attachment = Attachment.objects.create(
+                message=message,
+                file=file,
+                file_name=file.name,
+                file_type=file_type,
+                file_size=0,
+                mime_type=file.content_type
+            )
+            attachment.file_size = attachment.file.size
+            attachment.save(update_fields=['file_size'])
+        
+        return message
 
 
 class MessageUpdateSerializer(serializers.ModelSerializer):
@@ -144,7 +209,6 @@ class MessageUpdateSerializer(serializers.ModelSerializer):
         fields = ['content']
     
     def validate(self, attrs):
-        # Check if user can edit this message
         if self.instance.sender != self.context['request'].user:
             raise serializers.ValidationError("You can only edit your own messages.")
         return attrs
@@ -173,9 +237,21 @@ class ConversationSerializer(serializers.ModelSerializer):
     
     def get_participants(self, obj):
         if obj.conversation_type == 'group':
-            return obj.group.members.filter(status='active').values_list('user_id', flat=True)
+            members = obj.group.members.filter(status='active').select_related('user')
+            return [{
+                'id': str(m.user.id),
+                'username': (m.user.username and m.user.username.strip()) or m.user.first_name or m.user.email.split('@')[0] or 'Unknown',
+                'avatar': m.user.avatar.url if m.user.avatar else None,
+                'status': 'online'
+            } for m in members]
         else:
-            return obj.participants.values_list('id', flat=True)
+            participants = obj.participants.all()
+            return [{
+                'id': str(p.id),
+                'username': (p.username and p.username.strip()) or p.first_name or p.email.split('@')[0] or 'Unknown',
+                'avatar': p.avatar.url if p.avatar else None,
+                'status': getattr(p, 'online_status', 'offline')
+            } for p in participants]
     
     def get_last_message(self, obj):
         last_msg = obj.last_message
@@ -189,7 +265,7 @@ class ConversationCreateSerializer(serializers.ModelSerializer):
     Serializer for creating conversations.
     """
     participant_ids = serializers.ListField(
-        child=serializers.UUIDField(),
+        child=serializers.IntegerField(),
         required=False,
         write_only=True
     )
@@ -219,16 +295,13 @@ class ConversationCreateSerializer(serializers.ModelSerializer):
         conversation = Conversation.objects.create(**validated_data)
         
         if conversation.conversation_type == 'group' and group_data:
-            # Create group and link to conversation
             group_data['created_by'] = self.context['request'].user
             group = Group.objects.create(**group_data)
             conversation.group = group
             conversation.save()
             
-            # Add creator as owner
             group.add_member(self.context['request'].user, 'owner')
             
-            # Add participants if provided
             for participant_id in participant_ids:
                 try:
                     user = User.objects.get(id=participant_id)
@@ -236,7 +309,6 @@ class ConversationCreateSerializer(serializers.ModelSerializer):
                 except User.DoesNotExist:
                     continue
         else:
-            # Add participants to individual conversation
             request_user = self.context['request'].user
             conversation.add_participant(request_user)
             
@@ -248,71 +320,6 @@ class ConversationCreateSerializer(serializers.ModelSerializer):
                     continue
         
         return conversation
-
-
-class AttachmentSerializer(serializers.ModelSerializer):
-    """
-    Serializer for Attachment model.
-    """
-    message = serializers.StringRelatedField()
-    file_size_mb = serializers.ReadOnlyField()
-    is_image = serializers.ReadOnlyField()
-    is_audio = serializers.ReadOnlyField()
-    is_video = serializers.ReadOnlyField()
-    is_document = serializers.ReadOnlyField()
-    
-    class Meta:
-        model = Attachment
-        fields = [
-            'id', 'message', 'file', 'file_name', 'file_type', 'file_size',
-            'mime_type', 'duration', 'uploaded_at', 'file_size_mb',
-            'is_image', 'is_audio', 'is_video', 'is_document'
-        ]
-        read_only_fields = [
-            'id', 'uploaded_at', 'file_size_mb', 'is_image', 'is_audio',
-            'is_video', 'is_document'
-        ]
-
-
-class AttachmentCreateSerializer(serializers.ModelSerializer):
-    """
-    Serializer for creating attachments.
-    """
-    
-    class Meta:
-        model = Attachment
-        fields = ['file', 'file_type', 'duration']
-    
-    def validate_file(self, value):
-        # File size validation (10MB limit)
-        if value.size > 10 * 1024 * 1024:
-            raise serializers.ValidationError("File size cannot exceed 10MB.")
-        return value
-    
-    def create(self, validated_data):
-        message_id = self.context['message_id']
-        validated_data['message_id'] = message_id
-        
-        # Auto-detect file type if not provided
-        if 'file_type' not in validated_data or not validated_data['file_type']:
-            file = validated_data['file']
-            if file.content_type.startswith('image/'):
-                validated_data['file_type'] = 'image'
-            elif file.content_type.startswith('video/'):
-                validated_data['file_type'] = 'video'
-            elif file.content_type.startswith('audio/'):
-                validated_data['file_type'] = 'audio'
-            elif file.content_type in ['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document']:
-                validated_data['file_type'] = 'document'
-            else:
-                validated_data['file_type'] = 'other'
-        
-        # Set file metadata
-        validated_data['file_name'] = validated_data['file'].name
-        validated_data['file_size'] = validated_data['file'].size
-        validated_data['mime_type'] = validated_data['file'].content_type
-        
-        return super().create(validated_data)
 
 
 class SearchSerializer(serializers.Serializer):

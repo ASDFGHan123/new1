@@ -38,6 +38,7 @@ interface UnifiedSidebarProps {
   groups: any[];
   onCreateGroup: (data: any) => Promise<any>;
   onCreateIndividualChat: (userId: string) => Conversation;
+  onDeleteConversation?: (conversationId: string) => void;
 }
 
 export const UnifiedSidebar = ({
@@ -49,18 +50,30 @@ export const UnifiedSidebar = ({
   availableUsers,
   groups,
   onCreateGroup,
-  onCreateIndividualChat
+  onCreateIndividualChat,
+  onDeleteConversation
 }: UnifiedSidebarProps) => {
   const [searchTerm, setSearchTerm] = useState("");
   const [showCreateGroup, setShowCreateGroup] = useState(false);
 
+  const getConversationTitle = (conversation: Conversation) => {
+    if (conversation.type === 'group') {
+      return conversation.groupName || "Unnamed Group";
+    } else {
+      const otherUser = conversation.participants?.find(p => String(p.id) !== String(currentUser.id));
+      if (otherUser?.username) return otherUser.username;
+      return "Unknown User";
+    }
+  };
+
   const filteredConversations = conversations.filter(conversation => {
+    if (!searchTerm.trim()) return true;
     const searchLower = searchTerm.toLowerCase();
     if (conversation.type === 'group') {
-      return conversation.groupName?.toLowerCase().includes(searchLower);
+      return conversation.groupName?.toLowerCase().includes(searchLower) || false;
     } else {
-      const otherUser = conversation.participants.find(p => p.id !== currentUser.id);
-      return otherUser?.username?.toLowerCase().includes(searchLower);
+      const title = getConversationTitle(conversation);
+      return title?.toLowerCase().includes(searchLower) || false;
     }
   });
 
@@ -105,37 +118,18 @@ export const UnifiedSidebar = ({
     }
   };
 
-  const getRoleIcon = (role?: string) => {
-    switch (role) {
-      case "admin":
-        return <Crown className="h-3 w-3 text-yellow-500" />;
-      case "moderator":
-        return <Shield className="h-3 w-3 text-blue-500" />;
-      default:
-        return <UserIcon className="h-3 w-3 text-gray-500" />;
-    }
-  };
-
   const getGroupIcon = (conversation: Conversation) => {
     if (conversation.type !== 'group') return null;
     return conversation.isGroupPrivate ? <Lock className="h-3 w-3" /> : <Globe className="h-3 w-3" />;
-  };
-
-  const getConversationTitle = (conversation: Conversation) => {
-    if (conversation.type === 'group') {
-      return conversation.groupName || "Unnamed Group";
-    } else {
-      const otherUser = conversation.participants.find(p => p.id !== currentUser.id);
-      return otherUser?.username || "Unknown User";
-    }
   };
 
   const getConversationAvatar = (conversation: Conversation) => {
     if (conversation.type === 'group') {
       return conversation.groupAvatar;
     } else {
-      const otherUser = conversation.participants.find(p => p.id !== currentUser.id);
-      return otherUser?.avatar;
+      const otherUser = conversation.participants?.find(p => String(p.id) !== String(currentUser.id));
+      if (otherUser?.avatar) return otherUser.avatar;
+      return undefined;
     }
   };
 
@@ -144,9 +138,9 @@ export const UnifiedSidebar = ({
     return (title || '??').slice(0, 2).toUpperCase();
   };
 
-  const handleDeleteConversation = (conversationId: string) => {
-    // Implementation would be passed from parent
-    console.log("Delete conversation:", conversationId);
+  const handleDeleteConversation = (e: React.MouseEvent, conversationId: string) => {
+    e.stopPropagation();
+    onDeleteConversation?.(conversationId);
   };
 
   return (
@@ -237,7 +231,7 @@ export const UnifiedSidebar = ({
                     {conversation.type === 'individual' && (
                       <div 
                         className={`absolute -bottom-1 -right-1 w-4 h-4 ${getStatusColor(
-                          conversation.participants.find(p => p.id !== currentUser.id)?.status || 'offline'
+                          availableUsers.find(u => String(u.id) === String(conversation.userId))?.status || 'offline'
                         )} rounded-full border-2 border-card`}
                       />
                     )}
@@ -251,8 +245,8 @@ export const UnifiedSidebar = ({
                       {getGroupIcon(conversation)}
                       {conversation.type === 'group' && (
                         <div className="flex -space-x-1">
-                          {(conversation.participants || []).slice(0, 3).map((member) => (
-                            <Avatar key={member.id} className="h-4 w-4 border border-card">
+                          {(conversation.participants || []).slice(0, 3).map((member, idx) => (
+                            <Avatar key={`${member.id}-${idx}`} className="h-4 w-4 border border-card">
                               <AvatarImage src={member.avatar} />
                               <AvatarFallback className="text-[8px]">
                                 {(member.username || '?').slice(0, 1)}
@@ -303,16 +297,14 @@ export const UnifiedSidebar = ({
                     <DropdownMenuItem>
                       View Details
                     </DropdownMenuItem>
-                    <DropdownMenuItem>
-                      Mark as Read
-                    </DropdownMenuItem>
-                    {conversation.type === 'group' && (
+                    {conversation.type === 'individual' && (
                       <DropdownMenuItem>
-                        Leave Group
+                        Mark as Read
                       </DropdownMenuItem>
                     )}
+
                     <DropdownMenuItem 
-                      onClick={() => handleDeleteConversation(conversation.id)}
+                      onClick={(e) => handleDeleteConversation(e as any, conversation.id)}
                       className="text-red-600 focus:text-red-600"
                     >
                       Delete Chat

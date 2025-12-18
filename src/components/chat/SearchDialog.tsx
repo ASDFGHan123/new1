@@ -138,11 +138,7 @@ export const SearchDialog = ({
                         {filteredUsers.map((user) => (
                           <div
                             key={user.id}
-                            className="flex items-center justify-between p-4 rounded-lg border hover:bg-muted/50 cursor-pointer transition-colors"
-                            onClick={() => {
-                              onSelectUser(user);
-                              onOpenChange(false);
-                            }}
+                            className="flex items-center justify-between p-4 rounded-lg border hover:bg-muted/50 transition-colors"
                           >
                             <div className="flex items-center gap-3">
                               <div className="relative">
@@ -161,7 +157,13 @@ export const SearchDialog = ({
                                 <p className="text-sm text-muted-foreground capitalize">{user.status}</p>
                               </div>
                             </div>
-                            <Button size="sm">
+                            <Button 
+                              size="sm"
+                              onClick={() => {
+                                onSelectUser(user);
+                                onOpenChange(false);
+                              }}
+                            >
                               <Plus className="h-4 w-4 mr-2" />
                               Chat
                             </Button>
@@ -184,13 +186,7 @@ export const SearchDialog = ({
                         {filteredGroups.map((conversation) => (
                           <div
                             key={conversation.id}
-                            className="flex items-center justify-between p-4 rounded-lg border hover:bg-muted/50 cursor-pointer transition-colors"
-                            onClick={() => {
-                              if (conversation.groupId) {
-                                onSelectGroup(conversation.groupId);
-                                onOpenChange(false);
-                              }
-                            }}
+                            className="flex items-center justify-between p-4 rounded-lg border hover:bg-muted/50 transition-colors"
                           >
                             <div className="flex items-center gap-3">
                               <Avatar className="h-12 w-12">
@@ -209,18 +205,18 @@ export const SearchDialog = ({
                                 </p>
                                 {conversation.participants.length > 0 && (
                                   <div className="flex -space-x-1 mt-1">
-                                    {conversation.participants.slice(0, 4).map((member) => (
+                                    {(conversation.participants || []).slice(0, 4).map((member) => (
                                       <Avatar key={member.id} className="h-6 w-6 border border-background">
                                         <AvatarImage src={member.avatar} />
                                         <AvatarFallback className="text-[10px]">
-                                          {member.username.slice(0, 1)}
+                                          {(member.username || '?').slice(0, 1)}
                                         </AvatarFallback>
                                       </Avatar>
                                     ))}
-                                    {conversation.participants.length > 4 && (
+                                    {(conversation.participants || []).length > 4 && (
                                       <div className="h-6 w-6 rounded-full bg-muted border border-background flex items-center justify-center">
                                         <span className="text-[10px]">
-                                          +{conversation.participants.length - 4}
+                                          +{(conversation.participants || []).length - 4}
                                         </span>
                                       </div>
                                     )}
@@ -228,7 +224,15 @@ export const SearchDialog = ({
                                 )}
                               </div>
                             </div>
-                            <Button size="sm">
+                            <Button 
+                              size="sm"
+                              onClick={() => {
+                                if (conversation.groupId) {
+                                  onSelectGroup(conversation.groupId);
+                                  onOpenChange(false);
+                                }
+                              }}
+                            >
                               <MessageCircle className="h-4 w-4 mr-2" />
                               Open
                             </Button>
@@ -256,11 +260,7 @@ export const SearchDialog = ({
                           return (
                             <div
                               key={conversation.id}
-                              className="flex items-center justify-between p-4 rounded-lg border hover:bg-muted/50 cursor-pointer transition-colors"
-                              onClick={() => {
-                                onSelectGroup(conversation.groupId || '');
-                                onOpenChange(false);
-                              }}
+                              className="flex items-center justify-between p-4 rounded-lg border hover:bg-muted/50 transition-colors"
                             >
                               <div className="flex items-center gap-3">
                                 <Avatar className="h-12 w-12">
@@ -285,7 +285,13 @@ export const SearchDialog = ({
                                   </p>
                                 </div>
                               </div>
-                              <Button size="sm">
+                              <Button 
+                                size="sm"
+                                onClick={() => {
+                                  onSelectGroup(conversation.groupId || conversation.id);
+                                  onOpenChange(false);
+                                }}
+                              >
                                 Open
                               </Button>
                             </div>
