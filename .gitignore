@@ -12,6 +12,33 @@ dist
 dist-ssr
 *.local
 
+# Python
+venv/
+env/
+*.pyc
+__pycache__/
+*.egg-info/
+.pytest_cache/
+.coverage
+db.sqlite3
+*.pyo
+*.pyd
+.Python
+build/
+develop-eggs/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
