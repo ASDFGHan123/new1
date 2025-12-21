@@ -87,8 +87,8 @@ class User(AbstractBaseUser, PermissionsMixin):
         unique=True,
         validators=[
             RegexValidator(
-                regex=r'^[\w.-]+$',
-                message='Username can only contain letters, numbers, dots, underscores, and hyphens.'
+                regex=r'^[\w.\- ]+$',
+                message='Username can only contain letters, numbers, dots, underscores, hyphens, and spaces.'
             )
         ]
     )

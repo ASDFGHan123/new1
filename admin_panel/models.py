@@ -540,3 +540,230 @@ class MessageTemplate(models.Model):
             }
         )
         return setting
+
+
+class FlaggedMessage(models.Model):
+    """
+    Model for flagged/reported messages for moderation.
+    """
+    
+    class ReportReason(models.TextChoices):
+        SPAM = 'spam', 'Spam'
+        HARASSMENT = 'harassment', 'Harassment'
+        HATE_SPEECH = 'hate_speech', 'Hate Speech'
+        VIOLENCE = 'violence', 'Violence'
+        EXPLICIT = 'explicit', 'Explicit Content'
+        MISINFORMATION = 'misinformation', 'Misinformation'
+        OTHER = 'other', 'Other'
+    
+    class Status(models.TextChoices):
+        PENDING = 'pending', 'Pending Review'
+        APPROVED = 'approved', 'Approved'
+        REJECTED = 'rejected', 'Rejected'
+        REMOVED = 'removed', 'Removed'
+    
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    message_id = models.CharField(max_length=255)
+    message_content = models.TextField()
+    sender_id = models.CharField(max_length=255)
+    sender_username = models.CharField(max_length=150)
+    
+    reason = models.CharField(max_length=50, choices=ReportReason.choices)
+    description = models.TextField(blank=True)
+    status = models.CharField(max_length=20, choices=Status.choices, default=Status.PENDING)
+    
+    reported_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name='message_reports'
+    )
+    reviewed_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='reviewed_messages'
+    )
+    
+    review_notes = models.TextField(blank=True)
+    reported_at = models.DateTimeField(auto_now_add=True)
+    reviewed_at = models.DateTimeField(null=True, blank=True)
+    
+    class Meta:
+        db_table = 'flagged_messages'
+        verbose_name = 'Flagged Message'
+        verbose_name_plural = 'Flagged Messages'
+        ordering = ['-reported_at']
+        indexes = [
+            models.Index(fields=['status']),
+            models.Index(fields=['reason']),
+            models.Index(fields=['reported_at']),
+            models.Index(fields=['sender_id']),
+        ]
+    
+    def __str__(self):
+        return f"Message from {self.sender_username} - {self.reason}"
+    
+    def approve(self, reviewed_by, notes=''):
+        self.status = self.Status.APPROVED
+        self.reviewed_by = reviewed_by
+        self.review_notes = notes
+        self.reviewed_at = timezone.now()
+        self.save()
+    
+    def reject(self, reviewed_by, notes=''):
+        self.status = self.Status.REJECTED
+        self.reviewed_by = reviewed_by
+        self.review_notes = notes
+        self.reviewed_at = timezone.now()
+        self.save()
+    
+    def remove(self, reviewed_by, notes=''):
+        self.status = self.Status.REMOVED
+        self.reviewed_by = reviewed_by
+        self.review_notes = notes
+        self.reviewed_at = timezone.now()
+        self.save()
+
+
+class UserModeration(models.Model):
+    """
+    Model for user moderation actions (bans, suspensions).
+    """
+    
+    class ActionType(models.TextChoices):
+        SUSPEND = 'suspend', 'Suspend'
+        BAN = 'ban', 'Ban'
+        WARN = 'warn', 'Warn'
+        MUTE = 'mute', 'Mute'
+    
+    class Status(models.TextChoices):
+        ACTIVE = 'active', 'Active'
+        EXPIRED = 'expired', 'Expired'
+        LIFTED = 'lifted', 'Lifted'
+    
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    user = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name='moderation_actions'
+    )
+    
+    action_type = models.CharField(max_length=20, choices=ActionType.choices)
+    reason = models.TextField()
+    status = models.CharField(max_length=20, choices=Status.choices, default=Status.ACTIVE)
+    
+    duration_days = models.PositiveIntegerField(null=True, blank=True)
+    
+    moderator = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name='moderation_actions_taken'
+    )
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+    expires_at = models.DateTimeField(null=True, blank=True)
+    lifted_at = models.DateTimeField(null=True, blank=True)
+    
+    class Meta:
+        db_table = 'user_moderation'
+        verbose_name = 'User Moderation'
+        verbose_name_plural = 'User Moderations'
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['user']),
+            models.Index(fields=['action_type']),
+            models.Index(fields=['status']),
+            models.Index(fields=['created_at']),
+        ]
+    
+    def __str__(self):
+        return f"{self.action_type} - {self.user.username}"
+    
+    def is_active(self):
+        if self.status != self.Status.ACTIVE:
+            return False
+        if self.expires_at and timezone.now() > self.expires_at:
+            self.status = self.Status.EXPIRED
+            self.save()
+            return False
+        return True
+    
+    def lift(self):
+        self.status = self.Status.LIFTED
+        self.lifted_at = timezone.now()
+        self.save()
+
+
+class ContentReview(models.Model):
+    """
+    Model for content review workflow.
+    """
+    
+    class ContentType(models.TextChoices):
+        MESSAGE = 'message', 'Message'
+        USER_PROFILE = 'user_profile', 'User Profile'
+        GROUP = 'group', 'Group'
+    
+    class ReviewStatus(models.TextChoices):
+        PENDING = 'pending', 'Pending'
+        IN_REVIEW = 'in_review', 'In Review'
+        APPROVED = 'approved', 'Approved'
+        REJECTED = 'rejected', 'Rejected'
+    
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    content_type = models.CharField(max_length=20, choices=ContentType.choices)
+    content_id = models.CharField(max_length=255)
+    content_data = models.JSONField(default=dict)
+    
+    status = models.CharField(max_length=20, choices=ReviewStatus.choices, default=ReviewStatus.PENDING)
+    priority = models.PositiveIntegerField(default=1)
+    
+    submitted_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name='content_submissions'
+    )
+    reviewed_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='content_reviews'
+    )
+    
+    review_notes = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    reviewed_at = models.DateTimeField(null=True, blank=True)
+    
+    class Meta:
+        db_table = 'content_reviews'
+        verbose_name = 'Content Review'
+        verbose_name_plural = 'Content Reviews'
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['status']),
+            models.Index(fields=['content_type']),
+            models.Index(fields=['priority']),
+            models.Index(fields=['created_at']),
+        ]
+    
+    def __str__(self):
+        return f"{self.content_type} - {self.status}"
+    
+    def approve(self, reviewed_by, notes=''):
+        self.status = self.ReviewStatus.APPROVED
+        self.reviewed_by = reviewed_by
+        self.review_notes = notes
+        self.reviewed_at = timezone.now()
+        self.save()
+    
+    def reject(self, reviewed_by, notes=''):
+        self.status = self.ReviewStatus.REJECTED
+        self.reviewed_by = reviewed_by
+        self.review_notes = notes
+        self.reviewed_at = timezone.now()
+        self.save()

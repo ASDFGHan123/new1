@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useSearchParams } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { UnifiedChatInterface } from "@/components/chat/UnifiedChatInterface";
 import { LoginForm } from "@/components/auth/LoginForm";
@@ -8,6 +9,8 @@ import { AlertCircle, RefreshCw } from "lucide-react";
 
 export const UnifiedChatPage = () => {
   const { user, isAuthenticated, isLoading, error, login, signup, clearError } = useAuth();
+  const [searchParams] = useSearchParams();
+  const conversationId = searchParams.get('conversation');
 
   // API Integration states
   const [authRetries, setAuthRetries] = useState(0);
@@ -130,5 +133,5 @@ export const UnifiedChatPage = () => {
   }
 
   // User is authenticated, show the unified chat interface
-  return <UnifiedChatInterface />;
+  return <UnifiedChatInterface initialConversationId={conversationId} />;
 };

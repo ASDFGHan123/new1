@@ -32,9 +32,10 @@ interface UserManagementProps {
   updateUser?: (userId: string, updates: Partial<User>) => void;
   forceLogoutUser?: (userId: string) => void;
   deleteUser?: (userId: string) => void;
+  onUserDeleted?: () => void;
 }
 
-export const UserManagement = React.memo(({ users: propUsers = [], approveUser, rejectUser, addUser, updateUser, forceLogoutUser, deleteUser }: UserManagementProps) => {
+export const UserManagement = React.memo(({ users: propUsers = [], approveUser, rejectUser, addUser, updateUser, forceLogoutUser, deleteUser, onUserDeleted }: UserManagementProps) => {
   const { toast } = useToast();
   
   const [users, setUsers] = useState<User[]>(propUsers);
@@ -60,6 +61,8 @@ export const UserManagement = React.memo(({ users: propUsers = [], approveUser, 
   const [roleFilter, setRoleFilter] = useState<string>("all");
   const [showFilters, setShowFilters] = useState(false);
   const [actionLoading, setActionLoading] = useState<{[key: string]: boolean}>({});
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [userToDelete, setUserToDelete] = useState<string | null>(null);
 
   const loadUsers = useCallback(async (retryAttempt = 0) => {
     setLoading(true);
@@ -143,6 +146,7 @@ export const UserManagement = React.memo(({ users: propUsers = [], approveUser, 
       if (response.success) {
         setUsers(prev => prev.filter(user => user.id !== userId));
         invalidateUsersCache();
+        onUserDeleted?.();
         
         toast({
           title: "User Rejected",
@@ -194,7 +198,7 @@ export const UserManagement = React.memo(({ users: propUsers = [], approveUser, 
     }
   };
 
-  const deleteUserInternal = async (userId: string) => {
+  const deleteUserInternal = async (userId: string, moveToTrash: boolean = true) => {
     if (deleteUser) {
       deleteUser(userId);
       return;
@@ -203,15 +207,18 @@ export const UserManagement = React.memo(({ users: propUsers = [], approveUser, 
     setActionLoading(prev => ({ ...prev, [userId]: true }));
     
     try {
-      const response = await apiService.deleteUser(userId);
+      const response = await apiService.httpRequest(`/users/admin/users/${userId}/?permanent=${!moveToTrash}`, {
+        method: 'DELETE'
+      });
       
       if (response.success) {
         setUsers(prev => prev.filter(user => user.id !== userId));
         invalidateUsersCache();
+        onUserDeleted?.();
         
         toast({
-          title: "User Deleted",
-          description: "User has been deleted successfully.",
+          title: moveToTrash ? "User Moved to Trash" : "User Permanently Deleted",
+          description: moveToTrash ? "User has been moved to trash." : "User has been permanently deleted.",
         });
       } else {
         throw new Error(response.error || 'Failed to delete user');
@@ -225,6 +232,8 @@ export const UserManagement = React.memo(({ users: propUsers = [], approveUser, 
       });
     } finally {
       setActionLoading(prev => ({ ...prev, [userId]: false }));
+      setDeleteConfirmOpen(false);
+      setUserToDelete(null);
     }
   };
 
@@ -724,7 +733,10 @@ export const UserManagement = React.memo(({ users: propUsers = [], approveUser, 
                           <Button 
                             size="sm" 
                             variant="destructive" 
-                            onClick={() => deleteUserInternal(user.id)}
+                            onClick={() => {
+                              setUserToDelete(user.id);
+                              setDeleteConfirmOpen(true);
+                            }}
                             disabled={actionLoading[user.id]}
                           >
                             Delete
@@ -745,6 +757,45 @@ export const UserManagement = React.memo(({ users: propUsers = [], approveUser, 
             )}
           </>
         )}
+        
+        <Dialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Delete User</DialogTitle>
+              <DialogDescription>Choose how to delete this user</DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4">
+              <Button 
+                className="w-full bg-yellow-600 hover:bg-yellow-700"
+                onClick={() => {
+                  if (userToDelete) deleteUserInternal(userToDelete, true);
+                }}
+                disabled={actionLoading[userToDelete || '']}
+              >
+                {actionLoading[userToDelete || ''] ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
+                Move to Trash
+              </Button>
+              <Button 
+                className="w-full bg-red-600 hover:bg-red-700"
+                onClick={() => {
+                  if (userToDelete) deleteUserInternal(userToDelete, false);
+                }}
+                disabled={actionLoading[userToDelete || '']}
+              >
+                {actionLoading[userToDelete || ''] ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
+                Permanently Delete
+              </Button>
+              <Button 
+                variant="outline"
+                className="w-full"
+                onClick={() => setDeleteConfirmOpen(false)}
+                disabled={actionLoading[userToDelete || '']}
+              >
+                Cancel
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
       </CardContent>
     </Card>
   );

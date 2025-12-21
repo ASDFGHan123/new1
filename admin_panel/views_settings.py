@@ -4,6 +4,7 @@ from rest_framework.permissions import AllowAny
 from .models import SystemSettings, AuditLog
 from .serializers import SystemSettingSerializer, SystemSettingCreateUpdateSerializer
 from .services.audit_logging_service import AuditLoggingService
+from users.views import IsAdminUser
 
 class SystemSettingsListView(APIView):
     permission_classes = [AllowAny]
@@ -14,6 +15,8 @@ class SystemSettingsListView(APIView):
         return Response(SystemSettingSerializer(settings, many=True).data)
     
     def post(self, request):
+        self.permission_classes = [IsAdminUser]
+        self.check_permissions(request)
         serializer = SystemSettingCreateUpdateSerializer(data=request.data, context={'request': request})
         if serializer.is_valid():
             return Response(SystemSettingSerializer(serializer.save()).data, status=201)
@@ -33,6 +36,8 @@ class SystemSettingUpdateView(APIView):
     permission_classes = [AllowAny]
     
     def put(self, request, key):
+        self.permission_classes = [IsAdminUser]
+        self.check_permissions(request)
         try:
             setting = SystemSettings.objects.get(key=key)
             serializer = SystemSettingCreateUpdateSerializer(setting, data=request.data, context={'request': request})
@@ -43,6 +48,8 @@ class SystemSettingUpdateView(APIView):
             return Response({'error': 'Not found'}, status=404)
     
     def delete(self, request, key):
+        self.permission_classes = [IsAdminUser]
+        self.check_permissions(request)
         try:
             SystemSettings.objects.get(key=key).delete()
             return Response(status=204)
@@ -50,7 +57,7 @@ class SystemSettingUpdateView(APIView):
             return Response({'error': 'Not found'}, status=404)
 
 class SystemSettingsBulkUpdateView(APIView):
-    permission_classes = [AllowAny]
+    permission_classes = [IsAdminUser]
     
     def post(self, request):
         settings_data = request.data.get('settings', [])

@@ -54,10 +54,18 @@ class TrashViewSet(viewsets.ModelViewSet):
             trash_item = TrashItem.objects.get(id=item_id)
             
             if item_type == 'user':
-                user = User.objects.get(id=trash_item.item_id)
-                user.is_active = True
-                user.status = 'active'
-                user.save()
+                # Recreate user from stored data
+                user_data = trash_item.item_data
+                User.objects.create_user(
+                    username=user_data['username'],
+                    email=user_data['email'],
+                    password='',  # Password is not stored, user will need to reset
+                    first_name=user_data.get('first_name', ''),
+                    last_name=user_data.get('last_name', ''),
+                    role=user_data.get('role', 'user'),
+                    status=user_data.get('status', 'active'),
+                    is_active=True,
+                )
             
             trash_item.delete()
             return Response({'success': True, 'message': 'Item restored successfully'})

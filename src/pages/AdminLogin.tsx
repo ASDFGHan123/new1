@@ -34,11 +34,10 @@ const AdminLogin = ({ onLogin }: AdminLoginProps) => {
       const success = await onLogin(identifier, password);
       if (success) {
         navigate("/admin");
-      } else {
-        setError("Invalid credentials or insufficient permissions");
       }
     } catch (err) {
-      setError("Login failed. Please try again.");
+      const errorMsg = err instanceof Error ? err.message : "Login failed. Please try again.";
+      setError(errorMsg);
     } finally {
       setLoading(false);
     }

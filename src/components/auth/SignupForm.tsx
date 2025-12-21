@@ -8,11 +8,12 @@ import { Eye, EyeOff, MessageCircle, User } from "lucide-react";
 
 interface SignupFormProps {
   onToggleMode: () => void;
-  onSignup: (username: string, password: string) => void;
+  onSignup: (username: string, email: string, password: string) => Promise<boolean>;
 }
 
 export const SignupForm = ({ onToggleMode, onSignup }: SignupFormProps) => {
   const [username, setUsername] = useState("");
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -21,11 +22,14 @@ export const SignupForm = ({ onToggleMode, onSignup }: SignupFormProps) => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
-    // Simulate API call
-    setTimeout(() => {
-      onSignup(username, password);
+    try {
+      const success = await onSignup(username, email, password);
+      if (success) {
+        navigate("/login");
+      }
+    } finally {
       setIsLoading(false);
-    }, 1000);
+    }
   };
 
   return (
@@ -51,12 +55,12 @@ export const SignupForm = ({ onToggleMode, onSignup }: SignupFormProps) => {
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="username">Name</Label>
+              <Label htmlFor="username">Username</Label>
               <div className="relative">
                 <Input
                   id="username"
                   type="text"
-                  placeholder="Enter your name"
+                  placeholder="e.g. ahmad zia"
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
                   required
@@ -64,6 +68,17 @@ export const SignupForm = ({ onToggleMode, onSignup }: SignupFormProps) => {
                 />
                 <User className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="email">Email (Optional)</Label>
+              <Input
+                id="email"
+                type="email"
+                placeholder="Enter your email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="transition-all duration-300 focus:shadow-glow"
+              />
             </div>
             <div className="space-y-2">
               <Label htmlFor="password">Password</Label>

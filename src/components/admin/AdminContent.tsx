@@ -1,4 +1,4 @@
-import React, { Suspense, useState } from 'react';
+import React, { Suspense, useState, useRef } from 'react';
 import { useAdmin } from '@/contexts/AdminContext';
 import { StatsCards } from './StatsCards';
 import { UserManagement } from './UserManagement';
@@ -32,6 +32,13 @@ interface AdminContentProps {
 export function AdminContent({ user }: AdminContentProps = {}) {
   const { state } = useAdmin();
   const [showEditProfile, setShowEditProfile] = useState(false);
+  const trashManagerRef = useRef<{ refresh: () => Promise<void> }>(null);
+
+  const handleUserDeleted = async () => {
+    if (trashManagerRef.current) {
+      await trashManagerRef.current.refresh();
+    }
+  };
 
   const renderContent = () => {
     switch (state.activeTab) {
@@ -39,15 +46,11 @@ export function AdminContent({ user }: AdminContentProps = {}) {
         return (
           <div className="space-y-6">
             <StatsCards users={state.users} />
-            <ErrorBoundary>
-              <Suspense fallback={<Loading />}>
-                <ConversationMonitor conversations={state.conversations} />
-              </Suspense>
-            </ErrorBoundary>
+            <MessageAnalytics />
           </div>
         );
       case 'users':
-        return <UserManagement />;
+        return <UserManagement onUserDeleted={handleUserDeleted} />;
       case 'analytics':
         return <MessageAnalytics />;
       case 'moderation':
@@ -83,7 +86,7 @@ export function AdminContent({ user }: AdminContentProps = {}) {
       case 'settings':
         return <SettingsManager />;
       case 'trash':
-        return <TrashManager />;
+        return <TrashManager ref={trashManagerRef} />;
       case 'profile':
         return (
           <div className="max-w-2xl mx-auto space-y-6">

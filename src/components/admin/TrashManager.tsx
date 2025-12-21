@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { Trash2, RotateCcw, Trash, Loader2, AlertCircle, RefreshCw } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -19,50 +19,26 @@ interface TrashItem {
   expires_at: string;
 }
 
-export const TrashManager = () => {
+export const TrashManager = React.forwardRef<{ refresh: () => Promise<void> }>((_props, ref) => {
   const { toast } = useToast();
   const [trashItems, setTrashItems] = useState<TrashItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [actionLoading, setActionLoading] = useState<{[key: string]: boolean}>({});
-
-  const getApiUrl = () => {
-    const hostname = window.location.hostname;
-    const port = '8000';
-    return `http://${hostname}:${port}/api`;
-  };
+  const refreshIntervalRef = useRef<NodeJS.Timeout>();
 
   const loadTrash = useCallback(async () => {
     setLoading(true);
     setError(null);
     
     try {
-      apiService.initializeAuth();
-      const token = apiService.getAuthToken();
-      if (!token) {
-        setError('Not authenticated');
-        setLoading(false);
-        return;
-      }
+      const response = await apiService.httpRequest<TrashItem[]>('/users/trash/');
       
-      const response = await fetch(`${getApiUrl()}/users/trash/`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
-      
-      if (response.status === 401) {
-        setError('Authentication failed. Please log in again.');
-        setTrashItems([]);
-      } else if (response.status === 500) {
-        setError('Trash feature not initialized. Run: python manage.py migrate users 0004_trash');
-        setTrashItems([]);
-      } else if (response.ok) {
-        const data = await response.json();
-        setTrashItems(Array.isArray(data) ? data : data.results || []);
+      if (response.success && response.data) {
+        setTrashItems(Array.isArray(response.data) ? response.data : response.data.results || []);
       } else {
-        throw new Error('Failed to load trash');
+        setError(response.error || 'Failed to load trash');
+        setTrashItems([]);
       }
     } catch (err) {
       console.error('Failed to load trash:', err);
@@ -76,36 +52,19 @@ export const TrashManager = () => {
     setActionLoading(prev => ({ ...prev, [item.id]: true }));
     
     try {
-      apiService.initializeAuth();
-      const token = apiService.getAuthToken();
-      if (!token) {
-        toast({
-          title: "Error",
-          description: 'Not authenticated',
-          variant: "destructive"
-        });
-        return;
-      }
-      
-      const response = await fetch(`${getApiUrl()}/users/trash/restore/`, {
+      const response = await apiService.httpRequest('/users/trash/restore/', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
         body: JSON.stringify({ item_id: item.id, item_type: item.item_type })
       });
       
-      if (response.ok) {
+      if (response.success) {
         setTrashItems(prev => prev.filter(t => t.id !== item.id));
         toast({
           title: "Item Restored",
           description: `${item.item_type} has been restored successfully.`
         });
-      } else if (response.status === 401) {
-        throw new Error('Authentication failed. Please log in again.');
       } else {
-        throw new Error('Failed to restore item');
+        throw new Error(response.error || 'Failed to restore item');
       }
     } catch (err) {
       toast({
@@ -122,34 +81,18 @@ export const TrashManager = () => {
     setActionLoading(prev => ({ ...prev, [item.id]: true }));
     
     try {
-      apiService.initializeAuth();
-      const token = apiService.getAuthToken();
-      if (!token) {
-        toast({
-          title: "Error",
-          description: 'Not authenticated',
-          variant: "destructive"
-        });
-        return;
-      }
-      
-      const response = await fetch(`${getApiUrl()}/users/trash/${item.id}/`, {
-        method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
+      const response = await apiService.httpRequest(`/users/trash/${item.id}/`, {
+        method: 'DELETE'
       });
       
-      if (response.ok) {
+      if (response.success) {
         setTrashItems(prev => prev.filter(t => t.id !== item.id));
         toast({
           title: "Item Deleted",
           description: `${item.item_type} has been permanently deleted.`
         });
-      } else if (response.status === 401) {
-        throw new Error('Authentication failed. Please log in again.');
       } else {
-        throw new Error('Failed to delete item');
+        throw new Error(response.error || 'Failed to delete item');
       }
     } catch (err) {
       toast({
@@ -166,36 +109,18 @@ export const TrashManager = () => {
     setLoading(true);
     
     try {
-      apiService.initializeAuth();
-      const token = apiService.getAuthToken();
-      if (!token) {
-        toast({
-          title: "Error",
-          description: 'Not authenticated',
-          variant: "destructive"
-        });
-        setLoading(false);
-        return;
-      }
-      
-      const response = await fetch(`${getApiUrl()}/users/trash/empty_trash/`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
+      const response = await apiService.httpRequest('/users/trash/empty_trash/', {
+        method: 'POST'
       });
       
-      if (response.ok) {
+      if (response.success) {
         setTrashItems([]);
         toast({
           title: "Trash Emptied",
           description: "All expired items have been permanently deleted."
         });
-      } else if (response.status === 401) {
-        throw new Error('Authentication failed. Please log in again.');
       } else {
-        throw new Error('Failed to empty trash');
+        throw new Error(response.error || 'Failed to empty trash');
       }
     } catch (err) {
       toast({
@@ -210,7 +135,21 @@ export const TrashManager = () => {
 
   useEffect(() => {
     loadTrash();
+    
+    // Auto-refresh every 5 seconds
+    refreshIntervalRef.current = setInterval(loadTrash, 5000);
+    
+    return () => {
+      if (refreshIntervalRef.current) {
+        clearInterval(refreshIntervalRef.current);
+      }
+    };
   }, [loadTrash]);
+
+  // Expose refresh method via ref
+  React.useImperativeHandle(ref, () => ({
+    refresh: loadTrash
+  }));
 
   const getDaysUntilExpiry = (expiresAt: string) => {
     const now = new Date();
@@ -368,4 +307,6 @@ export const TrashManager = () => {
       </CardContent>
     </Card>
   );
-};
+});
+
+TrashManager.displayName = 'TrashManager';

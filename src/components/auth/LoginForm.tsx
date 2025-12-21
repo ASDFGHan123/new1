@@ -9,7 +9,7 @@ import { Eye, EyeOff, MessageCircle, AlertCircle } from "lucide-react";
 
 interface LoginFormProps {
   onToggleMode: () => void;
-  onLogin: (identifier: string, password: string) => void;
+  onLogin: (identifier: string, password: string) => Promise<boolean>;
   error?: string | null;
 }
 
@@ -34,9 +34,21 @@ export const LoginForm = ({ onToggleMode, onLogin, error }: LoginFormProps) => {
     setLocalError(null);
     
     try {
-      await onLogin(identifier, password);
+      const success = await onLogin(identifier, password);
+      if (success) {
+        navigate("/chat");
+      }
     } catch (err) {
-      setLocalError(err instanceof Error ? err.message : 'Login failed');
+      const errorMsg = err instanceof Error ? err.message : 'Login failed';
+      if (errorMsg.includes('pending')) {
+        setLocalError('Your account is pending admin approval. Please wait.');
+      } else if (errorMsg.includes('suspended')) {
+        setLocalError('Your account has been suspended.');
+      } else if (errorMsg.includes('banned')) {
+        setLocalError('Your account has been banned.');
+      } else {
+        setLocalError(errorMsg);
+      }
     } finally {
       setIsLoading(false);
     }

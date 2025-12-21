@@ -9,6 +9,7 @@ from .models import AuditLog, SystemMessage, Trash, Backup
 from .serializers import SystemMessageSerializer
 from .views_settings import SystemSettingsListView, SystemSettingDetailView, SystemSettingUpdateView, SystemSettingsBulkUpdateView
 from .services.audit_logging_service import AuditLoggingService
+from users.views import IsAdminUser
 
 
 class AuditLogListView(APIView):

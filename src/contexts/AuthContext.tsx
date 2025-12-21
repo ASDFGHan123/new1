@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from "react";
+import { useNavigate } from "react-router-dom";
 import { AuthUser, LoginCredentials, SignupCredentials } from "@/types/chat";
 import { apiService } from "@/lib/api";
 
@@ -17,12 +18,20 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
+  const navigate = useNavigate();
   const [user, setUser] = useState<AuthUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     apiService.initializeAuth();
+    
+    apiService.setAuthExpiredCallback(() => {
+      setUser(null);
+      setError('Session expired. Please log in again.');
+      navigate('/admin-login');
+    });
+    
     const savedUser = localStorage.getItem("offchat_user");
     const accessToken = localStorage.getItem("access_token");
     
@@ -41,7 +50,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       localStorage.removeItem("refresh_token");
     }
     setIsLoading(false);
-  }, []);
+  }, [navigate]);
 
   const clearError = () => {
     setError(null);

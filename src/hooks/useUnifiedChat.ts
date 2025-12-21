@@ -32,24 +32,33 @@ export const useUnifiedChat = (): UnifiedChatData => {
       setError(null);
 
       try {
-        const usersResponse = await apiService.getUsers();
-        const usersMap: Record<string, User> = {};
-        
-        if (usersResponse.success && Array.isArray(usersResponse.data)) {
-          const otherUsers = usersResponse.data
-            .filter((user: any) => String(user.id) !== String(authUser.id))
-            .map((user: any) => {
-              const username = (user.username && user.username.trim()) || user.first_name || user.email?.split('@')[0] || 'Unknown';
-              const userData = {
-                id: String(user.id),
-                username,
-                avatar: user.avatar || '',
-                status: 'offline' as const
-              };
-              usersMap[String(user.id)] = userData;
-              return userData;
-            });
-          setAvailableUsers(otherUsers);
+        // Only load all users if user has admin access
+        const authToken = apiService.getAuthToken();
+        if (authToken) {
+          try {
+            const usersResponse = await apiService.getUsers();
+            const usersMap: Record<string, User> = {};
+            
+            if (usersResponse.success && Array.isArray(usersResponse.data)) {
+              const otherUsers = usersResponse.data
+                .filter((user: any) => String(user.id) !== String(authUser.id))
+                .map((user: any) => {
+                  const username = (user.username && user.username.trim()) || user.first_name || user.email?.split('@')[0] || 'Unknown';
+                  const userData = {
+                    id: String(user.id),
+                    username,
+                    avatar: user.avatar || '',
+                    status: 'offline' as const
+                  };
+                  usersMap[String(user.id)] = userData;
+                  return userData;
+                });
+              setAvailableUsers(otherUsers);
+            }
+          } catch (err) {
+            // If getUsers fails (e.g., insufficient permissions), continue without user list
+            console.warn('Could not load users list:', err);
+          }
         }
 
         const conversationsResponse = await apiService.getConversations();

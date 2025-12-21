@@ -42,7 +42,8 @@ export const MessageModeration = () => {
         setFlaggedMessages([]);
       } else {
         const data = await response.json();
-        setFlaggedMessages(Array.isArray(data) ? data : data.results || []);
+        const messages = Array.isArray(data) ? data : (data?.results || data?.data || []);
+        setFlaggedMessages(Array.isArray(messages) ? messages : []);
       }
     } catch (error) {
       console.error('Failed to load flagged messages:', error);

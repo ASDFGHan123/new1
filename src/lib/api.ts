@@ -132,6 +132,17 @@ class ApiService {
   private isRefreshing = false;
   private refreshPromise: Promise<string> | null = null;
   private failedRequests: Array<{url: string, options: RequestInit, resolve: Function, reject: Function}> = [];
+  private authExpiredCallback: (() => void) | null = null;
+
+  setAuthExpiredCallback(callback: () => void) {
+    this.authExpiredCallback = callback;
+  }
+
+  private notifyAuthExpired() {
+    if (this.authExpiredCallback) {
+      this.authExpiredCallback();
+    }
+  }
 
   constructor() {
     if (typeof window !== 'undefined' && !this.isInitialized) {
@@ -212,12 +223,30 @@ class ApiService {
           this.refreshToken = null;
           localStorage.removeItem('access_token');
           localStorage.removeItem('refresh_token');
+          localStorage.removeItem('offchat_user');
+          this.notifyAuthExpired();
           throw new Error('AUTHENTICATION_EXPIRED');
         }
       }
       
+      if (response.status === 401 && !this.refreshToken) {
+        this.authToken = null;
+        localStorage.removeItem('access_token');
+        localStorage.removeItem('refresh_token');
+        localStorage.removeItem('offchat_user');
+        this.notifyAuthExpired();
+      }
+      
       if (response.status === 429) {
         return response;
+      }
+      
+      if (response.status === 401) {
+        this.authToken = null;
+        localStorage.removeItem('access_token');
+        localStorage.removeItem('refresh_token');
+        localStorage.removeItem('offchat_user');
+        this.notifyAuthExpired();
       }
       
       if (!response.ok && retries > 0) {
@@ -266,16 +295,19 @@ class ApiService {
       ...options.headers,
     };
 
-    if (!this.authToken && typeof window !== 'undefined') {
+    // Always check localStorage for the latest token
+    let token = this.authToken;
+    if (typeof window !== 'undefined') {
       const accessToken = localStorage.getItem('access_token');
       if (accessToken) {
+        token = accessToken;
         this.authToken = accessToken;
       }
     }
 
-    if (this.authToken) {
-      headers['Authorization'] = `Bearer ${this.authToken}`;
-    } else {
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    } else if (!endpoint.includes('/auth/register/') && !endpoint.includes('/auth/login/')) {
       console.warn(`No auth token available for ${endpoint}`);
     }
 
@@ -326,6 +358,7 @@ class ApiService {
       }
 
       if (error.message === 'AUTHENTICATION_EXPIRED') {
+        this.notifyAuthExpired();
         return {
           data: null as T,
           success: false,
@@ -434,6 +467,7 @@ class ApiService {
       if (typeof window !== 'undefined') {
         localStorage.removeItem('access_token');
         localStorage.removeItem('refresh_token');
+        localStorage.removeItem('offchat_user');
       }
     }
     
@@ -744,8 +778,16 @@ class ApiService {
       }
       
       const headers: HeadersInit = {};
-      if (this.authToken) {
-        headers['Authorization'] = `Bearer ${this.authToken}`;
+      let token = this.authToken;
+      if (typeof window !== 'undefined') {
+        const accessToken = localStorage.getItem('access_token');
+        if (accessToken) {
+          token = accessToken;
+          this.authToken = accessToken;
+        }
+      }
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
       }
       
       const response = await this.fetchWithRetry(url, {
@@ -910,8 +952,16 @@ class ApiService {
       const url = `${this.baseURL}/users/profile/upload-image/`;
       const headers: HeadersInit = {};
       
-      if (this.authToken) {
-        headers['Authorization'] = `Bearer ${this.authToken}`;
+      let token = this.authToken;
+      if (typeof window !== 'undefined') {
+        const accessToken = localStorage.getItem('access_token');
+        if (accessToken) {
+          token = accessToken;
+          this.authToken = accessToken;
+        }
+      }
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
       }
       
       const response = await fetch(url, {

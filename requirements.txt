@@ -16,11 +16,11 @@ django-ratelimit==4.1.0
 cryptography==41.0.7
 
 # File Handling
-Pillow==10.1.0
+Pillow==11.0.0
 django-imagekit==4.1.0
 
 # Database
-psycopg2-binary==2.9.9
+psycopg[binary]==3.3.2
 
 # Background Tasks
 celery==5.3.4

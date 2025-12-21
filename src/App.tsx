@@ -6,7 +6,8 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { ThemeProvider } from "next-themes";
 import { Suspense, lazy, useState, useEffect } from "react";
 import { LoadingPage } from "@/components/ui/loading";
-import { AuthProvider, useAuth } from "@/contexts/AuthContext";
+import { AuthProvider } from "@/contexts/AuthContext";
+import { NotificationProvider } from "@/hooks/useNotifications";
 import { apiService, User, Conversation, MessageTemplate, Role } from "@/lib/api";
 
 // Initialize auth tokens from localStorage on app start
@@ -71,9 +72,7 @@ const SignupForm = lazy(() => import("@/components/auth/SignupForm").then(module
 
 const queryClient = new QueryClient();
 
-
-
-const App = () => {
+const AppContent = () => {
   // Admin force logout user
   const handleForceLogoutUser = (id: string) => {
     let username = id;
@@ -256,7 +255,7 @@ const App = () => {
       return;
     }
     const newUser = {
-      id: username,
+      id: String(Date.now()),
       username,
       email: `${username}@example.com`,
       password,
@@ -273,56 +272,51 @@ const App = () => {
   };
 
   // Only allow login for approved users, with specific error messages
-  const handleLogin = (identifier: string, password: string) => {
-    const userObj = users.find(u => u.username === identifier || u.email === identifier);
-    if (!userObj) {
-      alert("User does not exist.");
-      return;
+  const handleLogin = async (identifier: string, password: string) => {
+    try {
+      const response = await apiService.login({ username: identifier, password });
+      
+      if (response.success && response.data) {
+        const userData = response.data;
+        localStorage.setItem('access_token', userData.access);
+        localStorage.setItem('refresh_token', userData.refresh);
+        apiService.setAuthToken(userData.access);
+        
+        const userObj = { 
+          id: String(userData.user.id), 
+          username: userData.user.username, 
+          status: "online" as const, 
+          role: userData.user.role,
+          avatar: userData.user.avatar 
+        };
+        setUser(userObj);
+        localStorage.setItem('offchat_user', JSON.stringify(userObj));
+        return true;
+      } else {
+        throw new Error(response.error || "Login failed");
+      }
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : "Login failed";
+      throw new Error(errorMsg);
     }
-    if (userObj.status === "banned") {
-      alert("Your account was banned by admin.");
-      return;
-    }
-    if (userObj.status === "suspended") {
-      alert("Your account is suspended.");
-      return;
-    }
-    if (userObj.password !== password) {
-      alert("Incorrect password.");
-      return;
-    }
-    // Active and password matches
-    setUser({ id: userObj.id, username: userObj.username, status: "online", role: userObj.role });
   };
+
   // Signup always creates a pending user
-  const handleSignup = (username: string, password: string) => {
-    if (users.some(u => u.username === username)) {
-      alert("Username already exists.");
-      return;
-    }
-    const newUser = {
-      id: username,
-      username,
-      email: `${username}@example.com`,
-      password,
-      status: "active" as const,
-      role: "user",
-      joinDate: new Date().toISOString().split('T')[0],
-      lastActive: "Never",
-      messageCount: 0,
-      reportCount: 0,
-      avatar: undefined
-    };
-    setUsers(prev => [...prev, newUser]);
-    alert("Account created! Welcome to OffChat.");
-  };
-  // Helper function to update user state and persist to localStorage
-  const updateUserState = (userData: typeof user) => {
-    setUser(userData);
-    if (userData) {
-      localStorage.setItem('offchat_user', JSON.stringify(userData));
-    } else {
-      localStorage.removeItem('offchat_user');
+  const handleSignup = async (username: string, email: string, password: string) => {
+    try {
+      const response = await apiService.signup({ username, email, password });
+      
+      if (response.success && response.data) {
+        alert("Account created! Please wait for admin approval before logging in.");
+        setAuthMode('login');
+        return true;
+      } else {
+        alert(response.error || "Signup failed");
+        return false;
+      }
+    } catch (error) {
+      alert(error instanceof Error ? error.message : "Signup failed");
+      return false;
     }
   };
 
@@ -343,8 +337,7 @@ const App = () => {
         console.log('Login response user:', userData.user);
         
         if (userData.user.role !== "admin" && !userData.user.is_staff) {
-          alert("Access denied. Admin privileges required.");
-          return false;
+          throw new Error("Access denied. Admin privileges required.");
         }
         
         localStorage.setItem('access_token', userData.access);
@@ -352,7 +345,7 @@ const App = () => {
         apiService.setAuthToken(userData.access);
         
         const userObj = { 
-          id: userData.user.id, 
+          id: String(userData.user.id), 
           username: userData.user.username, 
           status: "online" as const, 
           role: userData.user.role,
@@ -368,13 +361,11 @@ const App = () => {
         
         return true;
       } else {
-        alert("Login failed. Please check your credentials.");
-        return false;
+        throw new Error(response.error || "Login failed. Please check your credentials.");
       }
     } catch (error) {
       console.error('Login error:', error);
-      alert("Login failed. Please try again.");
-      return false;
+      throw error;
     }
   };
 
@@ -486,6 +477,73 @@ const App = () => {
   };
 
   return (
+    <Suspense fallback={<LoadingPage message="Loading page..." />}>
+      <Routes>
+        <Route path="/" element={<AdminLogin onLogin={handleAdminLogin} />} />
+        <Route path="/admin-login" element={<AdminLogin onLogin={handleAdminLogin} />} />
+        <Route 
+          path="/admin" 
+          element={
+            user && user.role === "admin" ? (
+              <AdminDashboard
+                users={users}
+                roles={roles}
+                conversations={conversations}
+                messageTemplates={messageTemplates}
+                user={user}
+                approveUser={approveUser}
+                rejectUser={rejectUser}
+                addUser={handleAddUser}
+                updateUser={updateUser}
+                addRole={addRole}
+                updateRole={updateRole}
+                deleteRole={deleteRole}
+                hasPermission={hasPermission}
+                sendSystemMessage={sendSystemMessage}
+                sendBulkMessage={sendBulkMessage}
+                addMessageTemplate={addMessageTemplate}
+                deleteMessageTemplate={deleteMessageTemplate}
+                forceLogoutUser={handleForceLogoutUser}
+                deleteUser={handleDeleteUser}
+                onLogout={handleLogout}
+              />
+            ) : (
+              <AdminLogin onLogin={handleAdminLogin} />
+            )
+          }
+        />
+        <Route
+          path="/login"
+          element={
+            <LoginForm
+              onToggleMode={() => setAuthMode("signup")}
+              onLogin={handleLogin}
+            />
+          }
+        />
+        <Route
+          path="/signup"
+          element={
+            <SignupForm
+              onToggleMode={() => setAuthMode("login")}
+              onSignup={handleSignup}
+            />
+          }
+        />
+
+        <Route
+          path="/chat"
+          element={<UnifiedChatPage />}
+        />
+        {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+        <Route path="*" element={<NotFound />} />
+      </Routes>
+    </Suspense>
+  );
+};
+
+const App = () => {
+  return (
     <QueryClientProvider client={queryClient}>
       <ThemeProvider
         attribute="class"
@@ -494,75 +552,15 @@ const App = () => {
         disableTransitionOnChange
       >
         <TooltipProvider>
-          <AuthProvider>
-            <Toaster />
-            <Sonner />
-            <BrowserRouter>
-            <Suspense fallback={<LoadingPage message="Loading page..." />}>
-              <Routes>
-              <Route path="/" element={<AdminLogin onLogin={handleAdminLogin} />} />
-              <Route path="/admin-login" element={<AdminLogin onLogin={handleAdminLogin} />} />
-              <Route 
-                path="/admin" 
-                element={
-                  user && user.role === "admin" ? (
-                    <AdminDashboard
-                      users={users}
-                      roles={roles}
-                      conversations={conversations}
-                      messageTemplates={messageTemplates}
-                      user={user}
-                      approveUser={approveUser}
-                      rejectUser={rejectUser}
-                      addUser={handleAddUser}
-                      updateUser={updateUser}
-                      addRole={addRole}
-                      updateRole={updateRole}
-                      deleteRole={deleteRole}
-                      hasPermission={hasPermission}
-                      sendSystemMessage={sendSystemMessage}
-                      sendBulkMessage={sendBulkMessage}
-                      addMessageTemplate={addMessageTemplate}
-                      deleteMessageTemplate={deleteMessageTemplate}
-                      forceLogoutUser={handleForceLogoutUser}
-                      deleteUser={handleDeleteUser}
-                      onLogout={handleLogout}
-                    />
-                  ) : (
-                    <AdminLogin onLogin={handleAdminLogin} />
-                  )
-                }
-              />
-              <Route
-                path="/login"
-                element={
-                  <LoginForm
-                    onToggleMode={() => setAuthMode("signup")}
-                    onLogin={handleLogin}
-                  />
-                }
-              />
-              <Route
-                path="/signup"
-                element={
-                  <SignupForm
-                    onToggleMode={() => setAuthMode("login")}
-                    onSignup={handleSignup}
-                  />
-                }
-              />
-
-              <Route
-                path="/chat"
-                element={<UnifiedChatPage />}
-              />
-              {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-              <Route path="*" element={<NotFound />} />
-             </Routes>
-           </Suspense>
-         </BrowserRouter>
-
-          </AuthProvider>
+          <BrowserRouter>
+            <AuthProvider>
+              <NotificationProvider>
+                <Toaster />
+                <Sonner />
+                <AppContent />
+              </NotificationProvider>
+            </AuthProvider>
+          </BrowserRouter>
         </TooltipProvider>
       </ThemeProvider>
     </QueryClientProvider>

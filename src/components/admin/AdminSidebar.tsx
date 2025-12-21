@@ -2,7 +2,6 @@ import React, { useState } from "react";
 import {
   LayoutDashboard,
   Users,
-  MessageSquare,
   Settings,
   Shield,
   Activity,
@@ -22,7 +21,6 @@ const sidebarItems = [
   { icon: User, label: "Profile", value: "profile" },
   { icon: Users, label: "User Management", value: "users" },
   { icon: ShieldAlert, label: "Moderation", value: "moderation" },
-  { icon: MessageSquare, label: "Messages", value: "messages" },
   { icon: Activity, label: "Conversations", value: "conversations" },
   { icon: FileText, label: "Audit Logs", value: "audit" },
   { icon: Shield, label: "Permissions", value: "permissions" },

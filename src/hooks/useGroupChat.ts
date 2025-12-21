@@ -77,18 +77,27 @@ export const useGroupChat = (currentUserId: string = "1") => {
       setError(null);
       
       try {
-        const usersResponse = await apiService.getUsers();
-        if (usersResponse.success && Array.isArray(usersResponse.data)) {
-          const users = usersResponse.data.map((user: any) => ({
-            id: user.id,
-            username: user.username,
-            avatar: user.avatar,
-            status: (user.status === 'active' ? 'online' : user.status === 'away' ? 'away' : 'offline') as "online" | "away" | "offline"
-          }));
-          
-          const current = users.find((u: User) => u.id === currentUserId);
-          setCurrentUser(current || null);
-          setAvailableUsers(users.filter((u: User) => u.id !== currentUserId));
+        // Only load all users if user has admin access
+        const authToken = apiService.getAuthToken();
+        if (authToken) {
+          try {
+            const usersResponse = await apiService.getUsers();
+            if (usersResponse.success && Array.isArray(usersResponse.data)) {
+              const users = usersResponse.data.map((user: any) => ({
+                id: user.id,
+                username: user.username,
+                avatar: user.avatar,
+                status: (user.status === 'active' ? 'online' : user.status === 'away' ? 'away' : 'offline') as "online" | "away" | "offline"
+              }));
+              
+              const current = users.find((u: User) => u.id === currentUserId);
+              setCurrentUser(current || null);
+              setAvailableUsers(users.filter((u: User) => u.id !== currentUserId));
+            }
+          } catch (err) {
+            // If getUsers fails (e.g., insufficient permissions), continue without user list
+            console.warn('Could not load users list:', err);
+          }
         }
 
         await loadConversations();
@@ -226,8 +235,6 @@ export const useGroupChat = (currentUserId: string = "1") => {
       setLoading(false);
     }
   }, []);
-
-
 
   const deleteGroup = useCallback(async (groupId: string) => {
     setLoading(true);

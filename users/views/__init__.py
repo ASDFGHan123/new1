@@ -9,6 +9,7 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from django.contrib.auth import authenticate, get_user_model
 from django.db.models import Q, Count, Avg
 from django.utils import timezone
+from datetime import timedelta
 from django_filters.rest_framework import DjangoFilterBackend
 from users.models import UserSession, UserActivity, BlacklistedToken
 from users.serializers import (
@@ -41,7 +42,10 @@ class IsAdminUser(permissions.BasePermission):
     def has_permission(self, request, view):
         if not request.user or not request.user.is_authenticated:
             return False
-        return request.user.is_staff or getattr(request.user, 'role', None) == 'admin'
+        # Check both is_staff and role='admin'
+        is_staff = getattr(request.user, 'is_staff', False)
+        is_admin_role = getattr(request.user, 'role', None) == 'admin'
+        return is_staff or is_admin_role
 
 
 class RegisterView(APIView):
@@ -49,17 +53,29 @@ class RegisterView(APIView):
     permission_classes = [permissions.AllowAny]
     
     def post(self, request):
-        serializer = UserCreateSerializer(data=request.data)
-        if serializer.is_valid():
-            user = serializer.save()
+        from users.auth_views import validate_signup_input
+        
+        try:
+            username = request.data.get('username', '').strip()
+            email = request.data.get('email', '').strip()
+            password = request.data.get('password', '').strip()
             
-            # Log user activity
-            UserActivity.objects.create(
-                user=user,
-                action='register',
-                description='User registered',
-                ip_address=self.get_client_ip(request),
-                user_agent=request.META.get('HTTP_USER_AGENT', '')
+            # Validate input
+            is_valid, error_msg = validate_signup_input(username, email, password)
+            if not is_valid:
+                return Response(
+                    {'error': error_msg},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            # Create user with generated email if not provided
+            user_email = email if email else f"{username}@offchat.local"
+            
+            user = User.objects.create_user(
+                username=username,
+                email=user_email,
+                password=password,
+                status='pending'
             )
             
             # Generate tokens
@@ -68,21 +84,16 @@ class RegisterView(APIView):
             return Response({
                 'user': UserSerializer(user).data,
                 'tokens': {
-                    'refresh': str(refresh),
                     'access': str(refresh.access_token),
-                },
-                'message': 'User registered successfully'
+                    'refresh': str(refresh)
+                }
             }, status=status.HTTP_201_CREATED)
-        
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-    
-    def get_client_ip(self, request):
-        x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
-        if x_forwarded_for:
-            ip = x_forwarded_for.split(',')[0]
-        else:
-            ip = request.META.get('REMOTE_ADDR')
-        return ip
+            
+        except Exception as e:
+            return Response(
+                {'error': 'Signup failed'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
 
 
 class LoginView(APIView):
@@ -90,67 +101,65 @@ class LoginView(APIView):
     permission_classes = [permissions.AllowAny]
     
     def post(self, request):
-        username = request.data.get('username')
-        password = request.data.get('password')
+        from users.auth_views import validate_login_input
         
-        if not username or not password:
+        try:
+            username = request.data.get('username', '').strip()
+            password = request.data.get('password', '').strip()
+            
+            # Validate input
+            is_valid, error_msg = validate_login_input(username, password)
+            if not is_valid:
+                return Response(
+                    {'error': error_msg},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            # Authenticate user
+            user = authenticate(username=username, password=password)
+            if not user:
+                return Response(
+                    {'error': 'Invalid credentials'},
+                    status=status.HTTP_401_UNAUTHORIZED
+                )
+            
+            # Check if user is active
+            if not user.is_active:
+                return Response(
+                    {'error': 'Account is inactive'},
+                    status=status.HTTP_403_FORBIDDEN
+                )
+            
+            # Check if user is pending approval
+            if user.status == 'pending':
+                return Response(
+                    {'error': 'Your account is pending admin approval'},
+                    status=status.HTTP_403_FORBIDDEN
+                )
+            
+            # Check if user is suspended or banned
+            if user.status in ['suspended', 'banned']:
+                return Response(
+                    {'error': f'Your account is {user.status}'},
+                    status=status.HTTP_403_FORBIDDEN
+                )
+            
+            # Generate tokens
+            refresh = RefreshToken.for_user(user)
+            
             return Response({
-                'error': 'Username and password are required'
-            }, status=status.HTTP_400_BAD_REQUEST)
-        
-        user = authenticate(username=username, password=password)
-        
-        if not user:
-            return Response({
-                'error': 'Invalid credentials'
-            }, status=status.HTTP_401_UNAUTHORIZED)
-        
-        if not user.is_active:
-            return Response({
-                'error': 'Account is disabled'
-            }, status=status.HTTP_401_UNAUTHORIZED)
-        
-        if user.status != 'active':
-            return Response({
-                'error': 'Account is not active'
-            }, status=status.HTTP_401_UNAUTHORIZED)
-        
-        # Ensure staff users have admin role
-        if user.is_staff and user.role != 'admin':
-            user.role = 'admin'
-            user.save(update_fields=['role'])
-        
-        # Update user's online status
-        user.set_online()
-        
-        # Log user activity
-        UserActivity.objects.create(
-            user=user,
-            action='login',
-            description='User logged in',
-            ip_address=self.get_client_ip(request),
-            user_agent=request.META.get('HTTP_USER_AGENT', '')
-        )
-        
-        # Generate tokens
-        refresh = RefreshToken.for_user(user)
-        
-        return Response({
-            'user': UserSerializer(user).data,
-            'tokens': {
-                'refresh': str(refresh),
-                'access': str(refresh.access_token),
-            },
-            'message': 'Login successful'
-        }, status=status.HTTP_200_OK)
-    
-    def get_client_ip(self, request):
-        x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
-        if x_forwarded_for:
-            ip = x_forwarded_for.split(',')[0]
-        else:
-            ip = request.META.get('REMOTE_ADDR')
-        return ip
+                'user': UserSerializer(user).data,
+                'tokens': {
+                    'access': str(refresh.access_token),
+                    'refresh': str(refresh)
+                }
+            }, status=status.HTTP_200_OK)
+            
+        except Exception as e:
+            return Response(
+                {'error': 'Login failed'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
 
 
 class LogoutView(APIView):
@@ -505,6 +514,21 @@ class AdminUserDetailView(APIView):
     def delete(self, request, user_id):
         try:
             user = User.objects.get(id=user_id)
+            permanent = request.query_params.get('permanent', 'false').lower() == 'true'
+            
+            if not permanent:
+                # Move to trash
+                from users.trash_models import TrashItem
+                from users.services.user_management_service import UserManagementService
+                user_data = UserManagementService._serialize_user(user)
+                TrashItem.objects.create(
+                    item_type='user',
+                    item_id=user.id,
+                    item_data=user_data,
+                    deleted_by=request.user,
+                    expires_at=timezone.now() + timedelta(days=30)
+                )
+            
             user.delete()
             
             return Response({

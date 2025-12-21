@@ -51,7 +51,33 @@ urlpatterns = [
     # Conversations endpoint
     path('conversations/', views.AdminConversationListView.as_view(), name='admin_conversations_list'),
     
-    # Moderation endpoints
-    path('suspicious-activities/', moderation_views.suspicious_activities_list, name='suspicious_activities_list'),
-    path('suspicious-activities/<uuid:activity_id>/resolve/', moderation_views.resolve_suspicious_activity, name='resolve_suspicious_activity'),
+    # Flagged messages
+    path('flagged-messages/', moderation_views.FlaggedMessageViewSet.as_view({'get': 'list', 'post': 'create'}), name='flagged_messages_list'),
+    path('flagged-messages/<uuid:pk>/', moderation_views.FlaggedMessageViewSet.as_view({'get': 'retrieve', 'put': 'update', 'delete': 'destroy'}), name='flagged_message_detail'),
+    path('flagged-messages/<uuid:pk>/approve/', moderation_views.FlaggedMessageViewSet.as_view({'post': 'approve'}), name='flagged_message_approve'),
+    path('flagged-messages/<uuid:pk>/reject/', moderation_views.FlaggedMessageViewSet.as_view({'post': 'reject'}), name='flagged_message_reject'),
+    path('flagged-messages/<uuid:pk>/remove/', moderation_views.FlaggedMessageViewSet.as_view({'post': 'remove'}), name='flagged_message_remove'),
+    path('flagged-messages/stats/', moderation_views.FlaggedMessageViewSet.as_view({'get': 'stats'}), name='flagged_messages_stats'),
+    
+    # User moderation
+    path('user-moderation/', moderation_views.UserModerationViewSet.as_view({'get': 'list', 'post': 'create'}), name='user_moderation_list'),
+    path('user-moderation/<uuid:pk>/', moderation_views.UserModerationViewSet.as_view({'get': 'retrieve', 'put': 'update', 'delete': 'destroy'}), name='user_moderation_detail'),
+    path('user-moderation/<uuid:pk>/lift/', moderation_views.UserModerationViewSet.as_view({'post': 'lift'}), name='user_moderation_lift'),
+    path('user-moderation/active/', moderation_views.UserModerationViewSet.as_view({'get': 'active'}), name='user_moderation_active'),
+    path('user-moderation/stats/', moderation_views.UserModerationViewSet.as_view({'get': 'stats'}), name='user_moderation_stats'),
+    
+    # Content review
+    path('content-reviews/', moderation_views.ContentReviewViewSet.as_view({'get': 'list', 'post': 'create'}), name='content_reviews_list'),
+    path('content-reviews/<uuid:pk>/', moderation_views.ContentReviewViewSet.as_view({'get': 'retrieve', 'put': 'update', 'delete': 'destroy'}), name='content_review_detail'),
+    path('content-reviews/<uuid:pk>/approve/', moderation_views.ContentReviewViewSet.as_view({'post': 'approve'}), name='content_review_approve'),
+    path('content-reviews/<uuid:pk>/reject/', moderation_views.ContentReviewViewSet.as_view({'post': 'reject'}), name='content_review_reject'),
+    path('content-reviews/<uuid:pk>/start-review/', moderation_views.ContentReviewViewSet.as_view({'post': 'start_review'}), name='content_review_start'),
+    path('content-reviews/pending/', moderation_views.ContentReviewViewSet.as_view({'get': 'pending'}), name='content_reviews_pending'),
+    path('content-reviews/stats/', moderation_views.ContentReviewViewSet.as_view({'get': 'stats'}), name='content_reviews_stats'),
+    
+    # Pending users - use int:pk for User model IDs
+    path('pending-users/', moderation_views.PendingUsersViewSet.as_view({'get': 'list'}), name='pending_users_list'),
+    path('pending-users/<int:pk>/approve/', moderation_views.PendingUsersViewSet.as_view({'post': 'approve'}), name='pending_user_approve'),
+    path('pending-users/<int:pk>/reject/', moderation_views.PendingUsersViewSet.as_view({'post': 'reject'}), name='pending_user_reject'),
+    path('pending-users/stats/', moderation_views.PendingUsersViewSet.as_view({'get': 'stats'}), name='pending_users_stats'),
 ]

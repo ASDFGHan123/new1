@@ -1,139 +1,190 @@
 import { apiService } from './api';
 
-export interface SuspiciousActivity {
+export interface FlaggedMessage {
   id: string;
-  ip_address: string;
-  user?: { id: string; username: string };
-  activity_type: string;
+  message_id: string;
+  message_content: string;
+  sender_id: string;
+  sender_username: string;
+  reason: string;
   description: string;
-  severity: 'low' | 'medium' | 'high' | 'critical';
-  is_resolved: boolean;
-  timestamp: string;
+  status: 'pending' | 'approved' | 'rejected' | 'removed';
+  reported_by: string;
+  reported_by_username: string;
+  reviewed_by?: string;
+  reviewed_by_username?: string;
+  review_notes: string;
+  reported_at: string;
+  reviewed_at?: string;
 }
 
-export interface UserForModeration {
+export interface UserModeration {
   id: string;
-  username: string;
-  email: string;
-  status: 'active' | 'suspended' | 'banned' | 'pending';
-  report_count: number;
-  last_seen: string;
+  user: string;
+  user_username: string;
+  action_type: 'suspend' | 'ban' | 'warn' | 'mute';
+  reason: string;
+  status: 'active' | 'expired' | 'lifted';
+  duration_days?: number;
+  moderator: string;
+  moderator_username: string;
+  created_at: string;
+  expires_at?: string;
+  lifted_at?: string;
+}
+
+export interface ContentReview {
+  id: string;
+  content_type: 'message' | 'user_profile' | 'group';
+  content_id: string;
+  content_data: Record<string, any>;
+  status: 'pending' | 'in_review' | 'approved' | 'rejected';
+  priority: number;
+  submitted_by?: string;
+  submitted_by_username?: string;
+  reviewed_by?: string;
+  reviewed_by_username?: string;
+  review_notes: string;
+  created_at: string;
+  reviewed_at?: string;
 }
 
 export const moderationApi = {
-  async getSuspiciousActivities(): Promise<SuspiciousActivity[]> {
-    try {
-      const token = localStorage.getItem('access_token');
-      const response = await fetch('http://localhost:8000/api/admin/suspicious-activities/', {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-      });
-      
-      if (!response.ok) {
-        console.error('Response status:', response.status);
-        return [];
-      }
-      
-      const data = await response.json();
-      return data.results || data || [];
-    } catch (error) {
-      console.error('Failed to fetch suspicious activities:', error);
-      return [];
-    }
+  getFlaggedMessages: async (filters?: { status?: string; reason?: string }) => {
+    const params = new URLSearchParams();
+    if (filters?.status) params.append('status', filters.status);
+    if (filters?.reason) params.append('reason', filters.reason);
+    return apiService.httpRequest(`/admin/flagged-messages/?${params}`);
   },
 
-  async getReportedUsers(): Promise<UserForModeration[]> {
-    try {
-      const response = await apiService.getUsers();
-      if (response.success && response.data) {
-        return response.data
-          .filter((u: any) => u.report_count > 0)
-          .map((u: any) => ({
-            id: u.id,
-            username: u.username,
-            email: u.email,
-            status: u.status,
-            report_count: u.report_count,
-            last_seen: u.last_seen,
-          }));
-      }
-      return [];
-    } catch (error) {
-      console.error('Failed to fetch reported users:', error);
-      return [];
-    }
+  getFlaggedMessageStats: async () => {
+    return apiService.httpRequest('/admin/flagged-messages/stats/');
   },
 
-  async warnUser(userId: string, reason: string): Promise<boolean> {
-    try {
-      const token = localStorage.getItem('access_token');
-      const response = await fetch(`http://localhost:8000/api/users/admin/users/${userId}/warn/`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ reason }),
-      });
-      return response.ok;
-    } catch (error) {
-      console.error('Failed to warn user:', error);
-      return false;
-    }
+  approveFlaggedMessage: async (id: string, notes: string = '') => {
+    return apiService.httpRequest(`/admin/flagged-messages/${id}/approve/`, {
+      method: 'POST',
+      body: JSON.stringify({ notes }),
+    });
   },
 
-  async suspendUser(userId: string, duration: string, reason: string): Promise<boolean> {
-    try {
-      const token = localStorage.getItem('access_token');
-      const response = await fetch(`http://localhost:8000/api/users/admin/users/${userId}/suspend/`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ duration, reason }),
-      });
-      return response.ok;
-    } catch (error) {
-      console.error('Failed to suspend user:', error);
-      return false;
-    }
+  rejectFlaggedMessage: async (id: string, notes: string = '') => {
+    return apiService.httpRequest(`/admin/flagged-messages/${id}/reject/`, {
+      method: 'POST',
+      body: JSON.stringify({ notes }),
+    });
   },
 
-  async banUser(userId: string, reason: string): Promise<boolean> {
-    try {
-      const token = localStorage.getItem('access_token');
-      const response = await fetch(`http://localhost:8000/api/users/admin/users/${userId}/ban/`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ reason }),
-      });
-      return response.ok;
-    } catch (error) {
-      console.error('Failed to ban user:', error);
-      return false;
-    }
+  removeFlaggedMessage: async (id: string, notes: string = '') => {
+    return apiService.httpRequest(`/admin/flagged-messages/${id}/remove/`, {
+      method: 'POST',
+      body: JSON.stringify({ notes }),
+    });
   },
 
-  async resolveSuspiciousActivity(activityId: string): Promise<boolean> {
-    try {
-      const token = localStorage.getItem('access_token');
-      const response = await fetch(`http://localhost:8000/api/admin/suspicious-activities/${activityId}/resolve/`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-      });
-      return response.ok;
-    } catch (error) {
-      console.error('Failed to resolve activity:', error);
-      return false;
-    }
+  getUserModerations: async (filters?: { action_type?: string; status?: string; user_id?: string }) => {
+    const params = new URLSearchParams();
+    if (filters?.action_type) params.append('action_type', filters.action_type);
+    if (filters?.status) params.append('status', filters.status);
+    if (filters?.user_id) params.append('user_id', filters.user_id);
+    return apiService.httpRequest(`/admin/user-moderation/?${params}`);
+  },
+
+  getActiveModerations: async () => {
+    return apiService.httpRequest('/admin/user-moderation/active/');
+  },
+
+  getUserModerationStats: async () => {
+    return apiService.httpRequest('/admin/user-moderation/stats/');
+  },
+
+  createUserModeration: async (data: {
+    user: string;
+    action_type: string;
+    reason: string;
+    duration_days?: number;
+  }) => {
+    return apiService.httpRequest('/admin/user-moderation/', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
+  liftUserModeration: async (id: string) => {
+    return apiService.httpRequest(`/admin/user-moderation/${id}/lift/`, {
+      method: 'POST',
+      body: JSON.stringify({}),
+    });
+  },
+
+  getContentReviews: async (filters?: { status?: string; content_type?: string; priority?: string }) => {
+    const params = new URLSearchParams();
+    if (filters?.status) params.append('status', filters.status);
+    if (filters?.content_type) params.append('content_type', filters.content_type);
+    if (filters?.priority) params.append('priority', filters.priority);
+    return apiService.httpRequest(`/admin/content-reviews/?${params}`);
+  },
+
+  getPendingReviews: async () => {
+    return apiService.httpRequest('/admin/content-reviews/pending/');
+  },
+
+  getContentReviewStats: async () => {
+    return apiService.httpRequest('/admin/content-reviews/stats/');
+  },
+
+  createContentReview: async (data: {
+    content_type: string;
+    content_id: string;
+    content_data: Record<string, any>;
+    priority?: number;
+  }) => {
+    return apiService.httpRequest('/admin/content-reviews/', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
+  approveContentReview: async (id: string, notes: string = '') => {
+    return apiService.httpRequest(`/admin/content-reviews/${id}/approve/`, {
+      method: 'POST',
+      body: JSON.stringify({ notes }),
+    });
+  },
+
+  rejectContentReview: async (id: string, notes: string = '') => {
+    return apiService.httpRequest(`/admin/content-reviews/${id}/reject/`, {
+      method: 'POST',
+      body: JSON.stringify({ notes }),
+    });
+  },
+
+  startContentReview: async (id: string) => {
+    return apiService.httpRequest(`/admin/content-reviews/${id}/start-review/`, {
+      method: 'POST',
+      body: JSON.stringify({}),
+    });
+  },
+
+  getPendingUsers: async () => {
+    return apiService.httpRequest('/admin/pending-users/');
+  },
+
+  approvePendingUser: async (id: string) => {
+    return apiService.httpRequest(`/admin/pending-users/${id}/approve/`, {
+      method: 'POST',
+      body: JSON.stringify({}),
+    });
+  },
+
+  rejectPendingUser: async (id: string) => {
+    return apiService.httpRequest(`/admin/pending-users/${id}/reject/`, {
+      method: 'POST',
+      body: JSON.stringify({}),
+    });
+  },
+
+  getPendingUsersStats: async () => {
+    return apiService.httpRequest('/admin/pending-users/stats/');
   },
 };

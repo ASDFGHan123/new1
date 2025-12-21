@@ -15,8 +15,5 @@ httpx==0.25.2
 # Data Management
 django-import-export==3.3.7
 
-# Email Backend (Development)
-django-email==1.0.1
-
 # Compression
 django-compressor==4.4

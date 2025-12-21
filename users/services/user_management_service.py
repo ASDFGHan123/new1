@@ -243,6 +243,16 @@ class UserManagementService:
             user = User.objects.get(id=user_id)
             
             if permanent:
+                # Create trash item before deletion
+                from users.trash_models import TrashItem
+                user_data = cls._serialize_user(user)
+                TrashItem.objects.create(
+                    item_type='user',
+                    item_id=user.id,
+                    item_data=user_data,
+                    deleted_by=None,
+                    expires_at=timezone.now() + timedelta(days=30)
+                )
                 user.delete()
                 return {'message': 'User permanently deleted', 'deleted': True}
             else:
@@ -519,10 +529,10 @@ class UserManagementService:
             'email_verified': user.email_verified,
             'message_count': user.message_count,
             'report_count': user.report_count,
-            'join_date': user.join_date,
-            'last_seen': user.last_seen,
-            'created_at': user.created_at,
-            'updated_at': user.updated_at,
+            'join_date': user.join_date.isoformat() if user.join_date else None,
+            'last_seen': user.last_seen.isoformat() if user.last_seen else None,
+            'created_at': user.created_at.isoformat() if user.created_at else None,
+            'updated_at': user.updated_at.isoformat() if user.updated_at else None,
         }
         
         # Add avatar URL if exists

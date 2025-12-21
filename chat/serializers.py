@@ -222,13 +222,14 @@ class ConversationSerializer(serializers.ModelSerializer):
     participants = serializers.SerializerMethodField()
     last_message = serializers.SerializerMethodField()
     participant_count = serializers.ReadOnlyField()
+    message_count = serializers.SerializerMethodField()
     
     class Meta:
         model = Conversation
         fields = [
             'id', 'conversation_type', 'group', 'title', 'description',
             'last_message_at', 'created_at', 'updated_at', 'is_deleted', 'deleted_at',
-            'participant_count', 'participants', 'last_message'
+            'participant_count', 'participants', 'last_message', 'message_count'
         ]
         read_only_fields = [
             'id', 'last_message_at', 'created_at', 'updated_at',
@@ -258,6 +259,9 @@ class ConversationSerializer(serializers.ModelSerializer):
         if last_msg:
             return MessageSerializer(last_msg).data
         return None
+    
+    def get_message_count(self, obj):
+        return obj.messages.filter(is_deleted=False).count()
 
 
 class ConversationCreateSerializer(serializers.ModelSerializer):

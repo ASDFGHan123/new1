@@ -31,8 +31,8 @@ def validate_login_input(username: str, password: str) -> tuple[bool, str]:
 
 def validate_signup_input(username: str, email: str, password: str) -> tuple[bool, str]:
     """Validate signup input."""
-    if not username or not email or not password:
-        return False, "All fields are required"
+    if not username or not password:
+        return False, "Username and password are required"
     
     if len(username) < 3 or len(username) > 150:
         return False, "Username must be 3-150 characters"
@@ -40,17 +40,18 @@ def validate_signup_input(username: str, email: str, password: str) -> tuple[boo
     if len(password) < 8 or len(password) > 128:
         return False, "Password must be 8-128 characters"
     
-    # Validate email format
-    try:
-        EmailValidator()(email)
-    except ValidationError:
-        return False, "Invalid email format"
+    # Validate email format if provided
+    if email:
+        try:
+            EmailValidator()(email)
+        except ValidationError:
+            return False, "Invalid email format"
+        
+        if User.objects.filter(email=email).exists():
+            return False, "Email already exists"
     
     if User.objects.filter(username=username).exists():
         return False, "Username already exists"
-    
-    if User.objects.filter(email=email).exists():
-        return False, "Email already exists"
     
     return True, ""
 
@@ -85,6 +86,22 @@ def login_view(request):
             logger.warning(f"Login attempt for inactive user: {username}")
             return Response(
                 {'error': 'Account is inactive'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        # Check if user is pending approval
+        if user.status == 'pending':
+            logger.warning(f"Login attempt for pending user: {username}")
+            return Response(
+                {'error': 'Your account is pending admin approval'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        # Check if user is suspended or banned
+        if user.status in ['suspended', 'banned']:
+            logger.warning(f"Login attempt for {user.status} user: {username}")
+            return Response(
+                {'error': f'Your account is {user.status}'},
                 status=status.HTTP_403_FORBIDDEN
             )
         
@@ -124,10 +141,12 @@ def signup_view(request):
                 status=status.HTTP_400_BAD_REQUEST
             )
         
-        # Create user
+        # Create user with generated email if not provided
+        user_email = email if email else f"{username}@offchat.local"
+        
         user = User.objects.create_user(
             username=username,
-            email=email,
+            email=user_email,
             password=password,
             status='pending'
         )

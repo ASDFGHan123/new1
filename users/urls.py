@@ -10,7 +10,6 @@ from rest_framework_simplejwt.views import (
 from . import views
 from .views import user_management_views
 from .trash_views import TrashViewSet
-from admin_panel import moderation_views
 from rest_framework.routers import DefaultRouter
 
 router = DefaultRouter()
@@ -56,9 +55,4 @@ urlpatterns = router.urls + [
     path('admin/users/<int:user_id>/ban/', views.AdminBanUserView.as_view(), name='admin_ban_user'),
     path('admin/users/<int:user_id>/activate/', views.AdminActivateUserView.as_view(), name='admin_activate_user'),
     path('admin/users/<int:user_id>/force-logout/', views.AdminForceLogoutView.as_view(), name='admin_force_logout'),
-    
-    # Moderation endpoints
-    path('admin/users/<int:user_id>/warn/', moderation_views.warn_user, name='warn_user'),
-    path('admin/users/<int:user_id>/suspend/', moderation_views.suspend_user_view, name='suspend_user_moderation'),
-    path('admin/users/<int:user_id>/ban/', moderation_views.ban_user_view, name='ban_user_moderation'),
 ]

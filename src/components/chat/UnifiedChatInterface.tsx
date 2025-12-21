@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useUnifiedChat } from "@/hooks/useUnifiedChat";
 import { useAuth } from "@/contexts/AuthContext";
 import { UnifiedSidebar } from "./UnifiedSidebar.tsx";
@@ -59,7 +59,7 @@ import {
 import { apiService } from "@/lib/api";
 import type { Conversation, IndividualMessage, GroupMessage, User, Attachment } from "@/types/chat";
 
-export const UnifiedChatInterface = () => {
+export const UnifiedChatInterface = ({ initialConversationId }: { initialConversationId?: string | null }) => {
   const { user: authUser, logout: authLogout } = useAuth();
   const chat = useUnifiedChat();
   
@@ -84,6 +84,12 @@ export const UnifiedChatInterface = () => {
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const formRef = useRef<HTMLFormElement>(null);
+
+  useEffect(() => {
+    if (initialConversationId && chat.conversations.length > 0) {
+      chat.selectConversation(initialConversationId);
+    }
+  }, [initialConversationId, chat.conversations.length]);
 
   const handleSendMessage = async (e?: React.FormEvent | React.KeyboardEvent) => {
     if (e) {

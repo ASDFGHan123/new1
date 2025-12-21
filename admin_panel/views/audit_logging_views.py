@@ -4,11 +4,12 @@ Audit logging API views for admin panel.
 import logging
 from rest_framework import status, permissions
 from rest_framework.decorators import api_view, permission_classes
-from rest_framework.permissions import IsAuthenticated, IsAdminUser
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from django.core.exceptions import ValidationError
 
 from admin_panel.services.audit_logging_service import AuditLoggingService
+from users.views import IsAdminUser
 
 logger = logging.getLogger(__name__)
 

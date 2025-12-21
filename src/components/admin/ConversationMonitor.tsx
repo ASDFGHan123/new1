@@ -94,7 +94,7 @@ export const ConversationMonitor = ({ onTrashConversation }: ConversationMonitor
       if (token) {
         headers['Authorization'] = `Bearer ${token}`;
       }
-      const response = await fetch('http://localhost:8000/api/chat/conversations/', { headers });
+      const response = await fetch('http://localhost:8000/api/chat/conversations/?is_deleted=false', { headers });
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       const data = await response.json();
       
@@ -106,8 +106,6 @@ export const ConversationMonitor = ({ onTrashConversation }: ConversationMonitor
       } else if (data.data && Array.isArray(data.data)) {
         results = data.data;
       }
-      
-      console.log('Fetched conversations:', results);
       
       const formattedData = results.map((conv: any, idx: number) => {
         const lastMsg = conv.last_message;
@@ -127,35 +125,22 @@ export const ConversationMonitor = ({ onTrashConversation }: ConversationMonitor
           }
         }
         
+        const actTime = conv.last_message_at || conv.updated_at || conv.created_at;
         return {
           id: conv.id || idx + 1,
-          type: conv.conversation_type || conv.type || 'private',
+          type: conv.conversation_type === 'group' ? 'group' : 'private',
           title,
-          participants: Array.isArray(conv.participants) ? conv.participants.length : (conv.participant_count || 2),
+          participants: conv.participant_count || (Array.isArray(conv.participants) ? conv.participants.length : 2),
           participantsList: Array.isArray(conv.participants) ? conv.participants : [],
           lastMessage: lastMessageText,
-          lastActivity: conv.last_message_at ? new Date(conv.last_message_at).toLocaleString() : (conv.updated_at ? new Date(conv.updated_at).toLocaleString() : 'N/A'),
-          messageCount: Array.isArray(conv.messages) ? conv.messages.filter((m: any) => !m.is_deleted).length : (conv.message_count || 0),
-          isActive: conv.is_deleted !== true,
+          lastActivity: actTime ? new Date(actTime).toLocaleString() : 'N/A',
+          messageCount: conv.message_count || 0,
+          isActive: true,
           messages: conv.messages || []
         };
       });
       
-      console.log('Formatted conversations:', formattedData);
       setConversations(formattedData);
-      
-      formattedData.forEach(async (conv) => {
-        try {
-          const msgRes = await fetch(`http://localhost:8000/api/chat/conversations/${conv.id}/messages/`, { headers });
-          if (msgRes.ok) {
-            const msgData = await msgRes.json();
-            const count = Array.isArray(msgData) ? msgData.length : (msgData.results?.length || msgData.count || 0);
-            setConversations(prev => prev.map(c => c.id === conv.id ? { ...c, messageCount: count } : c));
-          }
-        } catch (err) {
-          console.error(`Failed to fetch message count for ${conv.id}:`, err);
-        }
-      });
     } catch (error) {
       console.error('Failed to load conversations:', error);
       setConversations([]);
@@ -521,7 +506,7 @@ export const ConversationMonitor = ({ onTrashConversation }: ConversationMonitor
                       </button>
                     </TableCell>
                     <TableCell>
-                      <button onClick={() => handleViewMessageHistory(conversation)} className="flex items-center space-x-1 hover:text-blue-600 cursor-pointer">
+                      <button onClick={() => window.location.href = `/chat?conversation=${conversation.id}`} className="flex items-center space-x-1 hover:text-blue-600 cursor-pointer">
                         <MessageCircle className="w-4 h-4 text-muted-foreground" />
                         <span>{conversation.messageCount.toLocaleString()}</span>
                       </button>
