@@ -156,6 +156,15 @@ class PendingUsersViewSet(viewsets.ViewSet):
         serializer = UserSerializer(pending_users, many=True)
         return Response(serializer.data)
     
+    def retrieve(self, request, pk=None):
+        from users.serializers import UserSerializer
+        try:
+            user = User.objects.get(id=pk, status='pending')
+            serializer = UserSerializer(user)
+            return Response(serializer.data)
+        except User.DoesNotExist:
+            return Response({'error': 'User not found'}, status=status.HTTP_404_NOT_FOUND)
+    
     @action(detail=True, methods=['post'])
     def approve(self, request, pk=None):
         try:

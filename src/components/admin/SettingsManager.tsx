@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Switch } from '@/components/ui/switch';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Loader2, Save } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
@@ -65,7 +66,9 @@ export function SettingsManager() {
 
   if (loading) return <div className="flex justify-center p-8"><Loader2 className="animate-spin" /></div>;
 
-  const categories = Object.keys(settings).sort();
+  const categories = Object.keys(settings)
+    .filter(cat => !['chat', 'email', 'general'].includes(cat.toLowerCase()))
+    .sort();
 
   if (categories.length === 0) {
     return <div className="text-center p-8 text-muted-foreground">No settings available</div>;
@@ -82,19 +85,31 @@ export function SettingsManager() {
       </div>
 
       <Tabs defaultValue={categories[0]}>
-        <TabsList className="grid w-full grid-cols-5">
+        <TabsList className="grid w-full" style={{ gridTemplateColumns: `repeat(${Math.min(categories.length, 5)}, minmax(0, 1fr))` }}>
           {categories.map(cat => <TabsTrigger key={cat} value={cat} className="capitalize">{cat}</TabsTrigger>)}
         </TabsList>
 
         {categories.map(cat => (
           <TabsContent key={cat} value={cat} className="space-y-3">
-            {settings[cat]?.map(s => (
+            {settings[cat]?.filter((s: Setting) => !['enable_2fa', 'lockout_duration', 'require_email_verification'].includes(s.key)).map(s => (
               <Card key={s.key}>
                 <CardHeader className="pb-3">
                   <CardTitle className="text-sm">{s.key.replace(/_/g, ' ').toUpperCase()}</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  {s.key.includes('enabled') || s.key.includes('require') ? (
+                  {s.key === 'backup_frequency' ? (
+                    <Select value={changes[s.key] ?? s.value} onValueChange={(v) => handleChange(s.key, v)}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="hourly">Hourly</SelectItem>
+                        <SelectItem value="daily">Daily</SelectItem>
+                        <SelectItem value="weekly">Weekly</SelectItem>
+                        <SelectItem value="monthly">Monthly</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  ) : s.key.includes('enabled') || s.key.includes('require') ? (
                     <Switch
                       checked={(changes[s.key] ?? s.value) === 'true'}
                       onCheckedChange={(v) => handleChange(s.key, v ? 'true' : 'false')}

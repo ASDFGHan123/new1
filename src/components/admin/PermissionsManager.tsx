@@ -3,9 +3,10 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Loader2, Plus, Trash2 } from 'lucide-react';
+import { Loader2, Plus, Trash2, CheckCircle, X } from 'lucide-react';
 import { useToast } from '@/hooks/useNotifications';
 import { cn } from '@/lib/utils';
+import { apiService } from '@/lib/api';
 import {
   Dialog,
   DialogContent,
@@ -33,6 +34,7 @@ interface Role {
   id: string;
   name: string;
   permissions: string[];
+  isBuiltIn?: boolean;
 }
 
 export function PermissionsManager() {
@@ -41,6 +43,7 @@ export function PermissionsManager() {
   const [loading, setLoading] = useState(true);
   const [selectedRole, setSelectedRole] = useState<string>('');
   const [showDialog, setShowDialog] = useState(false);
+  const [successMsg, setSuccessMsg] = useState<string>('');
   const { success, error } = useToast();
 
   useEffect(() => {
@@ -49,29 +52,41 @@ export function PermissionsManager() {
 
   const fetchData = async () => {
     try {
-      const defaultPermissions: Permission[] = [
-        { id: '1', name: 'view_users', description: 'View user list', category: 'Users' },
-        { id: '2', name: 'create_users', description: 'Create new users', category: 'Users' },
-        { id: '3', name: 'edit_users', description: 'Edit user information', category: 'Users' },
-        { id: '4', name: 'delete_users', description: 'Delete users', category: 'Users' },
-        { id: '5', name: 'view_messages', description: 'View messages', category: 'Messages' },
-        { id: '6', name: 'moderate_messages', description: 'Moderate messages', category: 'Messages' },
-        { id: '7', name: 'view_analytics', description: 'View analytics', category: 'Analytics' },
-        { id: '8', name: 'manage_settings', description: 'Manage system settings', category: 'Settings' },
-      ];
+      const permResponse = await apiService.httpRequest<any>('/users/permissions/');
+      const rolesResponse = await apiService.httpRequest<any>('/users/groups/');
       
-      const defaultRoles: Role[] = [
-        { id: '1', name: 'User', permissions: ['1', '5', '7'] },
-        { id: '2', name: 'Moderator', permissions: ['1', '5', '6', '7'] },
-        { id: '3', name: 'Admin', permissions: ['1', '2', '3', '4', '5', '6', '7', '8'] },
-      ];
-      
-      setPermissions(defaultPermissions);
-      setRoles(defaultRoles);
-      setSelectedRole(defaultRoles[0].id);
+      if (permResponse.success && rolesResponse.success) {
+        const permsData = permResponse.data;
+        const rolesData = rolesResponse.data;
+        
+        // Transform permissions
+        const transformedPerms = (permsData.results || permsData).map((p: any) => ({
+          id: String(p.id),
+          name: p.codename,
+          description: p.name,
+          category: p.content_type?.app_label || 'Other'
+        }));
+        
+        // Transform roles
+        const builtInRoles = ['User', 'Moderator', 'Admin'];
+        const transformedRoles = (rolesData.results || rolesData).map((r: any) => ({
+          id: r.id,
+          name: r.name,
+          permissions: (r.permissions || []).map((p: any) => String(p)),
+          isBuiltIn: builtInRoles.includes(r.name)
+        }));
+        
+        setPermissions(transformedPerms);
+        setRoles(transformedRoles);
+        if (transformedRoles.length > 0) {
+          setSelectedRole(transformedRoles[0].id);
+        }
+      } else {
+        throw new Error('Failed to fetch from backend');
+      }
     } catch (err) {
       console.error('Failed to load permissions:', err);
-      error('Failed to load permissions');
+      error('Failed to load permissions from backend');
     } finally {
       setLoading(false);
     }
@@ -91,20 +106,51 @@ export function PermissionsManager() {
     }));
   };
 
-  const handleSavePermissions = () => {
-    success('Permissions updated', 'Role permissions have been saved');
+  const handleSavePermissions = async () => {
+    if (!selectedRole) return;
+    try {
+      const role = roles.find(r => r.id === selectedRole);
+      
+      const response = await apiService.httpRequest<any>(`/users/groups/${selectedRole}/`, {
+        method: 'PATCH',
+        body: JSON.stringify({ permissions: role?.permissions.map(p => parseInt(p)) })
+      });
+      
+      if (response.success) {
+        setSuccessMsg('Permissions updated successfully');
+        setTimeout(() => setSuccessMsg(''), 5000);
+      } else {
+        throw new Error(response.error);
+      }
+    } catch (err) {
+      console.error('Error saving permissions:', err);
+      error('Failed to save permissions: ' + err);
+    }
   };
 
-  const handleDeleteRole = (roleId: string) => {
+  const handleDeleteRole = async (roleId: string) => {
     if (roles.length <= 1) {
       error('Cannot delete', 'At least one role must exist');
       return;
     }
-    setRoles(roles.filter(r => r.id !== roleId));
-    if (selectedRole === roleId) {
-      setSelectedRole(roles[0].id);
+    try {
+      const response = await apiService.httpRequest<any>(`/users/groups/${roleId}/`, {
+        method: 'DELETE'
+      });
+      
+      if (response.success) {
+        setRoles(roles.filter(r => r.id !== roleId));
+        if (selectedRole === roleId) {
+          setSelectedRole(roles[0].id);
+        }
+        success('Role deleted', 'Role has been removed from database');
+      } else {
+        throw new Error(response.error);
+      }
+    } catch (err) {
+      console.error('Error deleting role:', err);
+      error('Failed to delete role');
     }
-    success('Role deleted', 'Role has been removed');
   };
 
   if (loading) return <div className="flex justify-center p-8"><Loader2 className="animate-spin" /></div>;
@@ -133,17 +179,32 @@ export function PermissionsManager() {
                 type="text"
                 placeholder="Role name"
                 className="w-full px-3 py-2 border rounded-md bg-background text-foreground"
-                onKeyPress={(e) => {
+                onKeyPress={async (e) => {
                   if (e.key === 'Enter' && (e.target as HTMLInputElement).value) {
-                    const newRole: Role = {
-                      id: Date.now().toString(),
-                      name: (e.target as HTMLInputElement).value,
-                      permissions: []
-                    };
-                    setRoles([...roles, newRole]);
-                    setSelectedRole(newRole.id);
-                    setShowDialog(false);
-                    success('Role created', 'New role has been added');
+                    const roleName = (e.target as HTMLInputElement).value;
+                    try {
+                      const response = await apiService.httpRequest<any>('/users/groups/', {
+                        method: 'POST',
+                        body: JSON.stringify({ name: roleName, permissions: [] })
+                      });
+                      
+                      if (response.success) {
+                        const newRole = response.data;
+                        setRoles([...roles, {
+                          id: newRole.id,
+                          name: newRole.name,
+                          permissions: newRole.permissions || []
+                        }]);
+                        setSelectedRole(newRole.id);
+                        setShowDialog(false);
+                        success('Role created', 'New role has been saved to database');
+                      } else {
+                        throw new Error(response.error);
+                      }
+                    } catch (err) {
+                      console.error('Error creating role:', err);
+                      error('Failed to create role');
+                    }
                   }
                 }}
               />
@@ -170,7 +231,7 @@ export function PermissionsManager() {
                 ))}
               </SelectContent>
             </Select>
-            {currentRole && roles.length > 1 && (
+            {currentRole && !currentRole.isBuiltIn && roles.length > 1 && (
               <Button
                 variant="destructive"
                 size="sm"
@@ -221,10 +282,21 @@ export function PermissionsManager() {
         ))}
       </div>
 
-      <div className="flex justify-end gap-2">
-        <Button variant="outline" onClick={() => fetchData()}>Reset</Button>
-        <Button onClick={handleSavePermissions}>Save Permissions</Button>
-      </div>
+      {currentRole && (
+        <div className="flex justify-end gap-2">
+          <Button onClick={handleSavePermissions}>Save Permissions</Button>
+        </div>
+      )}
+      
+      {successMsg && (
+        <div className="fixed bottom-4 right-4 bg-green-500 text-white px-4 py-3 rounded-lg shadow-lg flex items-center gap-2 z-50">
+          <CheckCircle className="h-5 w-5" />
+          <span>{successMsg}</span>
+          <button onClick={() => setSuccessMsg('')} className="ml-2">
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+      )}
     </div>
   );
 }

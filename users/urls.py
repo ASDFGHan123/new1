@@ -7,13 +7,39 @@ from rest_framework_simplejwt.views import (
     TokenRefreshView,
     TokenVerifyView,
 )
+from rest_framework.routers import DefaultRouter
+from django.contrib.auth.models import Group, Permission
+from rest_framework import viewsets, serializers
+from rest_framework.permissions import IsAuthenticated
 from . import views
 from .views import user_management_views
 from .trash_views import TrashViewSet
-from rest_framework.routers import DefaultRouter
+
+class PermissionSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Permission
+        fields = ['id', 'codename', 'name', 'content_type']
+
+class GroupSerializer(serializers.ModelSerializer):
+    permissions = serializers.PrimaryKeyRelatedField(many=True, queryset=Permission.objects.all())
+    class Meta:
+        model = Group
+        fields = ['id', 'name', 'permissions']
+
+class PermissionViewSet(viewsets.ModelViewSet):
+    queryset = Permission.objects.all()
+    serializer_class = PermissionSerializer
+    permission_classes = [IsAuthenticated]
+
+class GroupViewSet(viewsets.ModelViewSet):
+    queryset = Group.objects.all()
+    serializer_class = GroupSerializer
+    permission_classes = [IsAuthenticated]
 
 router = DefaultRouter()
 router.register(r'trash', TrashViewSet, basename='trash')
+router.register(r'permissions', PermissionViewSet, basename='permission')
+router.register(r'groups', GroupViewSet, basename='group')
 
 urlpatterns = router.urls + [
     # Authentication endpoints
