@@ -1,4 +1,5 @@
 import React from "react";
+import { useTranslation } from "react-i18next";
 import { AlertTriangle, Ban, Clock, MessageSquare } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -23,6 +24,7 @@ interface ModerationToolsProps {
 }
 
 export const ModerationTools = ({ userId, username, isOpen, onClose, onModerate }: ModerationToolsProps) => {
+  const { t } = useTranslation();
   const [actionType, setActionType] = React.useState<"warn" | "suspend" | "ban">("warn");
   const [duration, setDuration] = React.useState("1d");
   const [reason, setReason] = React.useState("");
@@ -63,7 +65,7 @@ export const ModerationTools = ({ userId, username, isOpen, onClose, onModerate 
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle>Moderate User: {username}</DialogTitle>
+          <DialogTitle>{t('moderation.moderationTools')}: {username}</DialogTitle>
         </DialogHeader>
         
         <div className="space-y-4">
@@ -78,7 +80,7 @@ export const ModerationTools = ({ userId, username, isOpen, onClose, onModerate 
                 className={actionType === type ? getActionColor(type) : ""}
               >
                 {getActionIcon(type)}
-                <span className="ml-2 capitalize">{type}</span>
+                <span className="ml-2">{t(`moderation.${type}`)}</span>
               </Button>
             ))}
           </div>
@@ -86,18 +88,18 @@ export const ModerationTools = ({ userId, username, isOpen, onClose, onModerate 
           {/* Duration Selection (for suspend/ban) */}
           {actionType !== "warn" && (
             <div>
-              <Label htmlFor="duration">Duration</Label>
+              <Label htmlFor="duration">{t('moderation.duration')}</Label>
               <Select value={duration} onValueChange={setDuration}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="1h">1 Hour</SelectItem>
-                  <SelectItem value="1d">1 Day</SelectItem>
-                  <SelectItem value="3d">3 Days</SelectItem>
-                  <SelectItem value="7d">1 Week</SelectItem>
-                  <SelectItem value="30d">1 Month</SelectItem>
-                  <SelectItem value="permanent">Permanent</SelectItem>
+                  <SelectItem value="1h">1 {t('moderation.hours')}</SelectItem>
+                  <SelectItem value="1d">1 {t('moderation.days')}</SelectItem>
+                  <SelectItem value="3d">3 {t('moderation.days')}</SelectItem>
+                  <SelectItem value="7d">1 {t('moderation.weeks')}</SelectItem>
+                  <SelectItem value="30d">1 {t('moderation.months')}</SelectItem>
+                  <SelectItem value="permanent">{t('moderation.permanent')}</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -105,10 +107,10 @@ export const ModerationTools = ({ userId, username, isOpen, onClose, onModerate 
 
           {/* Reason */}
           <div>
-            <Label htmlFor="reason">Reason *</Label>
+            <Label htmlFor="reason">{t('moderation.reason')} *</Label>
             <Textarea
               id="reason"
-              placeholder="Explain the reason for this moderation action..."
+              placeholder={t('moderation.explainReason')}
               value={reason}
               onChange={(e) => setReason(e.target.value)}
               rows={3}
@@ -121,9 +123,9 @@ export const ModerationTools = ({ userId, username, isOpen, onClose, onModerate 
               <div className="flex items-center space-x-2">
                 {getActionIcon(actionType)}
                 <span className="font-medium">
-                  {actionType === "warn" && "Warning will be issued"}
-                  {actionType === "suspend" && `User will be suspended for ${duration}`}
-                  {actionType === "ban" && `User will be banned ${duration === "permanent" ? "permanently" : `for ${duration}`}`}
+                  {actionType === "warn" && t('moderation.warningWillBeIssued')}
+                  {actionType === "suspend" && `${t('moderation.userWillBeSuspended')} ${duration}`}
+                  {actionType === "ban" && `${t('moderation.userWillBeBanned')} ${duration === "permanent" ? t('moderation.permanently') : `${t('moderation.for')} ${duration}`}`}
                 </span>
               </div>
             </CardContent>
@@ -131,13 +133,13 @@ export const ModerationTools = ({ userId, username, isOpen, onClose, onModerate 
         </div>
 
         <DialogFooter>
-          <Button variant="outline" onClick={onClose}>Cancel</Button>
+          <Button variant="outline" onClick={onClose}>{t('common.cancel')}</Button>
           <Button 
             onClick={handleSubmit}
             disabled={!reason.trim()}
             className={getActionColor(actionType)}
           >
-            Apply {actionType}
+            {t('moderation.apply')} {t(`moderation.${actionType}`)}
           </Button>
         </DialogFooter>
       </DialogContent>

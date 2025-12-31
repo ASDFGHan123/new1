@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
   Dialog,
   DialogContent,
@@ -36,6 +37,7 @@ export const SystemMessageDialog = ({
   initialContent = "",
   initialPriority = "normal",
 }: SystemMessageDialogProps) => {
+  const { t } = useTranslation();
   const [message, setMessage] = useState("");
   const [priority, setPriority] = useState("normal");
   const [isSending, setIsSending] = useState(false);
@@ -52,8 +54,8 @@ export const SystemMessageDialog = ({
   const handleSend = async () => {
     if (!message.trim()) {
       toast({
-        title: "Error",
-        description: "Please enter a message to send.",
+        title: t('common.error'),
+        description: t('system.failedToSend'),
         variant: "destructive",
       });
       return;
@@ -63,16 +65,16 @@ export const SystemMessageDialog = ({
     try {
       await onSendMessage(message, priority);
       toast({
-        title: "Success",
-        description: "Message sent successfully.",
+        title: t('common.success'),
+        description: t('system.messageSent'),
       });
       setMessage("");
       setPriority("normal");
       onClose();
     } catch (error) {
       toast({
-        title: "Error",
-        description: "Failed to send message. Please try again.",
+        title: t('common.error'),
+        description: t('system.failedToSend'),
         variant: "destructive",
       });
     } finally {
@@ -83,22 +85,22 @@ export const SystemMessageDialog = ({
   const getDialogTitle = () => {
     switch (mode) {
       case "broadcast":
-        return "Broadcast Message to All Users";
+        return t('system.sendSystemMessage');
       case "targeted":
-        return "Send Targeted Message";
+        return t('system.sendSystemMessage');
       default:
-        return "Send System Message";
+        return t('system.sendSystemMessage');
     }
   };
 
   const getDialogDescription = () => {
     switch (mode) {
       case "broadcast":
-        return `Send a message to all ${totalUsers} users in the system.`;
+        return t('system.selectRecipients');
       case "targeted":
-        return `Send a message to ${selectedUsers.length} selected user${selectedUsers.length !== 1 ? 's' : ''}.`;
+        return t('system.selectRecipients');
       default:
-        return "Send an important system-wide announcement or notification.";
+        return t('system.selectRecipients');
     }
   };
 
@@ -109,7 +111,7 @@ export const SystemMessageDialog = ({
           <div className="flex items-center gap-2 p-3 bg-blue-50 dark:bg-blue-950/20 rounded-lg border border-blue-200 dark:border-blue-800">
             <Users className="w-4 h-4 text-blue-600" />
             <span className="text-sm text-blue-700 dark:text-blue-300">
-              Broadcasting to all {totalUsers} users
+              {t('system.broadcastingToAll', { count: totalUsers })}
             </span>
           </div>
         );
@@ -118,7 +120,7 @@ export const SystemMessageDialog = ({
           <div className="flex items-center gap-2 p-3 bg-green-50 dark:bg-green-950/20 rounded-lg border border-green-200 dark:border-green-800">
             <User className="w-4 h-4 text-green-600" />
             <span className="text-sm text-green-700 dark:text-green-300">
-              Sending to {selectedUsers.length} selected user{selectedUsers.length !== 1 ? 's' : ''}
+              {t('system.sendingToSelected', { count: selectedUsers.length })}
             </span>
           </div>
         );
@@ -127,7 +129,7 @@ export const SystemMessageDialog = ({
           <div className="flex items-center gap-2 p-3 bg-orange-50 dark:bg-orange-950/20 rounded-lg border border-orange-200 dark:border-orange-800">
             <AlertTriangle className="w-4 h-4 text-orange-600" />
             <span className="text-sm text-orange-700 dark:text-orange-300">
-              System-wide announcement
+              {t('system.systemWideAnnouncement')}
             </span>
           </div>
         );
@@ -146,7 +148,7 @@ export const SystemMessageDialog = ({
           {getRecipientInfo()}
 
           <div className="space-y-2">
-            <Label htmlFor="priority">Priority Level</Label>
+            <Label htmlFor="priority">{t('messages.priority')}</Label>
             <div className="flex gap-2">
               <Button
                 type="button"
@@ -154,7 +156,7 @@ export const SystemMessageDialog = ({
                 size="sm"
                 onClick={() => setPriority("low")}
               >
-                Low
+                {t('messages.low')}
               </Button>
               <Button
                 type="button"
@@ -162,7 +164,7 @@ export const SystemMessageDialog = ({
                 size="sm"
                 onClick={() => setPriority("normal")}
               >
-                Normal
+                {t('messages.normal')}
               </Button>
               <Button
                 type="button"
@@ -170,7 +172,7 @@ export const SystemMessageDialog = ({
                 size="sm"
                 onClick={() => setPriority("high")}
               >
-                High
+                {t('messages.high')}
               </Button>
               <Button
                 type="button"
@@ -178,23 +180,23 @@ export const SystemMessageDialog = ({
                 size="sm"
                 onClick={() => setPriority("urgent")}
               >
-                Urgent
+                {t('messages.urgent')}
               </Button>
             </div>
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="message">Message Content</Label>
+            <Label htmlFor="message">{t('system.messageContent')}</Label>
             <Textarea
               id="message"
-              placeholder="Enter your message here..."
+              placeholder={t('system.enterMessage')}
               value={message}
               onChange={(e) => setMessage(e.target.value)}
               rows={6}
               className="resize-none"
             />
             <div className="text-xs text-muted-foreground text-right">
-              {message.length} characters
+              {message.length} {t('common.characters')}
             </div>
           </div>
 
@@ -203,7 +205,7 @@ export const SystemMessageDialog = ({
               <div className="flex items-center gap-2">
                 <AlertTriangle className="w-4 h-4 text-red-600" />
                 <span className="text-sm text-red-700 dark:text-red-300 font-medium">
-                  Urgent messages will be displayed prominently to all recipients.
+                  {t('system.urgentMessageWarning')}
                 </span>
               </div>
             </div>
@@ -212,18 +214,18 @@ export const SystemMessageDialog = ({
 
         <DialogFooter>
           <Button variant="outline" onClick={onClose} disabled={isSending}>
-            Cancel
+            {t('common.cancel')}
           </Button>
           <Button onClick={handleSend} disabled={isSending || !message.trim()}>
             {isSending ? (
               <>
                 <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />
-                Sending...
+                {t('common.loading')}
               </>
             ) : (
               <>
                 <Send className="w-4 h-4 mr-2" />
-                Send Message
+                {t('messages.sendMessage')}
               </>
             )}
           </Button>

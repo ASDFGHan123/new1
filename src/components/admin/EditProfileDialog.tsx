@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   Dialog,
   DialogContent,
@@ -24,6 +25,7 @@ export const EditProfileDialog: React.FC<EditProfileDialogProps> = ({
   onClose,
   user
 }) => {
+  const { t } = useTranslation();
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [currentPassword, setCurrentPassword] = useState('');
@@ -42,8 +44,8 @@ export const EditProfileDialog: React.FC<EditProfileDialogProps> = ({
   const handleSave = async () => {
     if (newPassword && newPassword !== confirmPassword) {
       toast({
-        title: 'Error',
-        description: 'Passwords do not match.',
+        title: t('common.error'),
+        description: t('auth.passwordsDoNotMatch'),
         variant: 'destructive'
       });
       return;
@@ -51,8 +53,8 @@ export const EditProfileDialog: React.FC<EditProfileDialogProps> = ({
 
     if (newPassword && !currentPassword) {
       toast({
-        title: 'Error',
-        description: 'Please enter your current password to change it.',
+        title: t('common.error'),
+        description: t('auth.currentPasswordRequired'),
         variant: 'destructive'
       });
       return;
@@ -75,17 +77,17 @@ export const EditProfileDialog: React.FC<EditProfileDialogProps> = ({
       
       if (response.success) {
         toast({
-          title: 'Success',
-          description: 'Profile updated successfully!'
+          title: t('common.success'),
+          description: t('admin.profileUpdated')
         });
         handleClose();
       } else {
-        throw new Error(response.error || 'Update failed');
+        throw new Error(response.error || t('errors.failedToUpdate'));
       }
     } catch (error) {
       toast({
-        title: 'Error',
-        description: error instanceof Error ? error.message : 'Failed to update profile',
+        title: t('common.error'),
+        description: error instanceof Error ? error.message : t('errors.failedToUpdate'),
         variant: 'destructive'
       });
     } finally {
@@ -106,26 +108,26 @@ export const EditProfileDialog: React.FC<EditProfileDialogProps> = ({
     <Dialog open={isOpen} onOpenChange={handleClose}>
       <DialogContent className="sm:max-w-[400px]">
         <DialogHeader>
-          <DialogTitle>Edit Profile</DialogTitle>
+          <DialogTitle>{t('admin.editProfile')}</DialogTitle>
           <DialogDescription>
-            Update your profile information and password.
+            {t('admin.updateProfileInfo')}
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="username">Username</Label>
+            <Label htmlFor="username">{t('common.username')}</Label>
             <Input
               id="username"
               type="text"
-              placeholder="Enter username"
+              placeholder={t('common.username')}
               value={username}
               onChange={(e) => setUsername(e.target.value)}
             />
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="email">Email</Label>
+            <Label htmlFor="email">{t('common.email')}</Label>
             <Input
               id="email"
               type="email"
@@ -136,36 +138,36 @@ export const EditProfileDialog: React.FC<EditProfileDialogProps> = ({
           </div>
 
           <div className="border-t pt-4">
-            <h3 className="font-semibold mb-4">Change Password</h3>
+            <h3 className="font-semibold mb-4">{t('admin.changePassword')}</h3>
             
             <div className="space-y-2">
-              <Label htmlFor="current-password">Current Password</Label>
+              <Label htmlFor="current-password">{t('admin.currentPassword')}</Label>
               <Input
                 id="current-password"
                 type="password"
-                placeholder="Enter current password"
+                placeholder={t('admin.currentPassword')}
                 value={currentPassword}
                 onChange={(e) => setCurrentPassword(e.target.value)}
               />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="new-password">New Password</Label>
+              <Label htmlFor="new-password">{t('admin.newPassword')}</Label>
               <Input
                 id="new-password"
                 type="password"
-                placeholder="Enter new password"
+                placeholder={t('admin.newPassword')}
                 value={newPassword}
                 onChange={(e) => setNewPassword(e.target.value)}
               />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="confirm-password">Confirm Password</Label>
+              <Label htmlFor="confirm-password">{t('admin.confirmPassword')}</Label>
               <Input
                 id="confirm-password"
                 type="password"
-                placeholder="Confirm new password"
+                placeholder={t('admin.confirmPassword')}
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
               />
@@ -175,10 +177,10 @@ export const EditProfileDialog: React.FC<EditProfileDialogProps> = ({
 
         <DialogFooter>
           <Button variant="outline" onClick={handleClose} disabled={isSaving}>
-            Cancel
+            {t('common.cancel')}
           </Button>
           <Button onClick={handleSave} disabled={isSaving || !hasChanges}>
-            {isSaving ? 'Saving...' : 'Save Changes'}
+            {isSaving ? t('common.loading') : t('settings.saveChanges')}
           </Button>
         </DialogFooter>
       </DialogContent>

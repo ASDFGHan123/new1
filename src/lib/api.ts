@@ -120,13 +120,16 @@ class ApiService {
     }
     
     const hostname = window.location.hostname;
-    const port = '8000';
+    const port = window.location.port ? `:${window.location.port}` : '';
+    const protocol = window.location.protocol;
     
+    // For localhost/127.0.0.1, use port 8000
     if (hostname === 'localhost' || hostname === '127.0.0.1') {
-      return `http://localhost:${port}/api`;
+      return `${protocol}//${hostname}:8000/api`;
     }
     
-    return `http://${hostname}:${port}/api`;
+    // For other IPs (LAN access), use port 8000
+    return `${protocol}//${hostname}:8000/api`;
   }
   
   private isRefreshing = false;
@@ -205,7 +208,9 @@ class ApiService {
     retries: number = 3
   ): Promise<Response> {
     try {
+      console.log(`[API] Fetching: ${url}`);
       const response = await fetch(url, options);
+      console.log(`[API] Response status: ${response.status}`);
       
       if (response.status === 401 && this.refreshToken && !options.headers?.['Authorization']?.includes('refresh')) {
         try {
@@ -257,6 +262,7 @@ class ApiService {
       
       return response;
     } catch (error) {
+      console.error(`[API] Fetch error: ${error.message}`);
       if (retries > 0 && error.message !== 'AUTHENTICATION_EXPIRED') {
         const delay = Math.pow(2, 3 - retries) * 1000;
         await new Promise(resolve => setTimeout(resolve, delay));
@@ -295,7 +301,6 @@ class ApiService {
       ...options.headers,
     };
 
-    // Always check localStorage for the latest token
     let token = this.authToken;
     if (typeof window !== 'undefined') {
       const accessToken = localStorage.getItem('access_token');
@@ -307,21 +312,20 @@ class ApiService {
 
     if (token) {
       headers['Authorization'] = `Bearer ${token}`;
-    } else if (!endpoint.includes('/auth/register/') && !endpoint.includes('/auth/login/')) {
-      console.warn(`No auth token available for ${endpoint}`);
     }
 
     try {
-      console.log(`Sending request to ${url}`);
+      console.log(`[API] Request: ${options.method || 'GET'} ${url}`);
       const response = await this.fetchWithRetry(url, {
         ...options,
         headers,
       });
 
-      const data = await response.json();
+      const data = await response.json().catch(() => ({}));
+      console.log(`[API] Response: ${response.status}`, data);
 
       if (!response.ok) {
-        console.error('Backend error response:', data);
+        console.error(`[API] Error ${response.status}:`, data);
         if (response.status === 401) {
           throw new Error('Authentication required');
         } else if (response.status === 403) {
@@ -347,13 +351,14 @@ class ApiService {
         success: true,
       };
     } catch (error) {
-      console.error(`API request failed for ${endpoint}:`, error);
+      console.error(`[API] Request failed for ${endpoint}:`, error);
       
-      if (error instanceof TypeError && error.message.includes('fetch')) {
+      if (error instanceof TypeError) {
+        console.error('[API] Network error:', error.message);
         return {
           data: null as T,
           success: false,
-          error: 'Network error. Please check your internet connection and try again.',
+          error: 'Network error. Check if backend is running at ' + this.baseURL,
         };
       }
 
@@ -376,14 +381,24 @@ class ApiService {
 
   async login(credentials: LoginCredentials): Promise<ApiResponse<{ user: User; access: string; refresh: string }>> {
     try {
-      const response = await this.request<{ user: User; tokens: { access: string; refresh: string } }>('/auth/login/', {
+      const response = await this.request<any>('/auth/login/', {
         method: 'POST',
         body: JSON.stringify(credentials),
       });
       
       if (response.success && response.data) {
-        const accessToken = response.data.tokens.access;
-        const refreshToken = response.data.tokens.refresh;
+        const tokens = response.data.tokens || {};
+        const accessToken = tokens.access || response.data.access;
+        const refreshToken = tokens.refresh || response.data.refresh;
+        
+        if (!accessToken || !refreshToken) {
+          console.error('Token response:', response.data);
+          return {
+            success: false,
+            data: null as any,
+            error: 'Invalid token response from server'
+          };
+        }
         
         this.authToken = accessToken;
         this.refreshToken = refreshToken;
@@ -409,6 +424,7 @@ class ApiService {
         error: response.error || 'Login failed'
       };
     } catch (error) {
+      console.error('Login error:', error);
       return {
         success: false,
         data: null as any,
@@ -419,31 +435,49 @@ class ApiService {
 
   async signup(data: SignupData): Promise<ApiResponse<{ user: User; token: string }>> {
     try {
-      const response = await this.request<{ user: User; tokens: { access: string; refresh: string } }>('/auth/register/', {
+      const response = await this.request<any>('/auth/register/', {
         method: 'POST',
         body: JSON.stringify(data),
       });
       
       if (response.success && response.data) {
-        this.authToken = response.data.tokens.access;
-        this.refreshToken = response.data.tokens.refresh;
+        const tokens = response.data.tokens || {};
+        const accessToken = tokens.access || response.data.access;
+        const refreshToken = tokens.refresh || response.data.refresh;
+        
+        if (!accessToken || !refreshToken) {
+          console.error('Token response:', response.data);
+          return {
+            success: false,
+            data: null as any,
+            error: 'Invalid token response from server'
+          };
+        }
+        
+        this.authToken = accessToken;
+        this.refreshToken = refreshToken;
         
         if (typeof window !== 'undefined') {
-          localStorage.setItem('access_token', response.data.tokens.access);
-          localStorage.setItem('refresh_token', response.data.tokens.refresh);
+          localStorage.setItem('access_token', accessToken);
+          localStorage.setItem('refresh_token', refreshToken);
         }
         
         return {
           success: true,
           data: {
             user: response.data.user,
-            token: response.data.tokens.access
+            token: accessToken
           }
         };
       }
       
-      return response as any;
+      return {
+        success: false,
+        data: null as any,
+        error: response.error || 'Registration failed'
+      };
     } catch (error) {
+      console.error('Signup error:', error);
       return {
         success: false,
         data: null as any,

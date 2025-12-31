@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect, useRef } from "react";
+import { useTranslation } from "react-i18next";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -37,6 +38,7 @@ interface MessageHistoryProps {
 // No mock data - all data must come from backend API
 
 export const MessageHistory = ({ initialMessages = [] }: MessageHistoryProps) => {
+  const { t } = useTranslation();
   const { toast } = useToast();
   
   // Component state
@@ -253,8 +255,8 @@ export const MessageHistory = ({ initialMessages = [] }: MessageHistoryProps) =>
     
     // Note: In a real implementation, this would send the message via API
     toast({
-      title: "Message Sent",
-      description: `Message has been sent to ${newMessage.recipientCount} recipients.`,
+      title: t('messages.sendMessage'),
+      description: t('system.messageSent'),
     });
   };
 
@@ -278,15 +280,15 @@ export const MessageHistory = ({ initialMessages = [] }: MessageHistoryProps) =>
         // const response = await apiService.moveMessageToTrash(messageId);
         
         toast({
-          title: "Message Moved to Trash",
-          description: "Message has been moved to trash and can be restored.",
+          title: t('trash.deletedItems'),
+          description: t('trash.restoreItem'),
         });
       }
     } catch (error) {
       console.error('Failed to delete message:', error);
       toast({
-        title: "Error",
-        description: "Failed to move message to trash.",
+        title: t('common.error'),
+        description: t('errors.failedToDelete'),
         variant: "destructive"
       });
     } finally {
@@ -522,8 +524,8 @@ export const MessageHistory = ({ initialMessages = [] }: MessageHistoryProps) =>
       setBackupProgress(100);
       
       toast({
-        title: "Backup Completed",
-        description: `Message history exported as ${backupFormat.toUpperCase()} file.`,
+        title: t('messages.backupComplete'),
+        description: t('messages.backupComplete'),
       });
       
       // Reset progress after a delay
@@ -535,8 +537,8 @@ export const MessageHistory = ({ initialMessages = [] }: MessageHistoryProps) =>
     } catch (error) {
       console.error('Backup failed:', error);
       toast({
-        title: "Backup Failed",
-        description: "An error occurred while creating the backup.",
+        title: t('messages.backupFailed'),
+        description: t('messages.backupFailed'),
         variant: "destructive"
       });
       setIsBackingUp(false);
@@ -560,8 +562,8 @@ export const MessageHistory = ({ initialMessages = [] }: MessageHistoryProps) =>
   const handleRestoreMessages = async () => {
     if (!restoreData.trim()) {
       toast({
-        title: "No Data",
-        description: "Please paste backup data to restore.",
+        title: t('common.error'),
+        description: t('messages.restoreData'),
         variant: "destructive"
       });
       return;
@@ -576,8 +578,8 @@ export const MessageHistory = ({ initialMessages = [] }: MessageHistoryProps) =>
       } catch {
         // If JSON parsing fails, assume it's CSV or XML and inform user
         toast({
-          title: "Invalid Format",
-          description: "Only JSON backup files are supported for restoration.",
+          title: t('common.error'),
+          description: t('messages.restoreFailed'),
           variant: "destructive"
         });
         return;
@@ -649,8 +651,8 @@ export const MessageHistory = ({ initialMessages = [] }: MessageHistoryProps) =>
       <CardHeader>
         <div className="flex items-center justify-between">
           <div>
-            <CardTitle>Message History</CardTitle>
-            <CardDescription>View and manage sent system messages</CardDescription>
+            <CardTitle>{t('messages.messageHistory')}</CardTitle>
+            <CardDescription>{t('messages.messageHistory')}</CardDescription>
           </div>
           <div className="flex items-center gap-2">
             {/* Error Alert */}
@@ -667,7 +669,7 @@ export const MessageHistory = ({ initialMessages = [] }: MessageHistoryProps) =>
                     className="ml-2"
                   >
                     <RefreshCw className={`h-3 w-3 mr-1 ${retryCount > 0 ? 'animate-spin' : ''}`} />
-                    Retry ({retryCount}/3)
+                    {t('common.retry')} ({retryCount}/3)
                   </Button>
                 </AlertDescription>
               </Alert>
@@ -677,7 +679,7 @@ export const MessageHistory = ({ initialMessages = [] }: MessageHistoryProps) =>
             {loading && (
               <div className="flex items-center gap-2 px-3 py-1 bg-blue-50 border border-blue-200 rounded">
                 <Loader2 className="w-4 h-4 animate-spin text-blue-600" />
-                <span className="text-sm text-blue-700">Loading...</span>
+                <span className="text-sm text-blue-700">{t('common.loading')}</span>
               </div>
             )}
             
@@ -685,7 +687,7 @@ export const MessageHistory = ({ initialMessages = [] }: MessageHistoryProps) =>
             {isBackingUp && (
               <div className="flex items-center gap-2 px-3 py-1 bg-blue-50 border border-blue-200 rounded">
                 <Loader2 className="w-4 h-4 animate-spin text-blue-600" />
-                <span className="text-sm text-blue-700">Creating backup...</span>
+                <span className="text-sm text-blue-700">{t('messages.backingUp')}</span>
                 <Progress value={backupProgress} className="w-16 h-2" />
                 <span className="text-xs text-blue-600">{backupProgress}%</span>
               </div>
@@ -700,14 +702,14 @@ export const MessageHistory = ({ initialMessages = [] }: MessageHistoryProps) =>
                 className="bg-green-50 hover:bg-green-100 border-green-200 text-green-700"
               >
                 <Archive className="w-4 h-4 mr-1" />
-                Backup
+                {t('messages.backup')}
               </Button>
               
               {showBackupOptions && (
                 <div data-backup-options className="absolute top-full right-0 mt-1 p-4 bg-white border rounded-lg shadow-lg z-50 min-w-[300px]">
                   <div className="space-y-3">
                     <div className="flex items-center justify-between">
-                      <Label className="text-sm font-medium">Backup Format</Label>
+                      <Label className="text-sm font-medium">{t('messages.backupFormat')}</Label>
                       <Select value={backupFormat} onValueChange={(value: "json" | "csv" | "xml") => setBackupFormat(value)}>
                         <SelectTrigger className="w-24 h-8">
                           <SelectValue />
@@ -721,14 +723,14 @@ export const MessageHistory = ({ initialMessages = [] }: MessageHistoryProps) =>
                     </div>
                     
                     <div className="space-y-2">
-                      <Label className="text-sm font-medium">Backup Options</Label>
+                      <Label className="text-sm font-medium">{t('messages.backupOptions')}</Label>
                       <div className="space-y-1">
                         {[
-                          { key: 'includeStatistics', label: 'Include Statistics' },
-                          { key: 'includeFilters', label: 'Include Current Filters' },
-                          { key: 'compressData', label: 'Compress Data' },
-                          { key: 'validateIntegrity', label: 'Validate Integrity' },
-                          { key: 'includeMetadata', label: 'Include Metadata' }
+                          { key: 'includeStatistics', label: t('messages.includeStatistics') },
+                          { key: 'includeFilters', label: t('messages.includeFilters') },
+                          { key: 'compressData', label: t('messages.compressData') },
+                          { key: 'validateIntegrity', label: t('messages.validateIntegrity') },
+                          { key: 'includeMetadata', label: t('messages.includeMetadata') }
                         ].map(({ key, label }) => (
                           <div key={key} className="flex items-center space-x-2">
                             <input
@@ -754,14 +756,14 @@ export const MessageHistory = ({ initialMessages = [] }: MessageHistoryProps) =>
                         className="flex-1"
                       >
                         <Download className="w-4 h-4 mr-1" />
-                        Create Backup
+                        {t('backup.createBackup')}
                       </Button>
                       <Button
                         onClick={() => setShowBackupOptions(false)}
                         variant="outline"
                         size="sm"
                       >
-                        Cancel
+                        {t('common.cancel')}
                       </Button>
                     </div>
                   </div>
@@ -778,7 +780,7 @@ export const MessageHistory = ({ initialMessages = [] }: MessageHistoryProps) =>
                 className="bg-purple-50 hover:bg-purple-100 border-purple-200 text-purple-700"
               >
                 <Upload className="w-4 h-4 mr-1" />
-                Restore
+                {t('messages.restore')}
               </Button>
             </div>
 
@@ -790,7 +792,7 @@ export const MessageHistory = ({ initialMessages = [] }: MessageHistoryProps) =>
               className="bg-blue-50 hover:bg-blue-100 border-blue-200 text-blue-700"
             >
               <Printer className="w-4 h-4 mr-1" />
-              Print
+              {t('common.print')}
             </Button>
 
             {/* Add Test Message Button */}
@@ -816,19 +818,19 @@ export const MessageHistory = ({ initialMessages = [] }: MessageHistoryProps) =>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-4 bg-muted/50 rounded-lg">
             <div className="text-center">
               <div className="text-2xl font-bold text-primary">{messageStats.total}</div>
-              <div className="text-sm text-muted-foreground">Total Messages</div>
+              <div className="text-sm text-muted-foreground">{t('messages.messageHistory')}</div>
             </div>
             <div className="text-center">
               <div className="text-2xl font-bold text-blue-600">{messageStats.byType.broadcast || 0}</div>
-              <div className="text-sm text-muted-foreground">Broadcast</div>
+              <div className="text-sm text-muted-foreground">{t('messages.broadcast')}</div>
             </div>
             <div className="text-center">
               <div className="text-2xl font-bold text-green-600">{messageStats.byStatus.delivered || 0}</div>
-              <div className="text-sm text-muted-foreground">Delivered</div>
+              <div className="text-sm text-muted-foreground">{t('messages.delivered')}</div>
             </div>
             <div className="text-center">
               <div className="text-2xl font-bold text-orange-600">{messageStats.totalRecipients}</div>
-              <div className="text-sm text-muted-foreground">Total Recipients</div>
+              <div className="text-sm text-muted-foreground">{t('messages.recipientCount')}</div>
             </div>
           </div>
           {/* Filters */}
@@ -836,7 +838,7 @@ export const MessageHistory = ({ initialMessages = [] }: MessageHistoryProps) =>
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
               <Input
-                placeholder="Search by content, sender, type, status, priority, date..."
+                placeholder={t('common.search')}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="pl-10"
@@ -844,36 +846,36 @@ export const MessageHistory = ({ initialMessages = [] }: MessageHistoryProps) =>
             </div>
             <Select value={typeFilter} onValueChange={setTypeFilter}>
               <SelectTrigger className="w-full sm:w-[140px]">
-                <SelectValue placeholder="Type" />
+                <SelectValue placeholder={t('messages.type')} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Types</SelectItem>
-                <SelectItem value="system">System</SelectItem>
-                <SelectItem value="broadcast">Broadcast</SelectItem>
-                <SelectItem value="targeted">Targeted</SelectItem>
+                <SelectItem value="all">{t('common.all')}</SelectItem>
+                <SelectItem value="system">{t('messages.system')}</SelectItem>
+                <SelectItem value="broadcast">{t('messages.broadcast')}</SelectItem>
+                <SelectItem value="targeted">{t('messages.targeted')}</SelectItem>
               </SelectContent>
             </Select>
             <Select value={statusFilter} onValueChange={setStatusFilter}>
               <SelectTrigger className="w-full sm:w-[140px]">
-                <SelectValue placeholder="Status" />
+                <SelectValue placeholder={t('common.status')} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Status</SelectItem>
-                <SelectItem value="sent">Sent</SelectItem>
-                <SelectItem value="delivered">Delivered</SelectItem>
-                <SelectItem value="failed">Failed</SelectItem>
+                <SelectItem value="all">{t('common.all')}</SelectItem>
+                <SelectItem value="sent">{t('messages.sent')}</SelectItem>
+                <SelectItem value="delivered">{t('messages.delivered')}</SelectItem>
+                <SelectItem value="failed">{t('messages.failed')}</SelectItem>
               </SelectContent>
             </Select>
             <Select value={priorityFilter} onValueChange={setPriorityFilter}>
               <SelectTrigger className="w-full sm:w-[140px]">
-                <SelectValue placeholder="Priority" />
+                <SelectValue placeholder={t('messages.priority')} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Priority</SelectItem>
-                <SelectItem value="low">Low</SelectItem>
-                <SelectItem value="normal">Normal</SelectItem>
-                <SelectItem value="high">High</SelectItem>
-                <SelectItem value="urgent">Urgent</SelectItem>
+                <SelectItem value="all">{t('common.all')}</SelectItem>
+                <SelectItem value="low">{t('messages.low')}</SelectItem>
+                <SelectItem value="normal">{t('messages.normal')}</SelectItem>
+                <SelectItem value="high">{t('messages.high')}</SelectItem>
+                <SelectItem value="urgent">{t('messages.urgent')}</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -883,13 +885,13 @@ export const MessageHistory = ({ initialMessages = [] }: MessageHistoryProps) =>
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Type</TableHead>
-                  <TableHead>Content</TableHead>
-                  <TableHead>Recipients</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Priority</TableHead>
-                  <TableHead>Sent</TableHead>
-                  <TableHead>Actions</TableHead>
+                  <TableHead>{t('messages.type')}</TableHead>
+                  <TableHead>{t('messages.content')}</TableHead>
+                  <TableHead>{t('messages.recipient')}</TableHead>
+                  <TableHead>{t('common.status')}</TableHead>
+                  <TableHead>{t('messages.priority')}</TableHead>
+                  <TableHead>{t('messages.sentAt')}</TableHead>
+                  <TableHead>{t('common.actions')}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -966,13 +968,13 @@ export const MessageHistory = ({ initialMessages = [] }: MessageHistoryProps) =>
                           </AlertDialogTrigger>
                           <AlertDialogContent>
                             <AlertDialogHeader>
-                              <AlertDialogTitle>Move to Trash</AlertDialogTitle>
+                              <AlertDialogTitle>{t('trash.deletedItems')}</AlertDialogTitle>
                               <AlertDialogDescription>
-                                Are you sure you want to move this message to trash? It can be restored later from the Trash tab.
+                                {t('trash.deleteWarning')}
                               </AlertDialogDescription>
                             </AlertDialogHeader>
                             <AlertDialogFooter>
-                              <AlertDialogCancel disabled={actionLoading[message.id]}>Cancel</AlertDialogCancel>
+                              <AlertDialogCancel disabled={actionLoading[message.id]}>{t('common.cancel')}</AlertDialogCancel>
                               <AlertDialogAction
                                 onClick={() => handleDeleteMessage(message.id)}
                                 disabled={actionLoading[message.id]}
@@ -981,10 +983,10 @@ export const MessageHistory = ({ initialMessages = [] }: MessageHistoryProps) =>
                                 {actionLoading[message.id] ? (
                                   <>
                                     <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                                    Moving...
+                                    {t('common.loading')}
                                   </>
                                 ) : (
-                                  'Move to Trash'
+                                  t('trash.deletedItems')
                                 )}
                               </AlertDialogAction>
                             </AlertDialogFooter>
@@ -999,7 +1001,7 @@ export const MessageHistory = ({ initialMessages = [] }: MessageHistoryProps) =>
             {filteredMessages.length === 0 && (
               <div className="text-center py-8 text-muted-foreground">
                 <AlertTriangle className="w-12 h-12 mx-auto mb-2 opacity-50" />
-                <p>No messages found matching your filters.</p>
+                <p>{t('messages.noMessages')}</p>
               </div>
             )}
           </ScrollArea>
@@ -1012,10 +1014,10 @@ export const MessageHistory = ({ initialMessages = [] }: MessageHistoryProps) =>
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               {selectedMessage && getTypeIcon(selectedMessage.type)}
-              Message Details
+              {t('messages.messageDetails')}
             </DialogTitle>
             <DialogDescription>
-              Detailed information about the sent message
+              {t('messages.messageDetails')}
             </DialogDescription>
           </DialogHeader>
 
@@ -1023,38 +1025,38 @@ export const MessageHistory = ({ initialMessages = [] }: MessageHistoryProps) =>
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <Label className="text-sm font-medium">Type</Label>
+                  <Label className="text-sm font-medium">{t('messages.type')}</Label>
                   <div className="flex items-center gap-2 mt-1">
                     {getTypeIcon(selectedMessage.type)}
                     <Badge className={`text-xs ${getTypeColor(selectedMessage.type)}`}>
-                      {selectedMessage.type}
+                      {t(`messages.${selectedMessage.type}`)}
                     </Badge>
                   </div>
                 </div>
                 <div>
-                  <Label className="text-sm font-medium">Priority</Label>
+                  <Label className="text-sm font-medium">{t('messages.priority')}</Label>
                   <div className="mt-1">
                     <Badge className={`text-xs ${getPriorityColor(selectedMessage.priority)}`}>
-                      {selectedMessage.priority}
+                      {t(`messages.${selectedMessage.priority}`)}
                     </Badge>
                   </div>
                 </div>
                 <div>
-                  <Label className="text-sm font-medium">Status</Label>
+                  <Label className="text-sm font-medium">{t('common.status')}</Label>
                   <div className="mt-1">
                     <Badge className={`text-xs ${getStatusColor(selectedMessage.status)}`}>
-                      {selectedMessage.status}
+                      {t(`messages.${selectedMessage.status}`)}
                     </Badge>
                   </div>
                 </div>
                 <div>
-                  <Label className="text-sm font-medium">Sent By</Label>
+                  <Label className="text-sm font-medium">{t('messages.sentBy')}</Label>
                   <p className="text-sm mt-1">{selectedMessage.sentBy}</p>
                 </div>
               </div>
 
               <div>
-                <Label className="text-sm font-medium">Recipients</Label>
+                <Label className="text-sm font-medium">{t('messages.recipient')}</Label>
                 <div className="flex items-center gap-2 mt-1">
                   {selectedMessage.type === "broadcast" ? (
                     <Users className="w-4 h-4" />
@@ -1062,13 +1064,13 @@ export const MessageHistory = ({ initialMessages = [] }: MessageHistoryProps) =>
                     <User className="w-4 h-4" />
                   )}
                   <span className="text-sm">
-                    {selectedMessage.recipientCount} recipient{selectedMessage.recipientCount !== 1 ? 's' : ''}
+                    {selectedMessage.recipientCount} {t('messages.recipient')}
                   </span>
                 </div>
               </div>
 
               <div>
-                <Label className="text-sm font-medium">Sent At</Label>
+                <Label className="text-sm font-medium">{t('messages.sentAt')}</Label>
                 <p className="text-sm mt-1 flex items-center gap-2">
                   <Clock className="w-4 h-4" />
                   {format(new Date(selectedMessage.sentAt), "PPP 'at' pp")}
@@ -1076,7 +1078,7 @@ export const MessageHistory = ({ initialMessages = [] }: MessageHistoryProps) =>
               </div>
 
               <div>
-                <Label className="text-sm font-medium">Message Content</Label>
+                <Label className="text-sm font-medium">{t('messages.content')}</Label>
                 <div className="mt-2 p-3 bg-muted rounded-lg border">
                   <p className="text-sm whitespace-pre-wrap">{selectedMessage.content}</p>
                 </div>

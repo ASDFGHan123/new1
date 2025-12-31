@@ -5,9 +5,11 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { ThemeProvider } from "next-themes";
 import { Suspense, lazy, useState, useEffect } from "react";
+import { useTranslation } from "react-i18next";
 import { LoadingPage } from "@/components/ui/loading";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { NotificationProvider } from "@/hooks/useNotifications";
+import { useRTL } from "@/hooks/useRTL";
 import { apiService, User, Conversation, MessageTemplate, Role } from "@/lib/api";
 
 // Initialize auth tokens from localStorage on app start
@@ -72,7 +74,9 @@ const SignupForm = lazy(() => import("@/components/auth/SignupForm").then(module
 
 const queryClient = new QueryClient();
 
-const AppContent = () => {
+  const AppContent = () => {
+    const { t } = useTranslation();
+    useRTL();
   // Admin force logout user
   const handleForceLogoutUser = (id: string) => {
     let username = id;
@@ -82,17 +86,17 @@ const AppContent = () => {
     // If the user is currently logged in, log them out
     if (user && user.id === id) {
       setUser(null);
-      alert("You have been logged out by an admin.");
+      alert(t('auth.loggedOutByAdmin'));
     }
     
     // Show message to admin
-    alert(`User '${username}' has been forcefully logged out.`);
+    alert(t('users.userForcefullyLoggedOut', { username }));
   };
 
   // Admin delete user
   const handleDeleteUser = (id: string) => {
     if (id === "admin") {
-      alert("Cannot delete the admin user.");
+      alert(t('users.cannotDeleteAdmin'));
       return;
     }
     const userObj = users.find(u => u.id === id);
@@ -103,7 +107,7 @@ const AppContent = () => {
     if (user && user.id === id) {
       setUser(null);
     }
-    alert(`User '${username}' has been deleted.`);
+    alert(t('users.userDeleted', { username }));
   };
 
   // Demo authentication state
@@ -251,7 +255,7 @@ const AppContent = () => {
   // Admin add user (approved by default)
   const handleAddUser = (username: string, password: string, role: string, avatar?: string) => {
     if (users.some(u => u.username === username)) {
-      alert("Username already exists.");
+      alert(t('users.usernameExists'));
       return;
     }
     const newUser = {
@@ -268,7 +272,7 @@ const AppContent = () => {
       avatar: avatar || undefined
     };
     setUsers(prev => [...prev, newUser]);
-    alert("User added and approved.");
+    alert(t('users.userAddedApproved'));
   };
 
   // Only allow login for approved users, with specific error messages
@@ -307,11 +311,11 @@ const AppContent = () => {
       const response = await apiService.signup({ username, email, password });
       
       if (response.success && response.data) {
-        alert("Account created! Please wait for admin approval before logging in.");
+        alert(t('auth.accountCreatedAdminApproval'));
         setAuthMode('login');
         return true;
       } else {
-        alert(response.error || "Signup failed");
+        alert(response.error || t('auth.signupFailed'));
         return false;
       }
     } catch (error) {
@@ -401,7 +405,7 @@ const AppContent = () => {
     // Don't allow deleting default roles
     const role = roles.find(r => r.id === id);
     if (role?.isDefault) {
-      alert("Cannot delete default roles");
+      alert(t('roles.cannotDeleteDefault'));
       return;
     }
     setRoles(prev => prev.filter(r => r.id !== id));

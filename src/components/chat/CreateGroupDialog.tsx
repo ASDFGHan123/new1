@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -40,6 +41,7 @@ export const CreateGroupDialog = ({
   onCreateGroup,
   trigger
 }: CreateGroupDialogProps) => {
+  const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const [step, setStep] = useState(1); // 1: Basic info, 2: Members
   const [groupName, setGroupName] = useState("");
@@ -143,7 +145,7 @@ export const CreateGroupDialog = ({
         {trigger || (
           <Button className="bg-gradient-to-r from-primary to-primary-glow">
             <Plus className="h-4 w-4 mr-2" />
-            Create Group
+            {t('chat.createGroup')}
           </Button>
         )}
       </DialogTrigger>
@@ -151,9 +153,9 @@ export const CreateGroupDialog = ({
         <DialogHeader className="flex-shrink-0">
           <DialogTitle className="flex items-center gap-2">
             <Users className="h-5 w-5" />
-            Create New Group
+            {t('chat.createGroup')}
           </DialogTitle>
-          <DialogDescription>Create a new group and invite members to chat</DialogDescription>
+          <DialogDescription>{t('chat.createGroup')}</DialogDescription>
         </DialogHeader>
 
         <div className="flex-1 overflow-y-auto space-y-6 pr-2">
@@ -163,22 +165,22 @@ export const CreateGroupDialog = ({
               <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${step >= 1 ? 'bg-primary text-primary-foreground' : 'bg-muted'}`}>
                 1
               </div>
-              <span className="text-sm font-medium">Group Info</span>
+              <span className="text-sm font-medium">{t('chat.groupInfo')}</span>
             </div>
             <div className={`w-12 h-0.5 ${step >= 2 ? 'bg-primary' : 'bg-muted'}`} />
             <div className={`flex items-center gap-2 ${step >= 2 ? 'text-primary' : 'text-muted-foreground'}`}>
               <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${step >= 2 ? 'bg-primary text-primary-foreground' : 'bg-muted'}`}>
                 2
               </div>
-              <span className="text-sm font-medium">Add Members</span>
+              <span className="text-sm font-medium">{t('chat.addMembers')}</span>
             </div>
           </div>
 
           {step === 1 && (
             <div className="space-y-4">
               <div className="text-center">
-                <h3 className="text-lg font-semibold">Group Information</h3>
-                <p className="text-sm text-muted-foreground">Give your group a name and description</p>
+                <h3 className="text-lg font-semibold">{t('chat.groupInfo')}</h3>
+                <p className="text-sm text-muted-foreground">{t('chat.groupDescription')}</p>
               </div>
 
               {/* Group Avatar */}
@@ -194,38 +196,38 @@ export const CreateGroupDialog = ({
 
               {/* Group Name */}
               <div className="space-y-2">
-                <Label htmlFor="groupName">Group Name *</Label>
+                <Label htmlFor="groupName">{t('chat.groupName')} *</Label>
                 <Input
                   id="groupName"
                   value={groupName}
                   onChange={(e) => setGroupName(e.target.value)}
-                  placeholder="Enter group name"
+                  placeholder={t('chat.groupName')}
                   maxLength={50}
                 />
                 <p className="text-xs text-muted-foreground">
-                  {groupName.length}/50 characters
+                  {groupName.length}/50 {t('common.characters')}
                 </p>
               </div>
 
               {/* Group Description */}
               <div className="space-y-2">
-                <Label htmlFor="groupDescription">Description</Label>
+                <Label htmlFor="groupDescription">{t('chat.groupDescription')}</Label>
                 <Textarea
                   id="groupDescription"
                   value={groupDescription}
                   onChange={(e) => setGroupDescription(e.target.value)}
-                  placeholder="What's this group about?"
+                  placeholder={t('chat.groupDescription')}
                   maxLength={200}
                   rows={3}
                 />
                 <p className="text-xs text-muted-foreground">
-                  {groupDescription.length}/200 characters
+                  {groupDescription.length}/200 {t('common.characters')}
                 </p>
               </div>
 
               {/* Privacy Settings */}
               <div className="space-y-3">
-                <Label>Privacy</Label>
+                <Label>{t('chat.groupPrivacy')}</Label>
                 <div className="grid grid-cols-2 gap-3">
                   <div
                     className={`p-4 rounded-lg border-2 cursor-pointer transition-colors ${
@@ -238,9 +240,9 @@ export const CreateGroupDialog = ({
                     <div className="flex items-center space-x-3">
                       <Globe className="h-5 w-5 text-muted-foreground" />
                       <div>
-                        <p className="font-medium">Public</p>
+                        <p className="font-medium">{t('chat.public')}</p>
                         <p className="text-xs text-muted-foreground">
-                          Anyone can find and join
+                          {t('chat.public')}
                         </p>
                       </div>
                       {!isPrivate && <Check className="h-4 w-4 text-primary ml-auto" />}
@@ -257,9 +259,9 @@ export const CreateGroupDialog = ({
                     <div className="flex items-center space-x-3">
                       <Lock className="h-5 w-5 text-muted-foreground" />
                       <div>
-                        <p className="font-medium">Private</p>
+                        <p className="font-medium">{t('chat.private')}</p>
                         <p className="text-xs text-muted-foreground">
-                          Only invited users can join
+                          {t('chat.private')}
                         </p>
                       </div>
                       {isPrivate && <Check className="h-4 w-4 text-primary ml-auto" />}
@@ -273,15 +275,15 @@ export const CreateGroupDialog = ({
           {step === 2 && (
             <div className="space-y-4">
               <div className="text-center">
-                <h3 className="text-lg font-semibold">Add Members</h3>
+                <h3 className="text-lg font-semibold">{t('chat.addMembers')}</h3>
                 <p className="text-sm text-muted-foreground">
-                  Select at least 2 people to start the group
+                  {t('chat.addMembers')}
                 </p>
               </div>
 
               {/* Selected Members */}
               <div className="space-y-2">
-                <Label>Selected Members ({selectedMembers.length})</Label>
+                <Label>{t('chat.members')} ({selectedMembers.length})</Label>
                 <div className="flex flex-wrap gap-2">
                   {selectedUserObjects.map((user) => (
                     <Badge key={user.id} variant="secondary" className="flex items-center gap-1">
@@ -309,13 +311,13 @@ export const CreateGroupDialog = ({
 
               {/* Search Users */}
               <div className="space-y-2">
-                <Label>Search Users</Label>
+                <Label>{t('system.searchUsers')}</Label>
                 <div className="relative">
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                   <Input
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
-                    placeholder="Search users..."
+                    placeholder={t('system.searchUsers')}
                     className="pl-10"
                   />
                 </div>
@@ -323,12 +325,12 @@ export const CreateGroupDialog = ({
 
               {/* Available Users */}
               <div className="space-y-2">
-                <Label>Available Users</Label>
+                <Label>{t('users.userList')}</Label>
                 <div className="max-h-48 overflow-y-auto space-y-2 border rounded-lg p-2 bg-muted/20">
                   {filteredUsers.length === 0 ? (
                     <div className="text-center py-4 text-muted-foreground">
                       <Users className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                      <p>No users found</p>
+                      <p>{t('users.noUsersFound')}</p>
                     </div>
                   ) : (
                     filteredUsers.map((user) => (
@@ -371,24 +373,24 @@ export const CreateGroupDialog = ({
             <div>
               {step === 2 && (
                 <Button variant="outline" onClick={handleBack}>
-                  Back
+                  {t('common.back')}
                 </Button>
               )}
             </div>
             <div className="space-x-2">
               <Button variant="outline" onClick={() => setOpen(false)}>
-                Cancel
+                {t('common.cancel')}
               </Button>
               {step === 1 ? (
                 <Button onClick={handleNext} disabled={!canProceed()}>
-                  Next
+                  {t('common.next')}
                 </Button>
               ) : (
                 <Button 
                   onClick={handleCreateGroup} 
                   disabled={!canProceed() || loading}
                 >
-                  {loading ? "Creating..." : "Create Group"}
+                  {loading ? t('common.loading') : t('chat.createGroup')}
                 </Button>
               )}
             </div>

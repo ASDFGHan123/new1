@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -8,6 +9,7 @@ import { moderationApi, FlaggedMessage, UserModeration, ContentReview } from '@/
 import { useToast } from '@/hooks/useNotifications';
 
 export function ModerationPanel() {
+  const { t } = useTranslation();
   const { success, error: showError } = useToast();
   const [activeTab, setActiveTab] = useState('pending-users');
   
@@ -189,24 +191,24 @@ export function ModerationPanel() {
   const handleApprovePendingUser = async (id: string) => {
     try {
       await moderationApi.approvePendingUser(id);
-      success('User approved');
+      success(t('moderation.userApproved'));
       loadPendingUsers();
       loadPendingUsersStats();
     } catch (err) {
       console.error('Error approving user:', err);
-      showError('Failed to approve user');
+      showError(t('moderation.failedToApproveUser'));
     }
   };
 
   const handleRejectPendingUser = async (id: string) => {
     try {
       await moderationApi.rejectPendingUser(id);
-      success('User rejected');
+      success(t('moderation.userRejected'));
       loadPendingUsers();
       loadPendingUsersStats();
     } catch (err) {
       console.error('Error rejecting user:', err);
-      showError('Failed to reject user');
+      showError(t('moderation.failedToRejectUser'));
     }
   };
 
@@ -307,14 +309,14 @@ export function ModerationPanel() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold">Moderation Center</h1>
-        <p className="text-muted-foreground mt-2">Manage Pending Users</p>
+        <h1 className="text-3xl font-bold">{t('moderation.contentModeration')}</h1>
+        <p className="text-muted-foreground mt-2">{t('moderation.pendingUsers')}</p>
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <TabsList className="grid w-full grid-cols-1">
           <TabsTrigger value="pending-users">
-            Pending Users
+            {t('moderation.pendingUsers')}
             {pendingUsersStats.total > 0 && (
               <Badge variant="destructive" className="ml-2">{pendingUsersStats.total}</Badge>
             )}
@@ -325,7 +327,7 @@ export function ModerationPanel() {
         <TabsContent value="pending-users" className="space-y-4">
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium">Pending Approvals</CardTitle>
+              <CardTitle className="text-sm font-medium">{t('moderation.pendingReview')}</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">{pendingUsersStats.total}</div>
@@ -334,9 +336,9 @@ export function ModerationPanel() {
 
           <div className="space-y-4">
             {loadingPendingUsers ? (
-              <div className="text-center py-8">Loading...</div>
+              <div className="text-center py-8">{t('common.loading')}</div>
             ) : pendingUsers.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground">No pending users</div>
+              <div className="text-center py-8 text-muted-foreground">{t('users.noUsersFound')}</div>
             ) : (
               pendingUsers.map(user => (
                 <Card key={user.id}>
@@ -346,20 +348,20 @@ export function ModerationPanel() {
                         <CardTitle className="text-base">{user.username}</CardTitle>
                         <CardDescription>{user.email}</CardDescription>
                       </div>
-                      <Badge className="bg-yellow-100 text-yellow-800">Pending</Badge>
+                      <Badge className="bg-yellow-100 text-yellow-800">{t('users.pending')}</Badge>
                     </div>
                   </CardHeader>
                   <CardContent className="space-y-4">
                     <div className="text-xs text-muted-foreground space-y-1">
-                      <div>Joined: {new Date(user.created_at).toLocaleDateString()}</div>
-                      {user.first_name && <div>Name: {user.first_name} {user.last_name}</div>}
+                      <div>{t('users.joinDate')}: {new Date(user.created_at).toLocaleDateString()}</div>
+                      {user.first_name && <div>{t('common.name')}: {user.first_name} {user.last_name}</div>}
                     </div>
                     <div className="flex gap-2">
                       <Button size="sm" variant="outline" onClick={() => handleApprovePendingUser(user.id)}>
-                        <CheckCircle className="w-4 h-4 mr-1" /> Approve
+                        <CheckCircle className="w-4 h-4 mr-1" /> {t('moderation.approve')}
                       </Button>
                       <Button size="sm" variant="destructive" onClick={() => handleRejectPendingUser(user.id)}>
-                        <XCircle className="w-4 h-4 mr-1" /> Reject
+                        <XCircle className="w-4 h-4 mr-1" /> {t('moderation.reject')}
                       </Button>
                     </div>
                   </CardContent>

@@ -5,9 +5,9 @@ import path from "path";
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => ({
   server: {
-    host: mode === 'development' ? 'localhost' : false,
+    host: '0.0.0.0',
     port: 5173,
-    strictPort: true,
+    strictPort: false,
     headers: {
       'X-Content-Type-Options': 'nosniff',
       'X-Frame-Options': 'DENY',

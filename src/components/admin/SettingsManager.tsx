@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -7,6 +8,7 @@ import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Loader2, Save } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { apiService } from '@/lib/api';
 
 interface Setting {
   key: string;
@@ -16,6 +18,7 @@ interface Setting {
 }
 
 export function SettingsManager() {
+  const { t } = useTranslation();
   const [settings, setSettings] = useState<Record<string, Setting[]>>({});
   const [loading, setLoading] = useState(true);
   const [changes, setChanges] = useState<Record<string, string>>({});
@@ -27,17 +30,18 @@ export function SettingsManager() {
 
   const fetchSettings = async () => {
     try {
-      const response = await fetch('http://localhost:8000/api/admin/settings/');
-      if (!response.ok) throw new Error('Failed to fetch');
-      const data = await response.json();
-      const grouped = data.reduce((acc: any, s: Setting) => {
-        if (!acc[s.category]) acc[s.category] = [];
-        acc[s.category].push(s);
-        return acc;
-      }, {});
-      setSettings(grouped);
+      const response = await apiService.httpRequest('/admin/settings/');
+      if (response.success && response.data) {
+        const data = Array.isArray(response.data) ? response.data : [];
+        const grouped = data.reduce((acc: any, s: Setting) => {
+          if (!acc[s.category]) acc[s.category] = [];
+          acc[s.category].push(s);
+          return acc;
+        }, {});
+        setSettings(grouped);
+      }
     } catch (error) {
-      console.error('Settings error:', error);
+      console.error(t('settings.settingsError'), error);
     } finally {
       setLoading(false);
     }
@@ -50,17 +54,22 @@ export function SettingsManager() {
   const saveSettings = async () => {
     if (Object.keys(changes).length === 0) return;
     try {
-      const token = localStorage.getItem('access_token');
-      await fetch('http://localhost:8000/api/admin/settings/bulk/update/', {
+      const response = await apiService.httpRequest('/admin/settings/bulk/update/', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
         body: JSON.stringify({ settings: Object.entries(changes).map(([k, v]) => ({ key: k, value: v })) }),
       });
-      toast({ title: 'Success', description: 'Settings saved' });
-      setChanges({});
-      fetchSettings();
+      
+      if (response.success) {
+        toast({ title: t('common.success'), description: t('settings.settingsSaved') });
+        setChanges({});
+        fetchSettings();
+        window.dispatchEvent(new CustomEvent('settingsUpdated', { detail: changes }));
+      } else {
+        throw new Error(response.error || 'Failed to save settings');
+      }
     } catch (error) {
-      toast({ title: 'Error', description: 'Failed to save', variant: 'destructive' });
+      console.error('Error saving settings:', error);
+      toast({ title: t('common.error'), description: t('settings.failedToSave'), variant: 'destructive' });
     }
   };
 
@@ -71,22 +80,22 @@ export function SettingsManager() {
     .sort();
 
   if (categories.length === 0) {
-    return <div className="text-center p-8 text-muted-foreground">No settings available</div>;
+    return <div className="text-center p-8 text-muted-foreground">{t('settings.noSettings')}</div>;
   }
 
   return (
     <div className="space-y-4">
       <div className="flex justify-between items-center">
-        <h2 className="text-2xl font-bold">Settings</h2>
+        <h2 className="text-2xl font-bold">{t('admin.settings')}</h2>
         <Button onClick={saveSettings} disabled={Object.keys(changes).length === 0}>
           <Save className="w-4 h-4 mr-2" />
-          Save
+          {t('common.save')}
         </Button>
       </div>
 
       <Tabs defaultValue={categories[0]}>
         <TabsList className="grid w-full" style={{ gridTemplateColumns: `repeat(${Math.min(categories.length, 5)}, minmax(0, 1fr))` }}>
-          {categories.map(cat => <TabsTrigger key={cat} value={cat} className="capitalize">{cat}</TabsTrigger>)}
+          {categories.map(cat => <TabsTrigger key={cat} value={cat} className="capitalize">{t(`settings.categories.${cat.toLowerCase().replace(/\s/g, '_')}`)}</TabsTrigger>)}
         </TabsList>
 
         {categories.map(cat => (
@@ -103,10 +112,10 @@ export function SettingsManager() {
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="hourly">Hourly</SelectItem>
-                        <SelectItem value="daily">Daily</SelectItem>
-                        <SelectItem value="weekly">Weekly</SelectItem>
-                        <SelectItem value="monthly">Monthly</SelectItem>
+                        <SelectItem value="hourly">{t('settings.hourly')}</SelectItem>
+                        <SelectItem value="daily">{t('settings.daily')}</SelectItem>
+                        <SelectItem value="weekly">{t('settings.weekly')}</SelectItem>
+                        <SelectItem value="monthly">{t('settings.monthly')}</SelectItem>
                       </SelectContent>
                     </Select>
                   ) : s.key.includes('enabled') || s.key.includes('require') ? (

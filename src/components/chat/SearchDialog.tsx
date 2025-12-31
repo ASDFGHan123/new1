@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -90,7 +91,7 @@ export const SearchDialog = ({
         {/* Header */}
         <div className="p-6 border-b">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-xl font-semibold">Search</h3>
+            <h3 className="text-xl font-semibold">{t('searchDialog.search')}</h3>
             <Button variant="ghost" size="sm" onClick={() => onOpenChange(false)}>
               ✕
             </Button>
@@ -100,7 +101,7 @@ export const SearchDialog = ({
           <div className="relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
-              placeholder="Search for users, groups, or conversations..."
+              placeholder={t('searchDialog.searchPlaceholder')}
               value={searchQuery}
               onChange={(e) => handleSearch(e.target.value)}
               className="pl-10"
@@ -115,13 +116,13 @@ export const SearchDialog = ({
             <Tabs value={activeTab} onValueChange={setActiveTab} className="flex flex-col h-full">
               <TabsList className="grid w-full grid-cols-3 mx-6 mt-4">
                 <TabsTrigger value="users">
-                  Users ({filteredUsers.length})
+                  {t('chat.users')} ({filteredUsers.length})
                 </TabsTrigger>
                 <TabsTrigger value="groups">
-                  Groups ({filteredGroups.length})
+                  {t('chat.groups')} ({filteredGroups.length})
                 </TabsTrigger>
                 <TabsTrigger value="conversations">
-                  Conversations ({filteredConversations.length})
+                  {t('conversations.conversationList')} ({filteredConversations.length})
                 </TabsTrigger>
               </TabsList>
 
@@ -131,7 +132,7 @@ export const SearchDialog = ({
                     {filteredUsers.length === 0 ? (
                       <div className="text-center py-8">
                         <UserIcon className="h-12 w-12 mx-auto mb-3 text-muted-foreground opacity-50" />
-                        <p className="text-sm text-muted-foreground">No users found</p>
+                        <p className="text-sm text-muted-foreground">{t('users.noUsersFound')}</p>
                       </div>
                     ) : (
                       <div className="space-y-3">
@@ -165,7 +166,7 @@ export const SearchDialog = ({
                               }}
                             >
                               <Plus className="h-4 w-4 mr-2" />
-                              Chat
+                              {t('chat.chat')}
                             </Button>
                           </div>
                         ))}
@@ -179,7 +180,7 @@ export const SearchDialog = ({
                     {filteredGroups.length === 0 ? (
                       <div className="text-center py-8">
                         <Users className="h-12 w-12 mx-auto mb-3 text-muted-foreground opacity-50" />
-                        <p className="text-sm text-muted-foreground">No groups found</p>
+                        <p className="text-sm text-muted-foreground">{t('chat.noGroupsFound')}</p>
                       </div>
                     ) : (
                       <div className="space-y-3">
@@ -234,7 +235,7 @@ export const SearchDialog = ({
                               }}
                             >
                               <MessageCircle className="h-4 w-4 mr-2" />
-                              Open
+                              {t('common.open')}
                             </Button>
                           </div>
                         ))}
@@ -248,7 +249,7 @@ export const SearchDialog = ({
                     {filteredConversations.length === 0 ? (
                       <div className="text-center py-8">
                         <MessageCircle className="h-12 w-12 mx-auto mb-3 text-muted-foreground opacity-50" />
-                        <p className="text-sm text-muted-foreground">No conversations found</p>
+                        <p className="text-sm text-muted-foreground">{t('conversations.noConversations')}</p>
                       </div>
                     ) : (
                       <div className="space-y-3">
@@ -308,33 +309,33 @@ export const SearchDialog = ({
             <div className="flex-1 flex items-center justify-center p-6">
               <div className="text-center max-w-md">
                 <Search className="h-16 w-16 mx-auto mb-4 text-muted-foreground opacity-50" />
-                <h3 className="text-lg font-semibold mb-2">Search OffChat</h3>
+                <h3 className="text-lg font-semibold mb-2">{t('searchDialog.searchOffChat')}</h3>
                 <p className="text-muted-foreground mb-6">
-                  Find users to chat with, join groups, or search through your existing conversations
+                  {t('searchDialog.searchDescription')}
                 </p>
                 
                 <div className="grid gap-3 text-left">
                   <div className="flex items-center gap-3 p-3 bg-muted rounded-lg">
                     <UserIcon className="h-5 w-5 text-primary" />
                     <div>
-                      <p className="font-medium">Users</p>
-                      <p className="text-sm text-muted-foreground">Find friends and colleagues</p>
+                      <p className="font-medium">{t('chat.users')}</p>
+                      <p className="text-sm text-muted-foreground">{t('searchDialog.findUsers')}</p>
                     </div>
                   </div>
                   
                   <div className="flex items-center gap-3 p-3 bg-muted rounded-lg">
                     <Users className="h-5 w-5 text-primary" />
                     <div>
-                      <p className="font-medium">Groups</p>
-                      <p className="text-sm text-muted-foreground">Discover public and private groups</p>
+                      <p className="font-medium">{t('chat.groups')}</p>
+                      <p className="text-sm text-muted-foreground">{t('searchDialog.discoverGroups')}</p>
                     </div>
                   </div>
                   
                   <div className="flex items-center gap-3 p-3 bg-muted rounded-lg">
                     <MessageCircle className="h-5 w-5 text-primary" />
                     <div>
-                      <p className="font-medium">Conversations</p>
-                      <p className="text-sm text-muted-foreground">Search your existing chats</p>
+                      <p className="font-medium">{t('conversations.conversationList')}</p>
+                      <p className="text-sm text-muted-foreground">{t('searchDialog.searchChats')}</p>
                     </div>
                   </div>
                 </div>

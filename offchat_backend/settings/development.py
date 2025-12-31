@@ -13,16 +13,11 @@ SECRET_KEY = config(
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = ['localhost', '127.0.0.1', '192.168.2.9', 'testserver']
+ALLOWED_HOSTS = ['*']
 
 # CORS settings for React frontend (Development only)
-CORS_ALLOWED_ORIGINS = [
-    "http://localhost:5173",
-    "http://127.0.0.1:5173",
-]
-
+CORS_ALLOW_ALL_ORIGINS = True
 CORS_ALLOW_CREDENTIALS = True
-CORS_ALLOW_ALL_ORIGINS = False
 CORS_EXPOSE_HEADERS = ['Content-Type', 'X-CSRFToken']
 CORS_ALLOWED_HEADERS = [
     'accept',
@@ -43,6 +38,9 @@ CORS_ALLOWED_METHODS = [
     'POST',
     'PUT',
 ]
+
+# Disable CSRF for API endpoints in development
+CSRF_TRUSTED_ORIGINS = ['http://localhost:5173', 'http://127.0.0.1:5173', 'http://192.168.2.33:5173']
 
 # Development middleware
 # MIDDLEWARE += [

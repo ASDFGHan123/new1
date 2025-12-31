@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -15,6 +16,7 @@ interface LoginFormProps {
 
 
 export const LoginForm = ({ onToggleMode, onLogin, error }: LoginFormProps) => {
+  const { t } = useTranslation();
   const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -26,7 +28,7 @@ export const LoginForm = ({ onToggleMode, onLogin, error }: LoginFormProps) => {
     e.preventDefault();
     
     if (!identifier.trim() || !password.trim()) {
-      setLocalError('Email/username and password are required');
+      setLocalError(t('auth.emailPasswordRequired'));
       return;
     }
     
@@ -39,13 +41,13 @@ export const LoginForm = ({ onToggleMode, onLogin, error }: LoginFormProps) => {
         navigate("/chat");
       }
     } catch (err) {
-      const errorMsg = err instanceof Error ? err.message : 'Login failed';
+      const errorMsg = err instanceof Error ? err.message : t('auth.loginFailed');
       if (errorMsg.includes('pending')) {
-        setLocalError('Your account is pending admin approval. Please wait.');
+        setLocalError(t('auth.accountPending'));
       } else if (errorMsg.includes('suspended')) {
-        setLocalError('Your account has been suspended.');
+        setLocalError(t('auth.accountSuspended'));
       } else if (errorMsg.includes('banned')) {
-        setLocalError('Your account has been banned.');
+        setLocalError(t('auth.accountBanned'));
       } else {
         setLocalError(errorMsg);
       }
@@ -70,9 +72,9 @@ export const LoginForm = ({ onToggleMode, onLogin, error }: LoginFormProps) => {
             </h1>
           </div>
           <div>
-            <CardTitle className="text-2xl">Welcome back</CardTitle>
+            <CardTitle className="text-2xl">{t('auth.welcomeBack')}</CardTitle>
             <CardDescription className="text-muted-foreground">
-              Sign in to continue your conversations
+              {t('auth.signInContinue')}
             </CardDescription>
           </div>
         </CardHeader>
@@ -85,11 +87,11 @@ export const LoginForm = ({ onToggleMode, onLogin, error }: LoginFormProps) => {
           )}
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="identifier">Email or Username</Label>
+              <Label htmlFor="identifier">{t('auth.emailOrUsername')}</Label>
               <Input
                 id="identifier"
                 type="text"
-                placeholder="Enter your email or username"
+                placeholder={t('auth.enterEmailOrUsername')}
                 value={identifier}
                 onChange={(e) => setIdentifier(e.target.value)}
                 disabled={isLoading}
@@ -98,12 +100,12 @@ export const LoginForm = ({ onToggleMode, onLogin, error }: LoginFormProps) => {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
+              <Label htmlFor="password">{t('common.password')}</Label>
               <div className="relative">
                 <Input
                   id="password"
                   type={showPassword ? "text" : "password"}
-                  placeholder="Enter your password"
+                  placeholder={t('auth.enterPassword')}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   disabled={isLoading}
@@ -131,18 +133,18 @@ export const LoginForm = ({ onToggleMode, onLogin, error }: LoginFormProps) => {
               className="w-full bg-gradient-to-r from-primary to-primary-glow hover:shadow-glow transition-all duration-300" 
               disabled={isLoading}
             >
-              {isLoading ? "Signing in..." : "Sign In"}
+              {isLoading ? t('auth.signingIn') : t('auth.signIn')}
             </Button>
           </form>
           <div className="mt-6 text-center">
             <p className="text-sm text-muted-foreground">
-              Don't have an account?{' '}
+              {t('auth.dontHaveAccount')}{' '}
               <Button
                 variant="link"
                 className="p-0 h-auto text-primary hover:text-primary-glow transition-colors"
                 onClick={() => navigate("/signup")}
               >
-                Sign up
+                {t('auth.signUp')}
               </Button>
             </p>
           </div>

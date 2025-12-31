@@ -2,11 +2,15 @@ import { Button } from "@/components/ui/button";
 import { Shield, MessageSquare, ArrowRight } from "lucide-react";
 import { Link } from "react-router-dom";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { LanguageSwitcher } from "@/components/LanguageSwitcher";
+import { useTranslation } from "react-i18next";
 
 const Index = () => {
+  const { t } = useTranslation();
   return (
     <div className="flex min-h-screen items-center justify-center bg-background relative">
-      <div className="absolute top-4 right-4">
+      <div className="absolute top-4 right-4 flex items-center gap-2">
+        <LanguageSwitcher />
         <ThemeToggle />
       </div>
       <div className="text-center space-y-8">
@@ -15,11 +19,10 @@ const Index = () => {
             OffChat
           </h1>
           <h2 className="text-2xl font-semibold text-foreground">
-            Offline Real-Time Messaging Platform
+            {t('landing.offlineRealtimeMessaging')}
           </h2>
           <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-            Secure, efficient messaging that works even when you're offline. 
-            Connect with your team anytime.
+            {t('landing.secureEfficientMessaging')}
           </p>
         </div>
         
@@ -27,14 +30,14 @@ const Index = () => {
           <Link to="/admin">
             <Button className="bg-admin-primary hover:bg-admin-primary/90 shadow-admin">
               <Shield className="w-4 h-4 mr-2" />
-              Admin Dashboard
+              {t('admin.adminDashboard')}
               <ArrowRight className="w-4 h-4 ml-2" />
             </Button>
           </Link>
         </div>
         
         <div className="text-sm text-muted-foreground">
-          Access the admin panel to manage users, monitor conversations, and view analytics
+          {t('landing.accessAdminPanel')}
         </div>
       </div>
     </div>

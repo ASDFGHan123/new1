@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -20,10 +21,10 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { 
-  Settings, 
-  Users, 
-  UserPlus, 
+import {
+  Settings,
+  Users,
+  UserPlus,
   UserMinus,
   Crown,
   Shield,
@@ -60,6 +61,7 @@ export const GroupManagementDialog = ({
   onDeleteGroup,
   trigger
 }: GroupManagementDialogProps) => {
+  const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const [activeTab, setActiveTab] = useState("settings"); // settings, members
   const [editingGroup, setEditingGroup] = useState(false);
@@ -165,7 +167,7 @@ export const GroupManagementDialog = ({
   const handleDeleteGroup = async () => {
     if (!isAdmin) return;
     
-    if (window.confirm("Are you sure you want to delete this group? This action cannot be undone.")) {
+    if (window.confirm(t('chat.confirmDeleteGroup'))) {
       await onDeleteGroup(group.id);
       setOpen(false);
     }
@@ -184,7 +186,7 @@ export const GroupManagementDialog = ({
         <DialogHeader className="flex-shrink-0">
           <DialogTitle className="flex items-center gap-2">
             <Users className="h-5 w-5" />
-            Group Management
+            {t('chat.groupSettings')}
           </DialogTitle>
         </DialogHeader>
 
@@ -198,7 +200,7 @@ export const GroupManagementDialog = ({
             }`}
             onClick={() => setActiveTab("settings")}
           >
-            Settings
+            {t('chat.settings')}
           </button>
           <button
             className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
@@ -208,7 +210,7 @@ export const GroupManagementDialog = ({
             }`}
             onClick={() => setActiveTab("members")}
           >
-            Members ({group.members.length})
+            {t('chat.members')} ({group.members.length})
           </button>
         </div>
 
@@ -220,7 +222,7 @@ export const GroupManagementDialog = ({
             {/* Group Info */}
             <div className="space-y-4">
               <div className="flex items-center justify-between">
-                <h3 className="text-lg font-semibold">Group Information</h3>
+                <h3 className="text-lg font-semibold">{t('chat.groupInformation')}</h3>
                 {canManageGroup && !editingGroup && (
                   <Button
                     variant="outline"
@@ -228,7 +230,7 @@ export const GroupManagementDialog = ({
                     onClick={() => setEditingGroup(true)}
                   >
                     <Edit className="h-4 w-4 mr-2" />
-                    Edit
+                    {t('common.edit')}
                   </Button>
                 )}
               </div>
@@ -244,11 +246,12 @@ export const GroupManagementDialog = ({
                       </AvatarFallback>
                     </Avatar>
                     <ImageUpload value={groupAvatar} onChange={setGroupAvatar} />
+                    <Label className="text-center">{t('chat.changeGroupAvatar')}</Label>
                   </div>
 
                   {/* Name */}
                   <div className="space-y-2">
-                    <Label htmlFor="editGroupName">Group Name</Label>
+                    <Label htmlFor="editGroupName">{t('chat.groupName')}</Label>
                     <Input
                       id="editGroupName"
                       value={groupName}
@@ -259,7 +262,7 @@ export const GroupManagementDialog = ({
 
                   {/* Description */}
                   <div className="space-y-2">
-                    <Label htmlFor="editGroupDescription">Description</Label>
+                    <Label htmlFor="editGroupDescription">{t('chat.groupDescription')}</Label>
                     <Textarea
                       id="editGroupDescription"
                       value={groupDescription}
@@ -271,7 +274,7 @@ export const GroupManagementDialog = ({
 
                   {/* Privacy */}
                   <div className="space-y-2">
-                    <Label>Privacy</Label>
+                    <Label>{t('chat.groupPrivacy')}</Label>
                     <div className="flex items-center space-x-2">
                       <Switch
                         id="editIsPrivate"
@@ -279,7 +282,7 @@ export const GroupManagementDialog = ({
                         onCheckedChange={setIsPrivate}
                       />
                       <Label htmlFor="editIsPrivate">
-                        {isPrivate ? "Private group" : "Public group"}
+                        {isPrivate ? t('chat.privateGroup') : t('chat.publicGroup')}
                       </Label>
                     </div>
                   </div>
@@ -296,10 +299,10 @@ export const GroupManagementDialog = ({
                         setIsPrivate(group.isPrivate);
                       }}
                     >
-                      Cancel
+                      {t('common.cancel')}
                     </Button>
                     <Button onClick={handleSaveGroup} disabled={loading}>
-                      {loading ? "Saving..." : "Save Changes"}
+                      {loading ? t('common.saving') : t('common.saveChanges')}
                     </Button>
                   </div>
                 </div>
@@ -315,13 +318,13 @@ export const GroupManagementDialog = ({
                     </Avatar>
                     <div className="flex-1">
                       <h4 className="text-xl font-semibold">{group.name}</h4>
-                      <p className="text-muted-foreground">{group.description || "No description"}</p>
+                      <p className="text-muted-foreground">{group.description || t('chat.noDescription')}</p>
                       <div className="flex items-center gap-2 mt-2">
                         <Badge variant={group.isPrivate ? "secondary" : "outline"}>
-                          {group.isPrivate ? "Private" : "Public"}
+                          {group.isPrivate ? t('chat.private') : t('chat.public')}
                         </Badge>
                         <span className="text-sm text-muted-foreground">
-                          Created {new Date(group.createdAt).toLocaleDateString()}
+                          {t('chat.created')} {new Date(group.createdAt).toLocaleDateString()}
                         </span>
                       </div>
                     </div>
@@ -331,15 +334,15 @@ export const GroupManagementDialog = ({
                   <div className="grid grid-cols-3 gap-4 p-4 bg-muted rounded-lg">
                     <div className="text-center">
                       <p className="text-2xl font-bold text-primary">{group.members.length}</p>
-                      <p className="text-sm text-muted-foreground">Members</p>
+                      <p className="text-sm text-muted-foreground">{t('chat.members')}</p>
                     </div>
                     <div className="text-center">
                       <p className="text-2xl font-bold text-primary">{group.members.filter(m => m.role === "admin").length}</p>
-                      <p className="text-sm text-muted-foreground">Admins</p>
+                      <p className="text-sm text-muted-foreground">{t('chat.admins')}</p>
                     </div>
                     <div className="text-center">
                       <p className="text-2xl font-bold text-primary">{group.unreadCount}</p>
-                      <p className="text-sm text-muted-foreground">Unread</p>
+                      <p className="text-sm text-muted-foreground">{t('chat.unread')}</p>
                     </div>
                   </div>
                 </div>
@@ -349,7 +352,7 @@ export const GroupManagementDialog = ({
             {/* Danger Zone */}
             {canManageGroup && (
               <div className="space-y-4 border-t pt-4">
-                <h3 className="text-lg font-semibold text-destructive">Danger Zone</h3>
+                <h3 className="text-lg font-semibold text-destructive">{t('chat.dangerZone')}</h3>
                 <div className="space-y-2">
                   {isAdmin && (
                     <Button
@@ -358,7 +361,7 @@ export const GroupManagementDialog = ({
                       className="w-full"
                     >
                       <Trash2 className="h-4 w-4 mr-2" />
-                      Delete Group
+                      {t('chat.deleteGroup')}
                     </Button>
                   )}
                   <Button
@@ -367,7 +370,7 @@ export const GroupManagementDialog = ({
                     className="w-full"
                   >
                     <UserMinus className="h-4 w-4 mr-2" />
-                    Leave Group
+                    {t('chat.leaveGroup')}
                   </Button>
                 </div>
               </div>
@@ -380,7 +383,7 @@ export const GroupManagementDialog = ({
           <div className="space-y-4">
             {/* Header */}
             <div className="flex items-center justify-between">
-              <h3 className="text-lg font-semibold">Group Members</h3>
+              <h3 className="text-lg font-semibold">{t('chat.groupMembers')}</h3>
               {canManageMembers && (
                 <Button
                   variant="outline"
@@ -388,7 +391,7 @@ export const GroupManagementDialog = ({
                   onClick={() => setShowAddMembers(true)}
                 >
                   <UserPlus className="h-4 w-4 mr-2" />
-                  Add Members
+                  {t('chat.addMembers')}
                 </Button>
               )}
             </div>
@@ -397,7 +400,7 @@ export const GroupManagementDialog = ({
             {showAddMembers && (
               <div className="border rounded-lg p-4 space-y-4">
                 <div className="flex items-center justify-between">
-                  <h4 className="font-medium">Add New Members</h4>
+                  <h4 className="font-medium">{t('chat.addNewMembers')}</h4>
                   <Button
                     variant="ghost"
                     size="sm"
@@ -417,7 +420,7 @@ export const GroupManagementDialog = ({
                   <Input
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
-                    placeholder="Search users..."
+                    placeholder={t('chat.searchUsers')}
                     className="pl-10"
                   />
                 </div>
@@ -427,7 +430,7 @@ export const GroupManagementDialog = ({
                   {filteredAvailableUsers.length === 0 ? (
                     <div className="text-center py-4 text-muted-foreground">
                       <UserPlus className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                      <p>No users found</p>
+                      <p>{t('chat.noUsersFound')}</p>
                     </div>
                   ) : (
                     filteredAvailableUsers.map((user) => (
@@ -452,7 +455,7 @@ export const GroupManagementDialog = ({
                           <div>
                             <p className="font-medium">{user.username}</p>
                             <p className="text-xs text-muted-foreground capitalize">
-                              {user.status}
+                              {t(`chat.${user.status}`)} {/* Localized user status */}
                             </p>
                           </div>
                         </div>
@@ -482,10 +485,10 @@ export const GroupManagementDialog = ({
                         setSearchTerm("");
                       }}
                     >
-                      Clear
+                      {t('common.clear')}
                     </Button>
                     <Button onClick={handleAddMembers} disabled={loading}>
-                      Add {selectedMembers.length} Member{selectedMembers.length !== 1 ? 's' : ''}
+                      {t('chat.add')} {selectedMembers.length} {t('chat.members')}
                     </Button>
                   </div>
                 )}
@@ -515,12 +518,12 @@ export const GroupManagementDialog = ({
                         <div className="flex items-center gap-2">
                           <p className="font-medium">
                             {member.username}
-                            {isCurrentUser && " (You)"}
+                            {isCurrentUser && ` (${t('chat.you')})`}
                           </p>
                           {getRoleIcon(member.role)}
                         </div>
                         <p className="text-xs text-muted-foreground capitalize">
-                          {member.role} • Joined {new Date(member.joinedAt).toLocaleDateString()}
+                          {t(`chat.${member.role}`)} • {t('chat.joined')} {new Date(member.joinedAt).toLocaleDateString()}
                         </p>
                       </div>
                     </div>
@@ -549,7 +552,7 @@ export const GroupManagementDialog = ({
                                 className="text-destructive"
                               >
                                 <UserMinus className="h-4 w-4 mr-2" />
-                                Remove from group
+                                {t('chat.removeFromGroup')}
                               </DropdownMenuItem>
                             )}
                             {isCurrentUser && (
@@ -558,7 +561,7 @@ export const GroupManagementDialog = ({
                                 className="text-destructive"
                               >
                                 <UserMinus className="h-4 w-4 mr-2" />
-                                Leave group
+                                {t('chat.leaveGroup')}
                               </DropdownMenuItem>
                             )}
                           </DropdownMenuContent>

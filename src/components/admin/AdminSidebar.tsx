@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
   LayoutDashboard,
   Users,
@@ -9,23 +10,25 @@ import {
   LogOut,
   User,
   Trash2,
-  ShieldAlert
+  ShieldAlert,
+  Database
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { cn } from "@/lib/utils";
 import { ProfileImageUploadDialog } from "./ProfileImageUploadDialog";
 
-const sidebarItems = [
-  { icon: LayoutDashboard, label: "Dashboard", value: "overview" },
-  { icon: User, label: "Profile", value: "profile" },
-  { icon: Users, label: "User Management", value: "users" },
-  { icon: ShieldAlert, label: "Moderation", value: "moderation" },
-  { icon: Activity, label: "Conversations", value: "conversations" },
-  { icon: FileText, label: "Audit Logs", value: "audit" },
-  { icon: Shield, label: "Permissions", value: "permissions" },
-  { icon: Settings, label: "Settings", value: "settings" },
-  { icon: Trash2, label: "Trash", value: "trash" },
+const getSidebarItems = (t: (key: string) => string) => [
+  { icon: LayoutDashboard, label: t('admin.dashboard'), value: "overview" },
+  { icon: User, label: t('admin.profile'), value: "profile" },
+  { icon: Users, label: t('admin.userManagement'), value: "users" },
+  { icon: ShieldAlert, label: t('admin.moderation'), value: "moderation" },
+  { icon: Activity, label: t('admin.conversations'), value: "conversations" },
+  { icon: FileText, label: t('admin.auditLogs'), value: "audit" },
+  { icon: Shield, label: t('admin.permissions'), value: "permissions" },
+  { icon: Database, label: t('messages.backup'), value: "backup" },
+  { icon: Settings, label: t('admin.settings'), value: "settings" },
+  { icon: Trash2, label: t('admin.trash'), value: "trash" },
 ];
 
 interface AdminSidebarProps {
@@ -37,7 +40,9 @@ interface AdminSidebarProps {
 }
 
 export const AdminSidebar = ({ user, activeTab = "overview", onTabChange, onLogout, onImageUpdated }: AdminSidebarProps) => {
+  const { t } = useTranslation();
   const [showImageUpload, setShowImageUpload] = useState(false);
+  const sidebarItems = getSidebarItems(t);
 
   const handleImageUpdated = () => {
     setShowImageUpload(false);
@@ -49,7 +54,7 @@ export const AdminSidebar = ({ user, activeTab = "overview", onTabChange, onLogo
       <div className="p-6 border-b border-sidebar-border">
         <div>
           <h2 className="text-lg font-semibold text-sidebar-foreground">OffChat</h2>
-          <p className="text-xs text-sidebar-foreground/60">Admin Portal</p>
+          <p className="text-xs text-sidebar-foreground/60">{t('admin.adminPortal')}</p>
         </div>
       </div>
 
@@ -84,7 +89,7 @@ export const AdminSidebar = ({ user, activeTab = "overview", onTabChange, onLogo
             </AvatarFallback>
           </Avatar>
           <div className="flex-1">
-            <p className="text-sm font-medium text-sidebar-foreground">{user?.username || 'Admin User'}</p>
+            <p className="text-sm font-medium text-sidebar-foreground">{user?.username || t('admin.adminUser')}</p>
             <p className="text-xs text-sidebar-foreground/60">{user?.username ? `${user.username}@offchat.com` : 'admin@offchat.com'}</p>
           </div>
         </div>
@@ -102,7 +107,7 @@ export const AdminSidebar = ({ user, activeTab = "overview", onTabChange, onLogo
           onClick={onLogout}
         >
           <LogOut className="w-4 h-4 mr-2" />
-          Sign Out
+          {t('admin.signOut')}
         </Button>
       </div>
     </div>

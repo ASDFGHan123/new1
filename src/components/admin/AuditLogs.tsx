@@ -1,4 +1,5 @@
 import { Search, Filter, Clock, User, Activity, ChevronUp, ChevronDown, Eye, Download, MoreHorizontal, Printer } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -59,6 +60,7 @@ const getSeverityBg = (severity: string) => {
 };
 
 export const AuditLogs = () => {
+  const { t } = useTranslation();
   const [auditLogs, setAuditLogs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
@@ -115,13 +117,13 @@ export const AuditLogs = () => {
       <CardHeader>
         <div className="flex items-center justify-between">
           <div>
-            <CardTitle className="text-xl">Audit Logs</CardTitle>
+            <CardTitle className="text-xl">{t('audit.auditLogs')}</CardTitle>
             <CardDescription>
-              Track all system actions and changes
+              {t('audit.auditLogsDescription')}
             </CardDescription>
           </div>
           <Button variant="outline" size="sm" onClick={fetchAuditLogs}>
-            Refresh
+            {t('common.refresh')}
           </Button>
         </div>
         
@@ -129,7 +131,7 @@ export const AuditLogs = () => {
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
             <Input
-              placeholder="Search audit logs..."
+              placeholder={t('common.search')}
               className="pl-10"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
@@ -154,19 +156,19 @@ export const AuditLogs = () => {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Timestamp</TableHead>
-                <TableHead>Action</TableHead>
-                <TableHead>Actor</TableHead>
-                <TableHead>Description</TableHead>
-                <TableHead>Severity</TableHead>
-                <TableHead>Actions</TableHead>
+                <TableHead>{t('audit.timestamp')}</TableHead>
+                <TableHead>{t('audit.action')}</TableHead>
+                <TableHead>{t('audit.user')}</TableHead>
+                <TableHead>{t('audit.details')}</TableHead>
+                <TableHead>{t('common.status')}</TableHead>
+                <TableHead>{t('common.actions')}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {paginatedLogs.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
-                    No audit logs found.
+                    {t('audit.noLogs')}
                   </TableCell>
                 </TableRow>
               ) : (
@@ -176,17 +178,17 @@ export const AuditLogs = () => {
                       <span className="text-sm font-mono">{new Date(log.timestamp).toLocaleString()}</span>
                     </TableCell>
                     <TableCell>
-                      <Badge variant="outline">{log.action_type}</Badge>
+                      <Badge variant="outline">{t(`audit.actions.${log.action_type}`)}</Badge>
                     </TableCell>
                     <TableCell>
-                      <span className="font-medium">{log.actor || 'System'}</span>
+                      <span className="font-medium">{log.actor || t('common.system')}</span>
                     </TableCell>
                     <TableCell>
                       <span className="text-sm">{log.description}</span>
                     </TableCell>
                     <TableCell>
                       <Badge variant={getSeverityColor(log.severity || 'info')}>
-                        {(log.severity || 'info').toUpperCase()}
+                        {t(log.severity || 'common.info').toUpperCase()}
                       </Badge>
                     </TableCell>
                     <TableCell>
@@ -211,7 +213,7 @@ export const AuditLogs = () => {
         {totalPages > 1 && (
           <div className="flex items-center justify-between mt-4">
             <div className="text-sm text-muted-foreground">
-              Page {currentPage} of {totalPages}
+              {t('common.page')} {currentPage} {t('common.of')} {totalPages}
             </div>
             <div className="flex gap-2">
               <Button
@@ -220,7 +222,7 @@ export const AuditLogs = () => {
                 onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
                 disabled={currentPage === 1}
               >
-                Previous
+                {t('common.previous')}
               </Button>
               <Button
                 variant="outline"
@@ -228,7 +230,7 @@ export const AuditLogs = () => {
                 onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
                 disabled={currentPage === totalPages}
               >
-                Next
+                {t('common.next')}
               </Button>
             </div>
           </div>
@@ -264,30 +266,30 @@ export const AuditLogs = () => {
       <Dialog open={showDetailsModal} onOpenChange={setShowDetailsModal}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Audit Log Details</DialogTitle>
+            <DialogTitle>{t('audit.logDetails')}</DialogTitle>
           </DialogHeader>
           {selectedLog && (
             <div className="space-y-4">
               <div>
-                <Label className="text-sm font-medium">Timestamp</Label>
+                <Label className="text-sm font-medium">{t('audit.timestamp')}</Label>
                 <p className="text-sm">{new Date(selectedLog.timestamp).toLocaleString()}</p>
               </div>
               <div>
-                <Label className="text-sm font-medium">Action</Label>
+                <Label className="text-sm font-medium">{t('audit.action')}</Label>
                 <p className="text-sm">{selectedLog.action_type}</p>
               </div>
               <div>
-                <Label className="text-sm font-medium">Actor</Label>
-                <p className="text-sm">{selectedLog.actor || 'System'}</p>
+                <Label className="text-sm font-medium">{t('audit.user')}</Label>
+                <p className="text-sm">{selectedLog.actor || t('common.system')}</p>
               </div>
               <div>
-                <Label className="text-sm font-medium">Description</Label>
+                <Label className="text-sm font-medium">{t('audit.details')}</Label>
                 <p className="text-sm">{selectedLog.description}</p>
               </div>
             </div>
           )}
           <DialogFooter>
-            <Button onClick={() => setShowDetailsModal(false)}>Close</Button>
+            <Button onClick={() => setShowDetailsModal(false)}>{t('common.close')}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

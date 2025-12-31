@@ -1,4 +1,5 @@
 import { Search, Filter, Users, Clock, MessageCircle, ChevronUp, ChevronDown, Eye, MoreHorizontal, Download, Archive, Trash2, VolumeX, AlertTriangle, Printer, Loader2 } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -64,6 +65,7 @@ interface ConversationMonitorProps {
 }
 
 export const ConversationMonitor = ({ onTrashConversation }: ConversationMonitorProps) => {
+  const { t } = useTranslation();
   const [conversations, setConversations] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
@@ -109,7 +111,7 @@ export const ConversationMonitor = ({ onTrashConversation }: ConversationMonitor
       
       const formattedData = results.map((conv: any, idx: number) => {
         const lastMsg = conv.last_message;
-        const lastMessageText = typeof lastMsg === 'string' ? lastMsg : (lastMsg?.content || 'No messages');
+        const lastMessageText = typeof lastMsg === 'string' ? lastMsg : (lastMsg?.content || t('messages.noMessages'));
         
         let title = conv.title;
         if (!title) {
@@ -121,7 +123,7 @@ export const ConversationMonitor = ({ onTrashConversation }: ConversationMonitor
           } else if (conv.participant_names) {
             title = conv.participant_names.join(', ');
           } else {
-            title = `Conversation ${idx + 1}`;
+            title = `${t('conversations.conversation')} ${idx + 1}`;
           }
         }
         
@@ -133,7 +135,7 @@ export const ConversationMonitor = ({ onTrashConversation }: ConversationMonitor
           participants: conv.participant_count || (Array.isArray(conv.participants) ? conv.participants.length : 2),
           participantsList: Array.isArray(conv.participants) ? conv.participants : [],
           lastMessage: lastMessageText,
-          lastActivity: actTime ? new Date(actTime).toLocaleString() : 'N/A',
+          lastActivity: actTime ? new Date(actTime).toLocaleString() : t('common.noData'),
           messageCount: conv.message_count || 0,
           isActive: true,
           messages: conv.messages || []
@@ -149,7 +151,7 @@ export const ConversationMonitor = ({ onTrashConversation }: ConversationMonitor
     }
   };
 
-  if (loading) return <div className="flex justify-center p-8"><Loader2 className="animate-spin" /></div>;
+  if (loading) return <div className="flex justify-center p-8"><Loader2 className="animate-spin" /> {t('conversations.loadingConversations')}</div>;
 
   const filteredAndSortedConversations = conversations
     .filter(conv => {
@@ -223,9 +225,9 @@ export const ConversationMonitor = ({ onTrashConversation }: ConversationMonitor
         const messages = msgList.map((msg: any) => ({
           id: msg.id || '',
           content: msg.content || '',
-          sender: msg.sender || 'Unknown',
+          sender: msg.sender || t('common.unknown'),
           senderId: msg.sender_id || '',
-          timestamp: msg.timestamp ? new Date(msg.timestamp).toLocaleString() : 'N/A',
+          timestamp: msg.timestamp ? new Date(msg.timestamp).toLocaleString() : t('common.noData'),
           type: msg.message_type || 'text'
         }));
         setConversationMessages(messages);
@@ -285,8 +287,8 @@ export const ConversationMonitor = ({ onTrashConversation }: ConversationMonitor
           onTrashConversation(conversationToModerate.id.toString());
         }
       } catch (error) {
-        console.error('Failed to delete conversation:', error);
-        alert('Failed to delete conversation');
+        console.error(t('conversations.failedToDeleteConversation'), error);
+        alert(t('conversations.failedToDeleteConversation'));
       }
     } else {
       setConversations(prev =>
@@ -294,19 +296,19 @@ export const ConversationMonitor = ({ onTrashConversation }: ConversationMonitor
           if (conv.id === conversationToModerate.id) {
             switch (action) {
               case "archive":
-                return { ...conv, isActive: false, lastActivity: "Archived" };
+                return { ...conv, isActive: false, lastActivity: t('common.archived') };
               case "mute":
-                return { ...conv, isActive: false, lastActivity: "Muted" };
+                return { ...conv, isActive: false, lastActivity: t('common.muted') };
               case "warn":
                 setTimeout(() => {
-                  alert(`Warning message sent successfully to all members of "${conversationToModerate.title}"`);
+                  alert(`${t('moderation.warningSent')} "${conversationToModerate.title}"`);
                 }, 100);
-                return { ...conv, lastActivity: "Warning Sent" };
+                return { ...conv, lastActivity: t('moderation.warningSent') };
               case "logout":
                 setTimeout(() => {
-                  alert(`All members of "${conversationToModerate.title}" have been logged out successfully`);
+                  alert(`${t('users.usersLoggedOut')} "${conversationToModerate.title}"`);
                 }, 100);
-                return { ...conv, isActive: false, lastActivity: "Members Logged Out" };
+                return { ...conv, isActive: false, lastActivity: t('users.usersLoggedOut') };
               default:
                 return conv;
             }
@@ -335,7 +337,7 @@ export const ConversationMonitor = ({ onTrashConversation }: ConversationMonitor
     const printData = generateConversationReportHTML(filteredAndSortedConversations);
     openPrintWindow({
       ...printData,
-      subtitle: `Filtered Results: ${filteredAndSortedConversations.length} of ${conversations.length} conversations`
+      subtitle: `${t('common.filteredResults')}: ${filteredAndSortedConversations.length} ${t('common.of')} ${conversations.length} ${t('conversations.conversations')}`
     });
   };
 
@@ -344,14 +346,14 @@ export const ConversationMonitor = ({ onTrashConversation }: ConversationMonitor
       <CardHeader>
         <div className="flex items-center justify-between">
           <div>
-            <CardTitle className="text-xl">Conversation Monitor</CardTitle>
+            <CardTitle className="text-xl">{t('conversations.conversationMonitor')}</CardTitle>
             <CardDescription>
-              Monitor active conversations and message flow
+              {t('conversations.monitorDescription')}
             </CardDescription>
           </div>
           <div className="flex items-center space-x-2">
             <Badge variant="secondary" className="bg-admin-success/20 text-admin-success border-admin-success/30">
-              {conversations.filter(c => c.isActive).length} Active
+              {conversations.filter(c => c.isActive).length} {t('conversations.activeConversations')}
             </Badge>
             <Button 
               onClick={handlePrintConversations}
@@ -360,7 +362,7 @@ export const ConversationMonitor = ({ onTrashConversation }: ConversationMonitor
               className="bg-blue-50 hover:bg-blue-100 border-blue-200 text-blue-700"
             >
               <Printer className="w-4 h-4 mr-2" />
-              Print Conversations
+              {t('conversations.printConversations')}
             </Button>
             <Button
               variant="outline"
@@ -376,7 +378,7 @@ export const ConversationMonitor = ({ onTrashConversation }: ConversationMonitor
               }}
             >
               <Download className="w-4 h-4 mr-2" />
-              Export All
+              {t('common.exportAll')}
             </Button>
           </div>
         </div>
@@ -385,7 +387,7 @@ export const ConversationMonitor = ({ onTrashConversation }: ConversationMonitor
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
             <Input
-              placeholder="Search conversations..."
+              placeholder={t('conversations.searchConversations')}
               className="pl-10 bg-input border-border"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
@@ -394,22 +396,22 @@ export const ConversationMonitor = ({ onTrashConversation }: ConversationMonitor
           <div className="flex gap-2">
             <Select value={typeFilter} onValueChange={(value: any) => setTypeFilter(value)}>
               <SelectTrigger className="w-32">
-                <SelectValue placeholder="Type" />
+                <SelectValue placeholder={t('common.type')} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Types</SelectItem>
-                <SelectItem value="private">Private</SelectItem>
-                <SelectItem value="group">Group</SelectItem>
+                <SelectItem value="all">{t('common.allTypes')}</SelectItem>
+                <SelectItem value="private">{t('conversations.private')}</SelectItem>
+                <SelectItem value="group">{t('conversations.group')}</SelectItem>
               </SelectContent>
             </Select>
             <Select value={statusFilter} onValueChange={(value: any) => setStatusFilter(value)}>
               <SelectTrigger className="w-32">
-                <SelectValue placeholder="Status" />
+                <SelectValue placeholder={t('common.status')} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Status</SelectItem>
-                <SelectItem value="active">Active</SelectItem>
-                <SelectItem value="inactive">Inactive</SelectItem>
+                <SelectItem value="all">{t('common.allStatus')}</SelectItem>
+                <SelectItem value="active">{t('common.active')}</SelectItem>
+                <SelectItem value="inactive">{t('common.inactive')}</SelectItem>
               </SelectContent>
             </Select>
             <Button variant="outline" size="sm" onClick={() => {
@@ -420,7 +422,7 @@ export const ConversationMonitor = ({ onTrashConversation }: ConversationMonitor
               setSortOrder("desc");
               setCurrentPage(1);
             }}>
-              Clear Filters
+              {t('common.clearFilters')}
             </Button>
           </div>
         </div>
@@ -433,38 +435,38 @@ export const ConversationMonitor = ({ onTrashConversation }: ConversationMonitor
               <TableRow>
                 <TableHead className="cursor-pointer hover:bg-muted/50 select-none" onClick={() => handleSort("title")}>
                   <div className="flex items-center space-x-1">
-                    <span>Conversation</span>
+                    <span>{t('conversations.conversation')}</span>
                     {sortBy === "title" && (sortOrder === "asc" ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />)}
                   </div>
                 </TableHead>
-                <TableHead>Type</TableHead>
+                <TableHead>{t('common.type')}</TableHead>
                 <TableHead className="cursor-pointer hover:bg-muted/50 select-none" onClick={() => handleSort("participants")}>
                   <div className="flex items-center space-x-1">
-                    <span>Participants</span>
+                    <span>{t('conversations.participants')}</span>
                     {sortBy === "participants" && (sortOrder === "asc" ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />)}
                   </div>
                 </TableHead>
                 <TableHead className="cursor-pointer hover:bg-muted/50 select-none" onClick={() => handleSort("messages")}>
                   <div className="flex items-center space-x-1">
-                    <span>Messages</span>
+                    <span>{t('conversations.messages')}</span>
                     {sortBy === "messages" && (sortOrder === "asc" ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />)}
                   </div>
                 </TableHead>
                 <TableHead className="cursor-pointer hover:bg-muted/50 select-none" onClick={() => handleSort("lastActivity")}>
                   <div className="flex items-center space-x-1">
-                    <span>Last Activity</span>
+                    <span>{t('conversations.lastActivity')}</span>
                     {sortBy === "lastActivity" && (sortOrder === "asc" ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />)}
                   </div>
                 </TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Actions</TableHead>
+                <TableHead>{t('common.status')}</TableHead>
+                <TableHead>{t('common.actions')}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {paginatedConversations.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
-                    No conversations found matching your criteria.
+                    {t('conversations.noConversationsFound')}
                   </TableCell>
                 </TableRow>
               ) : (
@@ -496,7 +498,7 @@ export const ConversationMonitor = ({ onTrashConversation }: ConversationMonitor
                     </TableCell>
                     <TableCell>
                       <Badge variant={conversation.type === 'group' ? 'default' : 'secondary'}>
-                        {conversation.type === 'group' ? 'Group' : 'Private'}
+                        {conversation.type === 'group' ? t('conversations.group') : t('conversations.private')}
                       </Badge>
                     </TableCell>
                     <TableCell>
@@ -521,7 +523,7 @@ export const ConversationMonitor = ({ onTrashConversation }: ConversationMonitor
                       <div className="flex items-center space-x-2">
                         <div className={`w-2 h-2 rounded-full ${conversation.isActive ? 'bg-admin-success animate-pulse' : 'bg-muted-foreground'}`} />
                         <span className="text-sm">
-                          {conversation.isActive ? 'Active' : 'Inactive'}
+                          {conversation.isActive ? t('common.active') : t('common.inactive')}
                         </span>
                       </div>
                     </TableCell>
@@ -535,19 +537,19 @@ export const ConversationMonitor = ({ onTrashConversation }: ConversationMonitor
                         <DropdownMenuContent align="end">
                           <DropdownMenuItem onClick={() => handleViewDetails(conversation)}>
                             <Eye className="w-4 h-4 mr-2" />
-                            View Details
+                            {t('conversations.viewConversation')}
                           </DropdownMenuItem>
                           <DropdownMenuItem onClick={() => handleViewMessageHistory(conversation)}>
                             <MessageCircle className="w-4 h-4 mr-2" />
-                            View Message History
+                            {t('messages.messageHistory')}
                           </DropdownMenuItem>
                           <DropdownMenuItem onClick={() => handleModerate(conversation)}>
                             <MessageCircle className="w-4 h-4 mr-2" />
-                            Moderate
+                            {t('moderation.moderate')}
                           </DropdownMenuItem>
                           <DropdownMenuItem onClick={() => handleExport(conversation)}>
                             <Download className="w-4 h-4 mr-2" />
-                            Export Data
+                            {t('common.exportData')}
                           </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
@@ -562,11 +564,11 @@ export const ConversationMonitor = ({ onTrashConversation }: ConversationMonitor
         {totalPages > 1 && (
           <div className="flex items-center justify-between mt-4">
             <div className="text-sm text-muted-foreground">
-              Showing {((currentPage - 1) * itemsPerPage) + 1} to {Math.min(currentPage * itemsPerPage, filteredAndSortedConversations.length)} of {filteredAndSortedConversations.length} conversations
+              {t('common.showing')} {((currentPage - 1) * itemsPerPage) + 1} {t('common.to')} {Math.min(currentPage * itemsPerPage, filteredAndSortedConversations.length)} {t('common.of')} {filteredAndSortedConversations.length} {t('conversations.conversations')}
             </div>
             <div className="flex items-center space-x-2">
               <Button variant="outline" size="sm" onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))} disabled={currentPage === 1}>
-                Previous
+                {t('common.previous')}
               </Button>
               <div className="flex items-center space-x-1">
                 {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
@@ -580,7 +582,7 @@ export const ConversationMonitor = ({ onTrashConversation }: ConversationMonitor
                 })}
               </div>
               <Button variant="outline" size="sm" onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))} disabled={currentPage === totalPages}>
-                Next
+                {t('common.next')}
               </Button>
             </div>
           </div>
@@ -595,55 +597,57 @@ export const ConversationMonitor = ({ onTrashConversation }: ConversationMonitor
 
       <Dialog open={showDetailsModal} onOpenChange={setShowDetailsModal}>
         <DialogContent className="max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>Conversation Details</DialogTitle>
-            <DialogDescription>View detailed information about this conversation</DialogDescription>
-          </DialogHeader>
+        <DialogHeader>
+          <DialogTitle>{t('conversations.conversationDetails')}</DialogTitle>
+          <DialogDescription>{t('conversations.conversationDetailsDescription')}</DialogDescription>
+        </DialogHeader>
           {selectedConversation && (
             <div className="space-y-4">
-              <p><strong>Title:</strong> {selectedConversation.title}</p>
-              <p><strong>Type:</strong> {selectedConversation.type}</p>
-              <p><strong>Participants:</strong> {selectedConversation.participants}</p>
-              <p><strong>Messages:</strong> {selectedConversation.messageCount}</p>
-              <p><strong>Status:</strong> {selectedConversation.isActive ? 'Active' : 'Inactive'}</p>
+              <p><strong>{t('common.title')}:</strong> {selectedConversation.title}</p>
+              <p><strong>{t('common.type')}:</strong> {selectedConversation.type}</p>
+              <p><strong>{t('conversations.participants')}:</strong> {selectedConversation.participants}</p>
+              <p><strong>{t('conversations.messages')}:</strong> {selectedConversation.messageCount}</p>
+              <p><strong>{t('common.status')}:</strong> {selectedConversation.isActive ? t('common.active') : t('common.inactive')}</p>
             </div>
           )}
           <DialogFooter>
-            <Button onClick={() => setShowDetailsModal(false)}>Close</Button>
+            <Button onClick={() => setShowDetailsModal(false)}>{t('common.close')}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
       <Dialog open={showModerationModal} onOpenChange={setShowModerationModal}>
         <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>Moderate Conversation</DialogTitle>
-            <DialogDescription>Choose a moderation action for this conversation</DialogDescription>
-          </DialogHeader>
+        <DialogHeader>
+          <DialogTitle>{t('moderation.moderateConversation')}</DialogTitle>
+          <DialogDescription>{t('moderation.chooseAction')}</DialogDescription>
+        </DialogHeader>
           <div className="space-y-2">
-            <Button onClick={() => handleModerationAction("archive")} className="w-full">Archive</Button>
-            <Button onClick={() => handleModerationAction("mute")} className="w-full">Mute</Button>
-            <Button onClick={() => handleModerationAction("warn")} className="w-full">Send Warning</Button>
-            <Button onClick={() => handleModerationAction("delete")} variant="destructive" className="w-full">Delete</Button>
+            <Button onClick={() => handleModerationAction("archive")} className="w-full">{t('common.archive')}</Button>
+            <Button onClick={() => handleModerationAction("mute")} className="w-full">{t('common.mute')}</Button>
+            <Button onClick={() => handleModerationAction("warn")} className="w-full">{t('moderation.sendWarning')}</Button>
+            <Button onClick={() => handleModerationAction("delete")} variant="destructive" className="w-full">{t('common.delete')}</Button>
           </div>
         </DialogContent>
       </Dialog>
 
       <Dialog open={showMessageHistory} onOpenChange={setShowMessageHistory}>
         <DialogContent className="max-w-4xl max-h-[80vh] flex flex-col">
-          <DialogHeader>
-            <DialogTitle>{selectedConversation?.title} - Message History</DialogTitle>
-            <DialogDescription>View all messages in this conversation</DialogDescription>
-          </DialogHeader>
-          <div className="flex-1 overflow-y-auto space-y-3 pr-4">
+        <DialogHeader>
+          <DialogTitle>{selectedConversation?.title} - {t('messages.messageHistory')}</DialogTitle>
+          <DialogDescription>{t('messages.viewAllMessages')}</DialogDescription>
+        </DialogHeader>
+        <div className="flex-1 overflow-y-auto space-y-3 pr-4">
             {conversationMessages.length === 0 ? (
-              <p className="text-muted-foreground text-center py-8">No messages</p>
+              <p className="text-muted-foreground text-center py-8">{t('messages.noMessages')}</p>
             ) : (
               conversationMessages.map((msg) => (
                 <div key={msg.id} className="border rounded-lg p-4 bg-muted/30">
                   <div className="flex justify-between items-start mb-2">
-                    <p className="font-semibold text-sm">{msg.sender}</p>
+                    <div className="flex justify-between items-start mb-2">
+                    <p className="font-semibold text-sm">{msg.sender || t('common.unknown')}</p>
                     <span className="text-xs text-muted-foreground">{msg.timestamp}</span>
+                  </div>
                   </div>
                   <p className="text-sm whitespace-pre-wrap break-words">{msg.content}</p>
                 </div>
@@ -651,20 +655,20 @@ export const ConversationMonitor = ({ onTrashConversation }: ConversationMonitor
             )}
           </div>
           <DialogFooter className="mt-4">
-            <Button variant="outline" onClick={() => setShowMessageHistory(false)}>Close</Button>
+            <Button variant="outline" onClick={() => setShowMessageHistory(false)}>{t('common.close')}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
       <Dialog open={showParticipantsModal} onOpenChange={setShowParticipantsModal}>
         <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>Participants</DialogTitle>
-            <DialogDescription>All participants in this conversation</DialogDescription>
-          </DialogHeader>
-          <div className="space-y-3 max-h-[400px] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>{t('conversations.participants')}</DialogTitle>
+          <DialogDescription>{t('conversations.allParticipants')}</DialogDescription>
+        </DialogHeader>
+        <div className="space-y-3 max-h-[400px] overflow-y-auto">
             {selectedParticipants.length === 0 ? (
-              <p className="text-muted-foreground text-center py-4">No participants</p>
+              <p className="text-muted-foreground text-center py-4">{t('conversations.noParticipantsFound')}</p>
             ) : (
               selectedParticipants.map((participant: any, idx: number) => (
                 <div key={idx} className="flex items-center space-x-3 p-2 rounded-lg hover:bg-muted/50">
@@ -675,7 +679,7 @@ export const ConversationMonitor = ({ onTrashConversation }: ConversationMonitor
                     </AvatarFallback>
                   </Avatar>
                   <div className="flex-1 min-w-0">
-                    <p className="font-medium text-sm">{participant.username || 'Unknown'}</p>
+                    <p className="font-medium text-sm">{participant.username || t('common.unknown')}</p>
                     {participant.email && (
                       <p className="text-xs text-muted-foreground truncate">{participant.email}</p>
                     )}
@@ -685,7 +689,7 @@ export const ConversationMonitor = ({ onTrashConversation }: ConversationMonitor
             )}
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowParticipantsModal(false)}>Close</Button>
+            <Button variant="outline" onClick={() => setShowParticipantsModal(false)}>{t('common.close')}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

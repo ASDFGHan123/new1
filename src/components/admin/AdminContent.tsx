@@ -1,4 +1,5 @@
 import React, { Suspense, useState, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useAdmin } from '@/contexts/AdminContext';
 import { StatsCards } from './StatsCards';
 import { UserManagement } from './UserManagement';
@@ -30,6 +31,7 @@ interface AdminContentProps {
 }
 
 export function AdminContent({ user }: AdminContentProps = {}) {
+  const { t } = useTranslation();
   const { state } = useAdmin();
   const [showEditProfile, setShowEditProfile] = useState(false);
   const trashManagerRef = useRef<{ refresh: () => Promise<void> }>(null);
@@ -91,34 +93,34 @@ export function AdminContent({ user }: AdminContentProps = {}) {
         return (
           <div className="max-w-2xl mx-auto space-y-6">
             <div className="bg-gradient-card border border-border/50 rounded-lg p-6">
-              <h2 className="text-2xl font-bold mb-6">Admin Profile</h2>
+              <h2 className="text-2xl font-bold mb-6">{t('admin.profile')}</h2>
               <div className="flex items-start space-x-6">
                 <div className="flex-shrink-0">
                   <ProfileImageUpload 
                     currentImage={user?.avatar}
-                    username={user?.username || 'admin'}
+                    username={user?.username || t('users.admin')}
                     key={user?.avatar}
                   />
                 </div>
                 <div className="flex-1 space-y-4">
                   <div>
-                    <label className="text-sm font-medium text-muted-foreground">Username</label>
-                    <p className="text-lg">{user?.username || 'admin'}</p>
+                    <label className="text-sm font-medium text-muted-foreground">{t('common.username')}</label>
+                    <p className="text-lg">{user?.username || t('users.admin')}</p>
                   </div>
                   <div>
-                    <label className="text-sm font-medium text-muted-foreground">Role</label>
-                    <p className="text-lg capitalize">{user?.role || 'Administrator'}</p>
+                    <label className="text-sm font-medium text-muted-foreground">{t('users.role')}</label>
+                    <p className="text-lg capitalize">{user?.role || t('users.administrator')}</p>
                   </div>
                   <div>
-                    <label className="text-sm font-medium text-muted-foreground">Status</label>
-                    <p className="text-lg text-green-600">Online</p>
+                    <label className="text-sm font-medium text-muted-foreground">{t('common.status')}</label>
+                    <p className="text-lg text-green-600">{t('users.online')}</p>
                   </div>
                   <div>
-                    <label className="text-sm font-medium text-muted-foreground">Last Login</label>
+                    <label className="text-sm font-medium text-muted-foreground">{t('users.lastActive')}</label>
                     <p className="text-lg">{new Date().toLocaleDateString()}</p>
                   </div>
                   <Button onClick={() => setShowEditProfile(true)} className="mt-4">
-                    Edit Profile
+                    {t('common.edit')}
                   </Button>
                 </div>
               </div>
@@ -133,7 +135,7 @@ export function AdminContent({ user }: AdminContentProps = {}) {
       default:
         return (
           <div className="flex items-center justify-center h-64">
-            <p className="text-muted-foreground">Select a tab to view content</p>
+            <p className="text-muted-foreground">{t('common.loading')}</p>
           </div>
         );
     }

@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from "react";
+import { useTranslation } from "react-i18next";
 import {
   Dialog,
   DialogContent,
@@ -32,6 +33,7 @@ export const UserSelectionDialog = ({
   users,
   preSelectedUsers = [],
 }: UserSelectionDialogProps) => {
+  const { t } = useTranslation();
   const [selectedUsers, setSelectedUsers] = useState<string[]>(preSelectedUsers);
   const [searchQuery, setSearchQuery] = useState("");
 
@@ -82,10 +84,10 @@ export const UserSelectionDialog = ({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Users className="w-5 h-5" />
-            Select Recipients
+            {t('system.selectRecipients')}
           </DialogTitle>
           <DialogDescription>
-            Choose users to send your targeted message to. You can search and filter the user list.
+            {t('system.selectRecipientsDesc')}
           </DialogDescription>
         </DialogHeader>
 
@@ -95,17 +97,17 @@ export const UserSelectionDialog = ({
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
               <Input
-                placeholder="Search users by name or email..."
+                placeholder={t('system.searchUsers')}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="pl-10"
               />
             </div>
             <Button variant="outline" size="sm" onClick={handleSelectAll}>
-              Select All
+              {t('common.selectAll')}
             </Button>
             <Button variant="outline" size="sm" onClick={handleClearAll}>
-              Clear All
+              {t('common.clearAll')}
             </Button>
           </div>
 
@@ -114,7 +116,7 @@ export const UserSelectionDialog = ({
             <div className="flex items-center gap-2">
               <UserCheck className="w-4 h-4 text-blue-600" />
               <span className="text-sm text-blue-700 dark:text-blue-300">
-                {selectedUsers.length} user{selectedUsers.length !== 1 ? 's' : ''} selected
+                {t('system.usersSelected', { count: selectedUsers.length })}
               </span>
             </div>
             {selectedUsers.length > 0 && (
@@ -156,7 +158,7 @@ export const UserSelectionDialog = ({
               {filteredUsers.length === 0 && (
                 <div className="text-center py-8 text-muted-foreground">
                   <Users className="w-12 h-12 mx-auto mb-2 opacity-50" />
-                  <p>No users found matching your search.</p>
+                  <p>{t('users.noUsersFound')}</p>
                 </div>
               )}
             </div>
@@ -165,10 +167,10 @@ export const UserSelectionDialog = ({
 
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>
-            Cancel
+            {t('common.cancel')}
           </Button>
           <Button onClick={handleConfirm} disabled={selectedUsers.length === 0}>
-            Send to {selectedUsers.length} User{selectedUsers.length !== 1 ? 's' : ''}
+            {t('system.sendToUsers', { count: selectedUsers.length })}
           </Button>
         </DialogFooter>
       </DialogContent>

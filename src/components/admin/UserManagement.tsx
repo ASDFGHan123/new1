@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
+import { useTranslation } from "react-i18next";
 import { Search, Filter, MoreHorizontal, UserPlus, Printer, Loader2, AlertCircle, RefreshCw } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -36,6 +37,7 @@ interface UserManagementProps {
 }
 
 export const UserManagement = React.memo(({ users: propUsers = [], approveUser, rejectUser, addUser, updateUser, forceLogoutUser, deleteUser, onUserDeleted }: UserManagementProps) => {
+  const { t } = useTranslation();
   const { toast } = useToast();
   
   const [users, setUsers] = useState<User[]>(propUsers);
@@ -114,8 +116,8 @@ export const UserManagement = React.memo(({ users: propUsers = [], approveUser, 
         ));
         
         toast({
-          title: "User Approved",
-          description: "User has been successfully approved.",
+          title: t('users.userApproved'),
+          description: t('users.userApprovedDesc'),
         });
       } else {
         throw new Error(response.error || 'Failed to approve user');
@@ -123,8 +125,8 @@ export const UserManagement = React.memo(({ users: propUsers = [], approveUser, 
     } catch (err) {
       console.error('Failed to approve user:', err);
       toast({
-        title: "Error",
-        description: err instanceof Error ? err.message : 'Failed to approve user',
+        title: t('common.error'),
+        description: err instanceof Error ? err.message : t('users.failedToLoadUsers'),
         variant: "destructive"
       });
     } finally {
@@ -149,8 +151,8 @@ export const UserManagement = React.memo(({ users: propUsers = [], approveUser, 
         onUserDeleted?.();
         
         toast({
-          title: "User Rejected",
-          description: "User has been rejected and removed.",
+          title: t('users.userRejected'),
+          description: t('users.userRejectedDesc'),
         });
       } else {
         throw new Error(response.error || 'Failed to reject user');
@@ -180,8 +182,8 @@ export const UserManagement = React.memo(({ users: propUsers = [], approveUser, 
       
       if (response.success) {
         toast({
-          title: "User Logged Out",
-          description: "User has been forcefully logged out.",
+          title: t('users.userLoggedOut'),
+          description: t('users.userLoggedOutDesc'),
         });
       } else {
         throw new Error(response.error || 'Failed to force logout user');
@@ -217,8 +219,8 @@ export const UserManagement = React.memo(({ users: propUsers = [], approveUser, 
         onUserDeleted?.();
         
         toast({
-          title: moveToTrash ? "User Moved to Trash" : "User Permanently Deleted",
-          description: moveToTrash ? "User has been moved to trash." : "User has been permanently deleted.",
+          title: moveToTrash ? t('trash.deletedItems') : t('users.deleteUser'),
+          description: moveToTrash ? t('trash.deletedItems') : t('trash.deletePermanently'),
         });
       } else {
         throw new Error(response.error || 'Failed to delete user');
@@ -273,8 +275,8 @@ export const UserManagement = React.memo(({ users: propUsers = [], approveUser, 
         setNewAvatar(undefined);
         
         toast({
-          title: "User Created",
-          description: "New user has been created successfully.",
+          title: t('users.addUser'),
+          description: t('users.userApprovedDesc'),
         });
       } else {
         throw new Error(response.error || 'Failed to create user');
@@ -387,9 +389,9 @@ export const UserManagement = React.memo(({ users: propUsers = [], approveUser, 
       <CardHeader>
         <div className="flex items-center justify-between">
           <div>
-            <CardTitle className="text-xl">User Management</CardTitle>
+            <CardTitle className="text-xl">{t('admin.userManagement')}</CardTitle>
             <CardDescription>
-              Manage users, roles, and permissions
+              {t('admin.userManagement')}
             </CardDescription>
           </div>
           <div className="flex items-center space-x-2">
@@ -406,7 +408,7 @@ export const UserManagement = React.memo(({ users: propUsers = [], approveUser, 
                     className="ml-2"
                   >
                     <RefreshCw className={`h-3 w-3 mr-1 ${retryCount > 0 ? 'animate-spin' : ''}`} />
-                    Retry ({retryCount}/3)
+                    {t('common.retry')} ({retryCount}/3)
                   </Button>
                 </AlertDescription>
               </Alert>
@@ -419,24 +421,24 @@ export const UserManagement = React.memo(({ users: propUsers = [], approveUser, 
               className="bg-blue-50 hover:bg-blue-100 border-blue-200 text-blue-700"
             >
               <Printer className="w-4 h-4 mr-2" />
-              Print Users
+              {t('common.print')}
             </Button>
             
             <Dialog open={open} onOpenChange={setOpen}>
               <DialogTrigger asChild>
                 <Button className="bg-admin-primary hover:bg-admin-primary/90" disabled={loading}>
                   <UserPlus className="w-4 h-4 mr-2" />
-                  Add User
+                  {t('users.addUser')}
                 </Button>
               </DialogTrigger>
               <DialogContent>
                 <DialogHeader>
-                  <DialogTitle>Add User</DialogTitle>
-                  <DialogDescription>Add a new user with a role and password.</DialogDescription>
+                  <DialogTitle>{t('users.addUser')}</DialogTitle>
+                  <DialogDescription>{t('users.addUser')}</DialogDescription>
                 </DialogHeader>
                 <form onSubmit={handleAddUser} className="space-y-4">
                   <div>
-                    <Label htmlFor="username">Username</Label>
+                    <Label htmlFor="username">{t('common.username')}</Label>
                     <Input 
                       id="username" 
                       value={newUsername} 
@@ -446,7 +448,7 @@ export const UserManagement = React.memo(({ users: propUsers = [], approveUser, 
                     />
                   </div>
                   <div>
-                    <Label htmlFor="email">Email (Optional)</Label>
+                    <Label htmlFor="email">{t('auth.emailOptional')}</Label>
                     <Input 
                       id="email" 
                       type="email" 
@@ -457,7 +459,7 @@ export const UserManagement = React.memo(({ users: propUsers = [], approveUser, 
                     />
                   </div>
                   <div>
-                    <Label htmlFor="password">Password</Label>
+                    <Label htmlFor="password">{t('common.password')}</Label>
                     <Input 
                       id="password" 
                       type="password" 
@@ -468,7 +470,7 @@ export const UserManagement = React.memo(({ users: propUsers = [], approveUser, 
                     />
                   </div>
                   <div>
-                    <Label htmlFor="role">Role</Label>
+                    <Label htmlFor="role">{t('users.role')}</Label>
                     <select 
                       id="role" 
                       className="w-full border rounded-md p-2" 
@@ -476,22 +478,22 @@ export const UserManagement = React.memo(({ users: propUsers = [], approveUser, 
                       onChange={e => setNewRole(e.target.value)}
                       disabled={addLoading}
                     >
-                      <option value="user">User</option>
-                      <option value="admin">Admin</option>
+                      <option value="user">{t('users.user')}</option>
+                      <option value="admin">{t('users.administrator')}</option>
                     </select>
                   </div>
                   <div>
-                    <Label>Profile Image (Optional)</Label>
+                    <Label>{t('common.optional')}</Label>
                     <ImageUpload value={newAvatar} onChange={setNewAvatar} disabled={addLoading} />
                   </div>
                   {formError && <div className="text-red-500 text-sm">{formError}</div>}
                   <DialogFooter>
                     <Button type="submit" className="bg-admin-primary hover:bg-admin-primary/90" disabled={addLoading}>
                       {addLoading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
-                      {addLoading ? 'Creating...' : 'Add'}
+                      {addLoading ? t('common.loading') : t('users.addUser')}
                     </Button>
                     <DialogClose asChild>
-                      <Button type="button" variant="outline" disabled={addLoading}>Cancel</Button>
+                      <Button type="button" variant="outline" disabled={addLoading}>{t('common.cancel')}</Button>
                     </DialogClose>
                   </DialogFooter>
                 </form>

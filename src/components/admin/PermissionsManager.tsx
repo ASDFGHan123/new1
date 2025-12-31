@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -38,6 +39,7 @@ interface Role {
 }
 
 export function PermissionsManager() {
+  const { t } = useTranslation();
   const [permissions, setPermissions] = useState<Permission[]>([]);
   const [roles, setRoles] = useState<Role[]>([]);
   const [loading, setLoading] = useState(true);
@@ -68,7 +70,7 @@ export function PermissionsManager() {
         }));
         
         // Transform roles
-        const builtInRoles = ['User', 'Moderator', 'Admin'];
+        const builtInRoles = [t('users.user'), t('users.moderator'), t('users.administrator')];
         const transformedRoles = (rolesData.results || rolesData).map((r: any) => ({
           id: r.id,
           name: r.name,
@@ -82,11 +84,11 @@ export function PermissionsManager() {
           setSelectedRole(transformedRoles[0].id);
         }
       } else {
-        throw new Error('Failed to fetch from backend');
+        throw new Error(t('errors.failedToLoad'));
       }
     } catch (err) {
-      console.error('Failed to load permissions:', err);
-      error('Failed to load permissions from backend');
+      console.error(t('permissions.failedToLoadPermissions'), err);
+      error(t('permissions.failedToLoadPermissionsBackend'));
     } finally {
       setLoading(false);
     }
@@ -117,20 +119,20 @@ export function PermissionsManager() {
       });
       
       if (response.success) {
-        setSuccessMsg('Permissions updated successfully');
+        setSuccessMsg(t('permissions.permissionsUpdatedSuccessfully'));
         setTimeout(() => setSuccessMsg(''), 5000);
       } else {
         throw new Error(response.error);
       }
     } catch (err) {
-      console.error('Error saving permissions:', err);
-      error('Failed to save permissions: ' + err);
+      console.error(t('permissions.errorSavingPermissions'), err);
+      error(t('permissions.failedToSavePermissions') + err);
     }
   };
 
   const handleDeleteRole = async (roleId: string) => {
     if (roles.length <= 1) {
-      error('Cannot delete', 'At least one role must exist');
+      error(t('common.cannotDelete'), t('permissions.atLeastOneRoleMustExist'));
       return;
     }
     try {
@@ -143,13 +145,13 @@ export function PermissionsManager() {
         if (selectedRole === roleId) {
           setSelectedRole(roles[0].id);
         }
-        success('Role deleted', 'Role has been removed from database');
+        success(t('permissions.roleDeleted'), t('permissions.roleRemovedFromDatabase'));
       } else {
         throw new Error(response.error);
       }
     } catch (err) {
-      console.error('Error deleting role:', err);
-      error('Failed to delete role');
+      console.error(t('permissions.errorDeletingRole'), err);
+      error(t('permissions.failedToDeleteRole'));
     }
   };
 
@@ -162,22 +164,22 @@ export function PermissionsManager() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-bold mb-2">Permissions</h2>
-          <p className="text-muted-foreground">Manage role permissions and access control</p>
+          <h2 className="text-2xl font-bold mb-2">{t('admin.permissions')}</h2>
+          <p className="text-muted-foreground">{t('permissions.manageRolePermissions')}</p>
         </div>
         <Dialog open={showDialog} onOpenChange={setShowDialog}>
           <DialogTrigger asChild>
-            <Button><Plus className="h-4 w-4 mr-2" />New Role</Button>
+            <Button><Plus className="h-4 w-4 mr-2" />{t('permissions.newRole')}</Button>
           </DialogTrigger>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>Create New Role</DialogTitle>
-              <DialogDescription>Add a new role to the system</DialogDescription>
+              <DialogTitle>{t('permissions.createNewRole')}</DialogTitle>
+              <DialogDescription>{t('permissions.addNewRoleToSystem')}</DialogDescription>
             </DialogHeader>
             <div className="space-y-4">
               <input
                 type="text"
-                placeholder="Role name"
+                placeholder={t('permissions.roleNamePlaceholder')}
                 className="w-full px-3 py-2 border rounded-md bg-background text-foreground"
                 onKeyPress={async (e) => {
                   if (e.key === 'Enter' && (e.target as HTMLInputElement).value) {
@@ -197,13 +199,13 @@ export function PermissionsManager() {
                         }]);
                         setSelectedRole(newRole.id);
                         setShowDialog(false);
-                        success('Role created', 'New role has been saved to database');
+                        success(t('permissions.roleCreated'), t('permissions.newRoleSaved'));
                       } else {
                         throw new Error(response.error);
                       }
                     } catch (err) {
                       console.error('Error creating role:', err);
-                      error('Failed to create role');
+                      error(t('permissions.failedToCreateRole'));
                     }
                   }
                 }}
@@ -215,7 +217,7 @@ export function PermissionsManager() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Role Selection</CardTitle>
+          <CardTitle>{t('permissions.roleSelection')}</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="flex items-center gap-4">
@@ -247,7 +249,7 @@ export function PermissionsManager() {
       <div className="space-y-6">
         {categories.map(category => (
           <div key={category}>
-            <h3 className="text-lg font-semibold mb-3 capitalize">{category}</h3>
+            <h3 className="text-lg font-semibold mb-3 capitalize">{t(`permissions.categories.${category.toLowerCase().replace(/\s/g, '_')}`)}</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {permissions.filter(p => p.category === category).map(perm => {
                 const isChecked = currentRole?.permissions.includes(perm.id) || false;
@@ -284,7 +286,7 @@ export function PermissionsManager() {
 
       {currentRole && (
         <div className="flex justify-end gap-2">
-          <Button onClick={handleSavePermissions}>Save Permissions</Button>
+          <Button onClick={handleSavePermissions}>{t('permissions.savePermissions')}</Button>
         </div>
       )}
       

@@ -1,4 +1,5 @@
 import { Users, MessageSquare, Activity, Shield, Printer, RefreshCw, AlertCircle } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -6,30 +7,30 @@ import { useState, useEffect, useCallback } from "react";
 import { openPrintWindow, generateStatsCardsHTML } from "@/lib/printUtils";
 import { apiService } from "@/lib/api";
 
-const initialStats = [
+const getInitialStats = (t: (key: string) => string) => [
   {
-    title: "Total Users",
+    title: t('stats.totalUsers'),
     value: 0,
     change: 0,
     icon: Users,
     color: "admin-primary",
   },
   {
-    title: "Active Conversations",
+    title: t('conversations.activeConversations'),
     value: 0,
     change: 0,
     icon: MessageSquare,
     color: "admin-secondary",
   },
   {
-    title: "Messages Today",
+    title: t('stats.totalMessages'),
     value: 0,
     change: 0,
     icon: Activity,
     color: "admin-warning",
   },
   {
-    title: "Online Users",
+    title: t('users.onlineUsers'),
     value: 0,
     change: 0,
     icon: Shield,
@@ -38,7 +39,8 @@ const initialStats = [
 ];
 
 export const StatsCards = () => {
-  const [stats, setStats] = useState(initialStats);
+  const { t } = useTranslation();
+  const [stats, setStats] = useState(getInitialStats(t));
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -59,28 +61,28 @@ export const StatsCards = () => {
         
         setStats([
           {
-            title: "Total Users",
+            title: t('stats.totalUsers'),
             value: totalUsers,
             change: 15.2, // Mock growth percentage
             icon: Users,
             color: "admin-primary",
           },
           {
-            title: "Active Conversations",
+            title: t('conversations.activeConversations'),
             value: Math.floor(activeUsers / 2), // Estimate based on active users
             change: 8.5,
             icon: MessageSquare,
             color: "admin-secondary",
           },
           {
-            title: "Messages Today",
+            title: t('stats.totalMessages'),
             value: Math.floor(totalMessages / 10), // Estimate daily messages
             change: 23.1,
             icon: Activity,
             color: "admin-warning",
           },
           {
-            title: "Online Users",
+            title: t('users.onlineUsers'),
             value: onlineUsers,
             change: -2.4,
             icon: Shield,
@@ -95,7 +97,7 @@ export const StatsCards = () => {
       setError(err instanceof Error ? err.message : 'Failed to load statistics');
       
       // Set stats to 0 if API fails
-      setStats(initialStats);
+      setStats(getInitialStats(t));
     } finally {
       setLoading(false);
     }
@@ -111,7 +113,7 @@ export const StatsCards = () => {
     const printData = generateStatsCardsHTML(stats);
     openPrintWindow({
       ...printData,
-      subtitle: "System Performance Overview"
+      subtitle: t('admin.systemPerformanceOverview')
     });
   };
 
@@ -127,7 +129,7 @@ export const StatsCards = () => {
           className="text-gray-900 hover:text-gray-900 dark:text-gray-100 dark:hover:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-800"
         >
           <RefreshCw className={`w-4 h-4 mr-2 text-gray-900 hover:text-gray-900 dark:text-gray-100 dark:hover:text-gray-100 ${loading ? 'animate-spin' : ''}`} />
-          Refresh
+          {t('common.refresh')}
         </Button>
         <Button 
           onClick={handlePrintStats}
@@ -136,7 +138,7 @@ export const StatsCards = () => {
           className="bg-blue-50 hover:bg-blue-100 border-blue-200 text-blue-700"
         >
           <Printer className="w-4 h-4 mr-2" />
-          Print Statistics
+          {t('common.print')}
         </Button>
       </div>
 
@@ -170,7 +172,7 @@ export const StatsCards = () => {
                   <p className={`text-xs ${
                     stat.change >= 0 ? 'text-admin-success' : 'text-admin-error'
                   }`}>
-                    {stat.change >= 0 ? '+' : ''}{stat.change.toFixed(1)}% from last month
+                    {stat.change >= 0 ? '+' : ''}{stat.change.toFixed(1)}% {t('common.fromLastMonth')}
                   </p>
                 </>
               )}

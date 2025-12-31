@@ -70,6 +70,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         password: credentials.password
       });
       
+      console.log('Login response:', response);
+      
       if (response.success && response.data) {
         const authUser: AuthUser = {
           ...response.data.user,
@@ -81,11 +83,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         return authUser;
       } else {
         const errorMessage = response.error || 'Login failed';
+        console.error('Login failed:', errorMessage);
         setError(errorMessage);
         throw new Error(errorMessage);
       }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Login failed';
+      console.error('Login error:', errorMessage);
       setError(errorMessage);
       throw error;
     } finally {
@@ -108,6 +112,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         password: credentials.password
       });
       
+      console.log('Signup response:', response);
+      
       if (response.success && response.data) {
         const authUser: AuthUser = {
           ...response.data.user,
@@ -119,11 +125,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         return authUser;
       } else {
         const errorMessage = response.error || 'Signup failed';
+        console.error('Signup failed:', errorMessage);
         setError(errorMessage);
         throw new Error(errorMessage);
       }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Signup failed';
+      console.error('Signup error:', errorMessage);
       setError(errorMessage);
       throw error;
     } finally {

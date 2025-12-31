@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { ThemeToggle } from '@/components/ThemeToggle';
+import { LanguageSwitcher } from '@/components/LanguageSwitcher';
 import { EditProfileDialog } from './EditProfileDialog';
 import { LogOut, Settings } from 'lucide-react';
 
@@ -18,16 +20,18 @@ interface AdminHeaderProps {
 }
 
 export function AdminHeader({ user, onLogout }: AdminHeaderProps) {
+  const { t } = useTranslation();
   const [showEditProfile, setShowEditProfile] = useState(false);
 
   return (
     <header className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="flex h-14 items-center justify-between px-4">
         <div className="flex items-center space-x-4">
-          <h1 className="text-lg font-semibold">Admin Dashboard</h1>
+          <h1 className="text-lg font-semibold">{t('admin.adminDashboard')}</h1>
         </div>
         
         <div className="flex items-center space-x-4">
+          <LanguageSwitcher />
           <ThemeToggle />
           
           {user && (
@@ -40,7 +44,7 @@ export function AdminHeader({ user, onLogout }: AdminHeaderProps) {
                   </AvatarFallback>
                 </Avatar>
                 <Badge variant="secondary" className="text-xs">
-                  {user.role || 'Admin'}
+                  {user.role || t('users.admin')}
                 </Badge>
               </div>
               

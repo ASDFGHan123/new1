@@ -25,7 +25,7 @@ class FlaggedMessageViewSet(viewsets.ModelViewSet):
         if status_filter:
             queryset = queryset.filter(status=status_filter)
         if reason_filter:
-            queryset = queryset.filter(reason=reason_filter)
+            queryset = queryset.filter(reaosn=reason_filter)
         
         return queryset.order_by('-reported_at')
     

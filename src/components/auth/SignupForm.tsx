@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,6 +13,7 @@ interface SignupFormProps {
 }
 
 export const SignupForm = ({ onToggleMode, onSignup }: SignupFormProps) => {
+  const { t } = useTranslation();
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -46,21 +48,21 @@ export const SignupForm = ({ onToggleMode, onSignup }: SignupFormProps) => {
             </h1>
           </div>
           <div>
-            <CardTitle className="text-2xl">Create account</CardTitle>
+            <CardTitle className="text-2xl">{t('auth.createAccount')}</CardTitle>
             <CardDescription className="text-muted-foreground">
-              Join the conversation and connect with others
+              {t('auth.joinConversation')}
             </CardDescription>
           </div>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="username">Username</Label>
+              <Label htmlFor="username">{t('common.username')}</Label>
               <div className="relative">
                 <Input
                   id="username"
                   type="text"
-                  placeholder="e.g. ahmad zia"
+                  placeholder={t('auth.usernamePlaceholder')}
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
                   required
@@ -70,23 +72,23 @@ export const SignupForm = ({ onToggleMode, onSignup }: SignupFormProps) => {
               </div>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="email">Email (Optional)</Label>
+              <Label htmlFor="email">{t('auth.emailOptional')}</Label>
               <Input
                 id="email"
                 type="email"
-                placeholder="Enter your email"
+                placeholder={t('auth.enterEmail')}
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 className="transition-all duration-300 focus:shadow-glow"
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
+              <Label htmlFor="password">{t('common.password')}</Label>
               <div className="relative">
                 <Input
                   id="password"
                   type={showPassword ? "text" : "password"}
-                  placeholder="Create a password"
+                  placeholder={t('auth.createPassword')}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
@@ -112,18 +114,18 @@ export const SignupForm = ({ onToggleMode, onSignup }: SignupFormProps) => {
               className="w-full bg-gradient-to-r from-primary to-primary-glow hover:shadow-glow transition-all duration-300" 
               disabled={isLoading}
             >
-              {isLoading ? "Creating account..." : "Create Account"}
+              {isLoading ? t('auth.creatingAccount') : t('auth.createAccountButton')}
             </Button>
           </form>
           <div className="mt-6 text-center">
             <p className="text-sm text-muted-foreground">
-              Already have an account?{" "}
+              {t('auth.alreadyHaveAccount')}{" "}
               <Button
                 variant="link"
                 className="p-0 h-auto text-primary hover:text-primary-glow transition-colors"
                 onClick={() => navigate("/login")}
               >
-                Sign in
+                {t('auth.signIn')}
               </Button>
             </p>
           </div>

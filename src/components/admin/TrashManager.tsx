@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
+import { useTranslation } from "react-i18next";
 import { Trash2, RotateCcw, Trash, Loader2, AlertCircle, RefreshCw } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -20,6 +21,7 @@ interface TrashItem {
 }
 
 export const TrashManager = React.forwardRef<{ refresh: () => Promise<void> }>((_props, ref) => {
+  const { t } = useTranslation();
   const { toast } = useToast();
   const [trashItems, setTrashItems] = useState<TrashItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -37,7 +39,7 @@ export const TrashManager = React.forwardRef<{ refresh: () => Promise<void> }>((
       if (response.success && response.data) {
         setTrashItems(Array.isArray(response.data) ? response.data : response.data.results || []);
       } else {
-        setError(response.error || 'Failed to load trash');
+        setError(response.error || t('errors.failedToLoad'));
         setTrashItems([]);
       }
     } catch (err) {
@@ -60,16 +62,16 @@ export const TrashManager = React.forwardRef<{ refresh: () => Promise<void> }>((
       if (response.success) {
         setTrashItems(prev => prev.filter(t => t.id !== item.id));
         toast({
-          title: "Item Restored",
-          description: `${item.item_type} has been restored successfully.`
+          title: t('trash.restoreItem'),
+          description: t('trash.restoreItem')
         });
       } else {
         throw new Error(response.error || 'Failed to restore item');
       }
     } catch (err) {
       toast({
-        title: "Error",
-        description: err instanceof Error ? err.message : 'Failed to restore item',
+        title: t('common.error'),
+        description: err instanceof Error ? err.message : t('errors.failedToUpdate'),
         variant: "destructive"
       });
     } finally {
@@ -88,16 +90,16 @@ export const TrashManager = React.forwardRef<{ refresh: () => Promise<void> }>((
       if (response.success) {
         setTrashItems(prev => prev.filter(t => t.id !== item.id));
         toast({
-          title: "Item Deleted",
-          description: `${item.item_type} has been permanently deleted.`
+          title: t('trash.deletePermanently'),
+          description: t('trash.deletePermanently')
         });
       } else {
         throw new Error(response.error || 'Failed to delete item');
       }
     } catch (err) {
       toast({
-        title: "Error",
-        description: err instanceof Error ? err.message : 'Failed to delete item',
+        title: t('common.error'),
+        description: err instanceof Error ? err.message : t('errors.failedToDelete'),
         variant: "destructive"
       });
     } finally {
@@ -116,8 +118,8 @@ export const TrashManager = React.forwardRef<{ refresh: () => Promise<void> }>((
       if (response.success) {
         setTrashItems([]);
         toast({
-          title: "Trash Emptied",
-          description: "All expired items have been permanently deleted."
+          title: t('trash.emptyTrash'),
+          description: t('trash.emptyTrash')
         });
       } else {
         throw new Error(response.error || 'Failed to empty trash');
@@ -163,9 +165,9 @@ export const TrashManager = React.forwardRef<{ refresh: () => Promise<void> }>((
       <CardHeader>
         <div className="flex items-center justify-between">
           <div>
-            <CardTitle className="text-xl">Trash</CardTitle>
+            <CardTitle className="text-xl">{t('admin.trash')}</CardTitle>
             <CardDescription>
-              Manage deleted items. Items expire after 30 days.
+              {t('trash.deletedItems')}
             </CardDescription>
           </div>
           <div className="flex gap-2">
@@ -176,26 +178,26 @@ export const TrashManager = React.forwardRef<{ refresh: () => Promise<void> }>((
               disabled={loading}
             >
               <RefreshCw className={`w-4 h-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
-              Refresh
+              {t('common.refresh')}
             </Button>
             {trashItems.length > 0 && (
               <Dialog>
                 <DialogTrigger asChild>
                   <Button variant="destructive" size="sm">
                     <Trash className="w-4 h-4 mr-2" />
-                    Empty Trash
+                    {t('trash.emptyTrash')}
                   </Button>
                 </DialogTrigger>
                 <DialogContent>
                   <DialogHeader>
-                    <DialogTitle>Empty Trash</DialogTitle>
+                    <DialogTitle>{t('trash.emptyTrash')}</DialogTitle>
                     <DialogDescription>
-                      This will permanently delete all expired items. This action cannot be undone.
+                      {t('trash.emptyTrashWarning')}
                     </DialogDescription>
                   </DialogHeader>
                   <DialogFooter>
                     <Button variant="outline" asChild>
-                      <DialogClose>Cancel</DialogClose>
+                      <DialogClose>{t('common.cancel')}</DialogClose>
                     </Button>
                     <Button 
                       variant="destructive" 
@@ -203,7 +205,7 @@ export const TrashManager = React.forwardRef<{ refresh: () => Promise<void> }>((
                       disabled={loading}
                     >
                       {loading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
-                      Empty Trash
+                      {t('trash.emptyTrash')}
                     </Button>
                   </DialogFooter>
                 </DialogContent>
@@ -224,24 +226,24 @@ export const TrashManager = React.forwardRef<{ refresh: () => Promise<void> }>((
         {loading ? (
           <div className="text-center py-8">
             <Loader2 className="h-8 w-8 animate-spin mx-auto mb-2 text-primary" />
-            <p className="text-muted-foreground">Loading trash...</p>
+            <p className="text-muted-foreground">{t('trash.loadingTrash')}</p>
           </div>
         ) : trashItems.length === 0 ? (
           <div className="text-center py-8">
             <Trash2 className="w-12 h-12 mx-auto mb-2 opacity-50" />
-            <p className="text-muted-foreground">Trash is empty</p>
+            <p className="text-muted-foreground">{t('trash.noDeletedItems')}</p>
           </div>
         ) : (
           <div className="max-h-[600px] overflow-y-auto">
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Type</TableHead>
-                  <TableHead>Item</TableHead>
-                  <TableHead>Deleted By</TableHead>
-                  <TableHead>Deleted At</TableHead>
-                  <TableHead>Expires In</TableHead>
-                  <TableHead>Actions</TableHead>
+                  <TableHead>{t('trash.itemType')}</TableHead>
+                  <TableHead>{t('common.name')}</TableHead>
+                  <TableHead>{t('trash.deletedBy')}</TableHead>
+                  <TableHead>{t('trash.deletedAt')}</TableHead>
+                  <TableHead>{t('common.status')}</TableHead>
+                  <TableHead>{t('common.actions')}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -249,14 +251,14 @@ export const TrashManager = React.forwardRef<{ refresh: () => Promise<void> }>((
                   <TableRow key={item.id}>
                     <TableCell>
                       <Badge variant="outline" className="capitalize">
-                        {item.item_type}
+                        {t(`trash.item_types.${item.item_type}`)}
                       </Badge>
                     </TableCell>
                     <TableCell>
                       {item.item_type === 'user' ? item.item_data.username : `ID: ${item.item_id}`}
                     </TableCell>
                     <TableCell>
-                      {item.deleted_by || 'System'}
+                      {item.deleted_by || t('common.system')}
                     </TableCell>
                     <TableCell>
                       {new Date(item.deleted_at).toLocaleDateString()}
@@ -265,7 +267,7 @@ export const TrashManager = React.forwardRef<{ refresh: () => Promise<void> }>((
                       <Badge 
                         variant={getDaysUntilExpiry(item.expires_at) <= 7 ? 'destructive' : 'secondary'}
                       >
-                        {getDaysUntilExpiry(item.expires_at)} days
+                        {getDaysUntilExpiry(item.expires_at)} {t('common.days')}
                       </Badge>
                     </TableCell>
                     <TableCell>
@@ -281,7 +283,7 @@ export const TrashManager = React.forwardRef<{ refresh: () => Promise<void> }>((
                           ) : (
                             <RotateCcw className="w-3 h-3 mr-1" />
                           )}
-                          Restore
+                          {t('trash.restore')}
                         </Button>
                         <Button
                           size="sm"
@@ -294,7 +296,7 @@ export const TrashManager = React.forwardRef<{ refresh: () => Promise<void> }>((
                           ) : (
                             <Trash className="w-3 h-3 mr-1" />
                           )}
-                          Delete
+                          {t('common.delete')}
                         </Button>
                       </div>
                     </TableCell>

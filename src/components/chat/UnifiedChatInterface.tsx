@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from "react";
+import { useTranslation } from "react-i18next";
 import { useUnifiedChat } from "@/hooks/useUnifiedChat";
 import { useAuth } from "@/contexts/AuthContext";
 import { UnifiedSidebar } from "./UnifiedSidebar.tsx";
@@ -60,6 +61,7 @@ import { apiService } from "@/lib/api";
 import type { Conversation, IndividualMessage, GroupMessage, User, Attachment } from "@/types/chat";
 
 export const UnifiedChatInterface = ({ initialConversationId }: { initialConversationId?: string | null }) => {
+  const { t } = useTranslation();
   const { user: authUser, logout: authLogout } = useAuth();
   const chat = useUnifiedChat();
   
@@ -137,7 +139,7 @@ export const UnifiedChatInterface = ({ initialConversationId }: { initialConvers
         });
         
         if (!response.success) {
-          throw new Error(response.error || 'Failed to edit message');
+            throw new Error(response.error || t('messages.failedToEditMessage'));
         }
         
         chat.editMessage(conversationId, messageId, content);
@@ -163,7 +165,7 @@ export const UnifiedChatInterface = ({ initialConversationId }: { initialConvers
         });
         
         if (!response.success) {
-          throw new Error(response.error || 'Failed to delete message');
+          throw new Error(response.error || t('messages.failedToDeleteMessage'));
         }
         
         chat.deleteMessage(conversationId, messageId);
@@ -180,8 +182,8 @@ export const UnifiedChatInterface = ({ initialConversationId }: { initialConvers
       <div className="flex h-screen items-center justify-center">
         <div className="text-center">
           <MessageCircle className="h-16 w-16 mx-auto mb-4 text-muted-foreground" />
-          <h3 className="text-xl font-semibold mb-2">Please log in</h3>
-          <p className="text-muted-foreground">You need to be logged in to access the chat.</p>
+          <h3 className="text-xl font-semibold mb-2">{t('auth.pleaseLogin')}</h3>
+          <p className="text-muted-foreground">{t('auth.needToLogin')}</p>
         </div>
       </div>
     );
@@ -273,7 +275,7 @@ export const UnifiedChatInterface = ({ initialConversationId }: { initialConvers
   };
 
   const formatFileSize = (bytes?: number) => {
-    if (!bytes) return '0 B';
+    if (!bytes) return t('common.zeroBytes');
     const k = 1024;
     const sizes = ['B', 'KB', 'MB', 'GB'];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
@@ -327,13 +329,13 @@ export const UnifiedChatInterface = ({ initialConversationId }: { initialConvers
         <div className="flex-1 flex items-center justify-center">
           <div className="text-center">
             <MessageCircle className="h-16 w-16 mx-auto mb-4 text-muted-foreground" />
-            <h3 className="text-xl font-semibold mb-2">Welcome to OffChat</h3>
+            <h3 className="text-xl font-semibold mb-2">{t('chat.welcomeToOffChat')}</h3>
             <p className="text-muted-foreground mb-6">
-              Select a conversation from the sidebar or search for users and groups to start chatting
+              {t('chat.selectConversationToStart')}
             </p>
             <Button onClick={() => setShowSearch(true)}>
               <Search className="h-4 w-4 mr-2" />
-              Search Users & Groups
+              {t('chat.searchUsersAndGroups')}
             </Button>
           </div>
         </div>
@@ -364,14 +366,14 @@ export const UnifiedChatInterface = ({ initialConversationId }: { initialConvers
                 <Avatar className="h-10 w-10">
                   <AvatarImage src={currentConversation.groupAvatar} />
                   <AvatarFallback className="bg-primary text-primary-foreground">
-                    {(currentConversation.groupName || '??').slice(0, 2).toUpperCase()}
+                    {(currentConversation.groupName || t('common.unknown')).slice(0, 2).toUpperCase()}
                   </AvatarFallback>
                 </Avatar>
               ) : (
                 <Avatar className="h-10 w-10">
                   <AvatarImage src={getOtherUser(currentConversation)?.avatar} />
                   <AvatarFallback className="bg-primary text-primary-foreground">
-                    {(getOtherUser(currentConversation)?.username || '??').slice(0, 2).toUpperCase()}
+                    {(getOtherUser(currentConversation)?.username || t('common.unknown')).slice(0, 2).toUpperCase()}
                   </AvatarFallback>
                 </Avatar>
               )}
@@ -389,14 +391,14 @@ export const UnifiedChatInterface = ({ initialConversationId }: { initialConvers
                   {currentConversation.type === 'group' ? (
                     <>
                       <Users className="h-4 w-4" />
-                      <span>{currentConversation.participants.length} members</span>
+                      <span>{currentConversation.participants.length} {t('chat.members')}</span>
                     </>
                   ) : (
                     <div className="flex items-center gap-2">
                       <div 
                         className={`w-3 h-3 rounded-full ${getStatusColor(getOtherUser(currentConversation)?.status || 'offline')}`}
                       />
-                      <span className="capitalize">{getOtherUser(currentConversation)?.status || 'offline'}</span>
+                      <span className="capitalize">{t(`chat.${getOtherUser(currentConversation)?.status || 'offline'}`)}</span>
                     </div>
                   )}
                 </div>
@@ -413,12 +415,12 @@ export const UnifiedChatInterface = ({ initialConversationId }: { initialConvers
                 </DialogTrigger>
                 <DialogContent>
                   <DialogHeader>
-                    <DialogTitle>Profile Settings</DialogTitle>
-                    <DialogDescription>Update your profile information</DialogDescription>
+                    <DialogTitle>{t('settings.profileSettings')}</DialogTitle>
+                    <DialogDescription>{t('settings.updateProfileInfo')}</DialogDescription>
                   </DialogHeader>
                   <div className="space-y-4">
                     <div>
-                      <Label>Profile Image</Label>
+                      <Label>{t('settings.profileImage')}</Label>
                       <ImageUpload value={avatar} onChange={setAvatar} />
                     </div>
                   </div>
@@ -445,7 +447,7 @@ export const UnifiedChatInterface = ({ initialConversationId }: { initialConvers
             {chat.loading && (
               <div className="text-center py-8">
                 <Loader2 className="h-8 w-8 animate-spin mx-auto mb-2 text-primary" />
-                <p className="text-muted-foreground">Loading messages...</p>
+                <p className="text-muted-foreground">{t('messages.loadingMessages')}</p>
               </div>
             )}
 
@@ -454,9 +456,9 @@ export const UnifiedChatInterface = ({ initialConversationId }: { initialConvers
                 <div className="mx-auto w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mb-4">
                   <MessageCircle className="h-8 w-8 text-primary" />
                 </div>
-                <h3 className="text-lg font-semibold mb-2">Start the conversation</h3>
+                <h3 className="text-lg font-semibold mb-2">{t('chat.startConversation')}</h3>
                 <p className="text-muted-foreground">
-                  Be the first to send a message in this chat
+                  {t('chat.firstMessagePrompt')}
                 </p>
               </div>
             ) : (
@@ -495,10 +497,10 @@ export const UnifiedChatInterface = ({ initialConversationId }: { initialConvers
                                 <div className="flex gap-2 justify-end">
                                   <Button size="sm" onClick={saveMessageEdit} disabled={!editMessageContent.trim()}>
                                     <Check className="h-3 w-3 mr-1" />
-                                    Save
+                                    {t('common.save')}
                                   </Button>
                                   <Button variant="outline" size="sm" onClick={cancelMessageEdit}>
-                                    Cancel
+                                    {t('common.cancel')}
                                   </Button>
                                 </div>
                               </div>
@@ -579,7 +581,7 @@ export const UnifiedChatInterface = ({ initialConversationId }: { initialConvers
                                         ) : (
                                           <Trash2 className="h-4 w-4 mr-2" />
                                         )}
-                                        Delete
+                                        {t('common.delete')}
                                       </DropdownMenuItem>
                                     </DropdownMenuContent>
                                   </DropdownMenu>
@@ -601,34 +603,34 @@ export const UnifiedChatInterface = ({ initialConversationId }: { initialConvers
                         {msg.attachments && msg.attachments.length > 0 && (
                           <div className={msg.content ? "mt-2 space-y-2" : "space-y-2"}>
                             {msg.attachments.map((attachment) => {
-                              const attachmentType = attachment.type || '';
-                              if (attachmentType.startsWith('image/')) {
-                                return (
-                                  <img
-                                    key={attachment.id}
-                                    src={attachment.url}
-                                    alt={attachment.name}
-                                    className="max-w-xs rounded-lg cursor-pointer hover:opacity-80"
-                                    onClick={() => setSelectedImage(attachment.url)}
-                                  />
-                                );
-                              }
-                              return (
-                                <a
-                                  key={attachment.id}
-                                  href={attachment.url}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="flex items-center gap-2 p-2 bg-black/10 rounded-lg cursor-pointer hover:bg-black/20"
-                                >
-                                  {getFileIcon(attachment.name, attachmentType)}
-                                  <div className="flex-1 min-w-0">
-                                    <p className="text-xs font-medium truncate">{attachment.name}</p>
-                                    {attachment.size > 0 && <p className="text-xs opacity-70">{formatFileSize(attachment.size)}</p>}
-                                  </div>
-                                </a>
-                              );
-                            })}
+                                      const attachmentType = attachment.type || '';
+                                      if (attachmentType.startsWith('image/')) {
+                                        return (
+                                          <img
+                                            key={attachment.id}
+                                            src={attachment.url}
+                                            alt={attachment.name}
+                                            className="max-w-xs rounded-lg cursor-pointer hover:opacity-80"
+                                            onClick={() => setSelectedImage(attachment.url)}
+                                          />
+                                        );
+                                      }
+                                      return (
+                                        <a
+                                          key={attachment.id}
+                                          href={attachment.url}
+                                          target="_blank"
+                                          rel="noopener noreferrer"
+                                          className="flex items-center gap-2 p-2 bg-black/10 rounded-lg cursor-pointer hover:bg-black/20"
+                                        >
+                                          {getFileIcon(attachment.name, attachmentType)}
+                                          <div className="flex-1 min-w-0">
+                                            <p className="text-xs font-medium truncate">{attachment.name}</p>
+                                            {attachment.size > 0 && <p className="text-xs opacity-70">{formatFileSize(attachment.size)}</p>}
+                                          </div>
+                                        </a>
+                                      );
+                                    })}
                           </div>
                         )}
                         
@@ -686,7 +688,7 @@ export const UnifiedChatInterface = ({ initialConversationId }: { initialConvers
               <Input
                 value={message}
                 onChange={(e) => setMessage(e.target.value)}
-                placeholder={`Message ${currentConversation.type === 'group' ? currentConversation.groupName : getOtherUser(currentConversation)?.username}...`}
+                    placeholder={`${t('chat.typeMessage')} ${currentConversation.type === 'group' ? currentConversation.groupName : getOtherUser(currentConversation)?.username}...`}
                 className="flex-1"
               />
               <input
@@ -724,7 +726,7 @@ export const UnifiedChatInterface = ({ initialConversationId }: { initialConvers
       <Dialog open={!!selectedImage} onOpenChange={() => setSelectedImage(null)}>
         <DialogContent className="max-w-2xl">
           {selectedImage && (
-            <img src={selectedImage} alt="Full size" className="w-full rounded-lg" />
+                <img src={selectedImage} alt={t('common.fullSize')} className="w-full rounded-lg" />
           )}
         </DialogContent>
       </Dialog>
