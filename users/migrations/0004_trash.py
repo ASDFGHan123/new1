@@ -1,13 +1,9 @@
-"""
-Migration to add TrashItem model.
-"""
 from django.conf import settings
 from django.db import migrations, models
 import django.db.models.deletion
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ('users', '0003_ipaddress_suspiciousactivity_ipaccesslog'),
     ]
