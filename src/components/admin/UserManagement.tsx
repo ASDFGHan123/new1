@@ -12,18 +12,11 @@ import { ImageUpload } from "@/components/ui/image-upload";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { UserManagementTable } from "./UserManagementTable";
 import { openPrintWindow, generateUserListHTML } from "@/lib/printUtils";
 import { apiService, type User } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
-import { invalidateUsersCache } from "@/hooks/useApiData";
+import { organizationApi } from "@/lib/organization-api";
 
 interface UserManagementProps {
   users?: User[];
@@ -50,6 +43,18 @@ export const UserManagement = React.memo(({ users: propUsers = [], approveUser, 
   const [newPassword, setNewPassword] = useState("");
   const [newRole, setNewRole] = useState("user");
   const [newAvatar, setNewAvatar] = useState<string | undefined>(undefined);
+  const [newDept, setNewDept] = useState("");
+  const [newOffice, setNewOffice] = useState("");
+  const [newFirstName, setNewFirstName] = useState("");
+  const [newLastName, setNewLastName] = useState("");
+  const [newFatherName, setNewFatherName] = useState("");
+  const [newPosition, setNewPosition] = useState("");
+  const [newPhoneNumber, setNewPhoneNumber] = useState("");
+  const [newIdCardNumber, setNewIdCardNumber] = useState("");
+  const [newNationalIdCardNumber, setNewNationalIdCardNumber] = useState("");
+  const [newDescription, setNewDescription] = useState("");
+  const [departments, setDepartments] = useState<any[]>([]);
+  const [offices, setOffices] = useState<any[]>([]);
   const [addLoading, setAddLoading] = useState(false);
   const [formError, setFormError] = useState("");
   const [editingUser, setEditingUser] = useState<User | null>(null);
@@ -63,6 +68,7 @@ export const UserManagement = React.memo(({ users: propUsers = [], approveUser, 
   const [roleFilter, setRoleFilter] = useState<string>("all");
   const [showFilters, setShowFilters] = useState(false);
   const [actionLoading, setActionLoading] = useState<{[key: string]: boolean}>({});
+  const [userDepartments, setUserDepartments] = useState<{[key: string]: any}>({});
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [userToDelete, setUserToDelete] = useState<string | null>(null);
 
@@ -147,7 +153,6 @@ export const UserManagement = React.memo(({ users: propUsers = [], approveUser, 
       
       if (response.success) {
         setUsers(prev => prev.filter(user => user.id !== userId));
-        invalidateUsersCache();
         onUserDeleted?.();
         
         toast({
@@ -215,7 +220,6 @@ export const UserManagement = React.memo(({ users: propUsers = [], approveUser, 
       
       if (response.success) {
         setUsers(prev => prev.filter(user => user.id !== userId));
-        invalidateUsersCache();
         onUserDeleted?.();
         
         toast({
@@ -239,6 +243,39 @@ export const UserManagement = React.memo(({ users: propUsers = [], approveUser, 
     }
   };
 
+  useEffect(() => {
+    loadUsers();
+  }, [loadUsers]);
+
+  useEffect(() => {
+    const fetchDepts = async () => {
+      try {
+        const data = await organizationApi.getDepartments();
+        setDepartments(Array.isArray(data) ? data : data.results || []);
+      } catch (err) {
+        console.error('Error fetching departments:', err);
+      }
+    };
+    fetchDepts();
+  }, []);
+
+  useEffect(() => {
+    if (newDept) {
+      const fetchOffices = async () => {
+        try {
+          const data = await organizationApi.getOffices(newDept);
+          setOffices(Array.isArray(data) ? data : data.results || []);
+        } catch (err) {
+          console.error('Error fetching offices:', err);
+        }
+      };
+      fetchOffices();
+    } else {
+      setOffices([]);
+      setNewOffice("");
+    }
+  }, [newDept]);
+
   const handleAddUser = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -261,18 +298,48 @@ export const UserManagement = React.memo(({ users: propUsers = [], approveUser, 
         email: newEmail || `${newUsername}@offchat.local`,
         password: newPassword,
         role: newRole,
-        status: 'active'
+        status: 'active',
+        first_name: newFirstName,
+        last_name: newLastName,
+        father_name: newFatherName,
+        position: newPosition,
+        phone_number: newPhoneNumber,
+        id_card_number: newIdCardNumber,
+        national_id_card_number: newNationalIdCardNumber,
+        description: newDescription
       });
       
       if (response.success && response.data) {
         setUsers(prev => [...prev, response.data]);
-        invalidateUsersCache();
+        
+        if (newDept && newOffice) {
+          try {
+            await organizationApi.assignUserToDepartmentOffice({
+              user: response.data.id,
+              department: newDept,
+              office: newOffice
+            });
+          } catch (err) {
+            console.error('Error assigning user to department:', err);
+          }
+        }
+        
         setOpen(false);
         setNewUsername("");
         setNewEmail("");
         setNewPassword("");
         setNewRole("user");
         setNewAvatar(undefined);
+        setNewDept("");
+        setNewOffice("");
+        setNewFirstName("");
+        setNewLastName("");
+        setNewFatherName("");
+        setNewPosition("");
+        setNewPhoneNumber("");
+        setNewIdCardNumber("");
+        setNewNationalIdCardNumber("");
+        setNewDescription("");
         
         toast({
           title: t('users.addUser'),
@@ -344,7 +411,6 @@ export const UserManagement = React.memo(({ users: propUsers = [], approveUser, 
               ? { ...user, username: editUsername, email: editEmail, role: editRole, avatar: editAvatar }
               : user
           ));
-          invalidateUsersCache();
           
           setEditingUser(null);
           
@@ -364,9 +430,34 @@ export const UserManagement = React.memo(({ users: propUsers = [], approveUser, 
     }
   };
 
-  useEffect(() => {
-    loadUsers();
+  const loadUserDepartments = useCallback(async () => {
+    try {
+      const data = await fetch('http://localhost:8000/api/users/department-office-users/', {
+        headers: { 'Authorization': `Bearer ${localStorage.getItem('access_token')}` }
+      }).then(r => r.json());
+      
+      const deptMap: {[key: string]: any} = {};
+      const assignments = Array.isArray(data) ? data : data.results || [];
+      
+      assignments.forEach((assign: any) => {
+        if (!deptMap[assign.user]) {
+          deptMap[assign.user] = [];
+        }
+        deptMap[assign.user].push({
+          department: assign.department_name,
+          office: assign.office_name
+        });
+      });
+      
+      setUserDepartments(deptMap);
+    } catch (err) {
+      console.error('Error loading user departments:', err);
+    }
   }, []);
+
+  useEffect(() => {
+    loadUserDepartments();
+  }, [loadUserDepartments]);
 
   const filteredUsers = users.filter(user => {
     const matchesSearch = user.username.toLowerCase().includes(search.toLowerCase()) ||
@@ -431,12 +522,13 @@ export const UserManagement = React.memo(({ users: propUsers = [], approveUser, 
                   {t('users.addUser')}
                 </Button>
               </DialogTrigger>
-              <DialogContent>
+              <DialogContent className="max-h-[90vh] overflow-hidden flex flex-col">
                 <DialogHeader>
                   <DialogTitle>{t('users.addUser')}</DialogTitle>
                   <DialogDescription>{t('users.addUser')}</DialogDescription>
                 </DialogHeader>
-                <form onSubmit={handleAddUser} className="space-y-4">
+                <div className="overflow-y-auto flex-1 pr-4">
+                  <div className="space-y-4">
                   <div>
                     <Label htmlFor="username">{t('common.username')}</Label>
                     <Input 
@@ -470,6 +562,87 @@ export const UserManagement = React.memo(({ users: propUsers = [], approveUser, 
                     />
                   </div>
                   <div>
+                    <Label htmlFor="firstName">First Name</Label>
+                    <Input 
+                      id="firstName" 
+                      type="text" 
+                      value={newFirstName} 
+                      onChange={e => setNewFirstName(e.target.value)} 
+                      disabled={addLoading}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="lastName">Last Name</Label>
+                    <Input 
+                      id="lastName" 
+                      type="text" 
+                      value={newLastName} 
+                      onChange={e => setNewLastName(e.target.value)} 
+                      disabled={addLoading}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="fatherName">Father Name</Label>
+                    <Input 
+                      id="fatherName" 
+                      type="text" 
+                      value={newFatherName} 
+                      onChange={e => setNewFatherName(e.target.value)} 
+                      disabled={addLoading}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="position">Position</Label>
+                    <Input 
+                      id="position" 
+                      type="text" 
+                      value={newPosition} 
+                      onChange={e => setNewPosition(e.target.value)} 
+                      disabled={addLoading}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="phoneNumber">Phone Number</Label>
+                    <Input 
+                      id="phoneNumber" 
+                      type="tel" 
+                      value={newPhoneNumber} 
+                      onChange={e => setNewPhoneNumber(e.target.value)} 
+                      disabled={addLoading}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="idCardNumber">ID Card Number</Label>
+                    <Input 
+                      id="idCardNumber" 
+                      type="text" 
+                      value={newIdCardNumber} 
+                      onChange={e => setNewIdCardNumber(e.target.value)} 
+                      disabled={addLoading}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="nationalIdCardNumber">National ID Card Number</Label>
+                    <Input 
+                      id="nationalIdCardNumber" 
+                      type="text" 
+                      value={newNationalIdCardNumber} 
+                      onChange={e => setNewNationalIdCardNumber(e.target.value)} 
+                      disabled={addLoading}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="description">Description</Label>
+                    <textarea 
+                      id="description" 
+                      value={newDescription} 
+                      onChange={e => setNewDescription(e.target.value)} 
+                      className="w-full border rounded-md p-2"
+                      rows={3}
+                      disabled={addLoading}
+                    />
+                  </div>
+                  <div>
                     <Label htmlFor="role">{t('users.role')}</Label>
                     <select 
                       id="role" 
@@ -483,21 +656,54 @@ export const UserManagement = React.memo(({ users: propUsers = [], approveUser, 
                     </select>
                   </div>
                   <div>
+                    <Label htmlFor="department">Department & Office (Optional)</Label>
+                    <select 
+                      id="department" 
+                      className="w-full border rounded-md p-2" 
+                      value={newDept} 
+                      onChange={e => setNewDept(e.target.value)}
+                      disabled={addLoading}
+                    >
+                      <option value="">Select a department</option>
+                      {departments.map((dept) => (
+                        <option key={dept.id} value={dept.id}>{dept.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                  {newDept && (
+                    <div>
+                      <Label htmlFor="office">Office</Label>
+                      <select 
+                        id="office" 
+                        className="w-full border rounded-md p-2" 
+                        value={newOffice} 
+                        onChange={e => setNewOffice(e.target.value)}
+                        disabled={addLoading}
+                      >
+                        <option value="">Select an office</option>
+                        {offices.map((office) => (
+                          <option key={office.id} value={office.id}>{office.name} - {office.location}</option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+                  <div>
                     <Label>{t('common.optional')}</Label>
                     <ImageUpload value={newAvatar} onChange={setNewAvatar} disabled={addLoading} />
                   </div>
                   {formError && <div className="text-red-500 text-sm">{formError}</div>}
-                  <DialogFooter>
-                    <Button type="submit" className="bg-admin-primary hover:bg-admin-primary/90" disabled={addLoading}>
+                  </div>
+                </div>
+                <DialogFooter>
+                    <Button onClick={handleAddUser} className="bg-admin-primary hover:bg-admin-primary/90" disabled={addLoading}>
                       {addLoading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
                       {addLoading ? t('common.loading') : t('users.addUser')}
                     </Button>
                     <DialogClose asChild>
-                      <Button type="button" variant="outline" disabled={addLoading}>{t('common.cancel')}</Button>
+                      <Button variant="outline" disabled={addLoading}>{t('common.cancel')}</Button>
                     </DialogClose>
                   </DialogFooter>
-                </form>
-              </DialogContent>
+                </DialogContent>
             </Dialog>
 
             <Dialog open={!!editingUser} onOpenChange={open => !open && setEditingUser(null)}>
@@ -643,112 +849,19 @@ export const UserManagement = React.memo(({ users: propUsers = [], approveUser, 
         ) : (
           <>
             <div className="max-h-[600px] overflow-y-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>User</TableHead>
-                    <TableHead>Email</TableHead>
-                    <TableHead>Join Date</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Role</TableHead>
-                    <TableHead>Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredUsers.map((user) => (
-                    <TableRow key={user.id}>
-                      <TableCell>
-                        <div className="flex items-center space-x-3">
-                          <Avatar className="w-8 h-8">
-                            <AvatarImage src={user.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.username}`} />
-                            <AvatarFallback>{user.username.slice(0, 2).toUpperCase()}</AvatarFallback>
-                          </Avatar>
-                          <p className="font-medium text-foreground">{user.username}</p>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <p className="text-sm text-muted-foreground">{user.email}</p>
-                      </TableCell>
-                      <TableCell>
-                        <p className="text-sm">{user.join_date ? new Date(user.join_date).toLocaleDateString() : user.created_at ? new Date(user.created_at).toLocaleDateString() : 'N/A'}</p>
-                      </TableCell>
-                      <TableCell>
-                        {user.status === "pending" && <Badge variant="secondary">Pending</Badge>}
-                        {user.status === "active" && <Badge variant="default">Active</Badge>}
-                        {user.status === "suspended" && <Badge variant="secondary">Suspended</Badge>}
-                        {user.status === "banned" && <Badge variant="destructive">Banned</Badge>}
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="outline">{user.role ? user.role.charAt(0).toUpperCase() + user.role.slice(1) : "User"}</Badge>
-                        {user.online_status && (
-                          <Badge variant={user.online_status === 'online' ? 'default' : 'secondary'} className="ml-1">
-                            {user.online_status}
-                          </Badge>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex gap-2 flex-wrap">
-                          {user.status === "pending" ? (
-                            <>
-                              <Button 
-                                size="sm" 
-                                variant="default" 
-                                onClick={() => approveUserInternal(user.id)}
-                                disabled={actionLoading[user.id]}
-                              >
-                                {actionLoading[user.id] ? (
-                                  <Loader2 className="w-3 h-3 mr-1 animate-spin" />
-                                ) : null}
-                                Approve
-                              </Button>
-                              <Button 
-                                size="sm" 
-                                variant="destructive" 
-                                onClick={() => rejectUserInternal(user.id)}
-                                disabled={actionLoading[user.id]}
-                              >
-                                {actionLoading[user.id] ? (
-                                  <Loader2 className="w-3 h-3 mr-1 animate-spin" />
-                                ) : null}
-                                Reject
-                              </Button>
-                            </>
-                          ) : (
-                            <span className="text-muted-foreground">—</span>
-                          )}
-                          <Button 
-                            size="sm" 
-                            variant="outline" 
-                            onClick={() => handleEditUser(user)}
-                            disabled={loading || actionLoading[user.id]}
-                          >
-                            Edit
-                          </Button>
-                          <Button 
-                            size="sm" 
-                            variant="outline" 
-                            onClick={() => forceLogoutUserInternal(user.id)}
-                            disabled={actionLoading[user.id]}
-                          >
-                            Force Logout
-                          </Button>
-                          <Button 
-                            size="sm" 
-                            variant="destructive" 
-                            onClick={() => {
-                              setUserToDelete(user.id);
-                              setDeleteConfirmOpen(true);
-                            }}
-                            disabled={actionLoading[user.id]}
-                          >
-                            Delete
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+              <UserManagementTable
+                filteredUsers={filteredUsers}
+                userDepartments={userDepartments}
+                actionLoading={actionLoading}
+                onApprove={approveUserInternal}
+                onReject={rejectUserInternal}
+                onEdit={handleEditUser}
+                onForceLogout={forceLogoutUserInternal}
+                onDelete={(userId) => {
+                  setUserToDelete(userId);
+                  setDeleteConfirmOpen(true);
+                }}
+              />
             </div>
             
             {filteredUsers.length === 0 && !loading && (

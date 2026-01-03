@@ -5,7 +5,7 @@ from rest_framework import serializers
 from django.contrib.auth import get_user_model
 from users.models import User, UserActivity
 from chat.models import Message, Conversation, Group
-from .models import AuditLog, SystemMessage, Trash, Backup, SystemSettings, MessageTemplate
+from .models import AuditLog, Trash, Backup, SystemSettings
 
 User = get_user_model()
 
@@ -14,7 +14,7 @@ class AuditLogSerializer(serializers.ModelSerializer):
     """
     Serializer for AuditLog model.
     """
-    actor = serializers.StringRelatedField()
+    actor = serializers.SerializerMethodField()
     
     class Meta:
         model = AuditLog
@@ -23,6 +23,11 @@ class AuditLogSerializer(serializers.ModelSerializer):
             'severity', 'category', 'ip_address', 'user_agent', 'session_id', 'timestamp', 'metadata'
         ]
         read_only_fields = ['id', 'timestamp']
+    
+    def get_actor(self, obj):
+        if obj.actor:
+            return obj.actor.username
+        return 'System'
 
 
 class AuditLogCreateSerializer(serializers.ModelSerializer):
@@ -47,64 +52,6 @@ class AuditLogCreateSerializer(serializers.ModelSerializer):
         else:
             ip = request.META.get('REMOTE_ADDR')
         return ip
-
-
-class SystemMessageSerializer(serializers.ModelSerializer):
-    """
-    Serializer for SystemMessage model.
-    """
-    created_by = serializers.StringRelatedField()
-    target_group = serializers.StringRelatedField(read_only=True)
-    target_user = serializers.StringRelatedField(read_only=True)
-    
-    class Meta:
-        model = SystemMessage
-        fields = [
-            'id', 'title', 'content', 'message_type', 'target_type',
-            'target_group', 'target_user', 'priority', 'is_persistent',
-            'expires_at', 'is_sent', 'sent_at', 'created_by', 'created_at'
-        ]
-        read_only_fields = [
-            'id', 'is_sent', 'sent_at', 'created_by', 'created_at'
-        ]
-
-
-class SystemMessageCreateSerializer(serializers.ModelSerializer):
-    """
-    Serializer for creating system messages.
-    """
-    
-    class Meta:
-        model = SystemMessage
-        fields = [
-            'title', 'content', 'message_type', 'target_type',
-            'target_group', 'target_user', 'priority', 'is_persistent', 'expires_at'
-        ]
-    
-    def create(self, validated_data):
-        validated_data['created_by'] = self.context['request'].user
-        return super().create(validated_data)
-
-
-class SystemMessageSendSerializer(serializers.Serializer):
-    """
-    Serializer for sending system messages.
-    """
-    target_group_id = serializers.UUIDField(required=False)
-    target_user_id = serializers.UUIDField(required=False)
-    
-    def validate(self, attrs):
-        # Ensure exactly one target is specified when needed
-        targets = [
-            attrs.get('target_group_id'),
-            attrs.get('target_user_id')
-        ]
-        targets = [t for t in targets if t is not None]
-        
-        if len(targets) > 1:
-            raise serializers.ValidationError("Only one target can be specified.")
-        
-        return attrs
 
 
 class TrashSerializer(serializers.ModelSerializer):
@@ -257,49 +204,3 @@ class SystemMonitoringSerializer(serializers.Serializer):
     cpu_history = serializers.ListField()
     memory_history = serializers.ListField()
     response_time_history = serializers.ListField()
-
-
-class MessageTemplateSerializer(serializers.ModelSerializer):
-    """
-    Serializer for MessageTemplate model.
-    """
-    created_by = serializers.StringRelatedField()
-    updated_by = serializers.StringRelatedField(read_only=True)
-    
-    class Meta:
-        model = MessageTemplate
-        fields = [
-            'id', 'name', 'content', 'category', 'usage_count',
-            'created_by', 'updated_by', 'created_at', 'updated_at'
-        ]
-        read_only_fields = [
-            'id', 'usage_count', 'created_by', 'created_at', 'updated_at'
-        ]
-
-
-class MessageTemplateCreateSerializer(serializers.ModelSerializer):
-    """
-    Serializer for creating message templates.
-    """
-    
-    class Meta:
-        model = MessageTemplate
-        fields = ['name', 'content', 'category']
-    
-    def create(self, validated_data):
-        validated_data['created_by'] = self.context['request'].user
-        return super().create(validated_data)
-
-
-class MessageTemplateUpdateSerializer(serializers.ModelSerializer):
-    """
-    Serializer for updating message templates.
-    """
-    
-    class Meta:
-        model = MessageTemplate
-        fields = ['name', 'content', 'category']
-    
-    def update(self, instance, validated_data):
-        validated_data['updated_by'] = self.context['request'].user
-        return super().update(instance, validated_data)

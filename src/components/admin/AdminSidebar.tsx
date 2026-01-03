@@ -11,7 +11,8 @@ import {
   User,
   Trash2,
   ShieldAlert,
-  Database
+  Database,
+  Building2
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -22,6 +23,7 @@ const getSidebarItems = (t: (key: string) => string) => [
   { icon: LayoutDashboard, label: t('admin.dashboard'), value: "overview" },
   { icon: User, label: t('admin.profile'), value: "profile" },
   { icon: Users, label: t('admin.userManagement'), value: "users" },
+  { icon: Building2, label: 'Departments', value: "departments" },
   { icon: ShieldAlert, label: t('admin.moderation'), value: "moderation" },
   { icon: Activity, label: t('admin.conversations'), value: "conversations" },
   { icon: FileText, label: t('admin.auditLogs'), value: "audit" },

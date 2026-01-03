@@ -57,22 +57,29 @@ class ConversationListCreateView(APIView):
     permission_classes = [permissions.IsAuthenticated]
     
     def get(self, request):
-        # Get user's conversations
-        conversations = Conversation.objects.filter(
-            is_deleted=False
-        ).filter(
-            Q(participants=request.user) |  # Individual conversations where user is participant
-            Q(conversation_type='group', group__members__user=request.user, group__members__status='active')  # Group conversations where user is member
-        ).distinct().order_by('-last_message_at', '-created_at')
-        
-        # Apply pagination
-        from rest_framework.pagination import PageNumberPagination
-        paginator = PageNumberPagination()
-        paginator.page_size = 20
-        result_page = paginator.paginate_queryset(conversations, request)
-        
-        serializer = ConversationSerializer(result_page, many=True, context={'request': request})
-        return paginator.get_paginated_response(serializer.data)
+        try:
+            conversations = Conversation.objects.filter(
+                is_deleted=False
+            ).filter(
+                Q(participants=request.user) |
+                Q(conversation_type='group', group__members__user=request.user, group__members__status='active')
+            ).distinct().order_by('-last_message_at', '-created_at')
+            
+            from rest_framework.pagination import PageNumberPagination
+            paginator = PageNumberPagination()
+            paginator.page_size = 20
+            result_page = paginator.paginate_queryset(conversations, request)
+            
+            serializer = ConversationSerializer(result_page, many=True, context={'request': request})
+            return paginator.get_paginated_response(serializer.data)
+        except Exception as e:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"Error fetching conversations: {str(e)}", exc_info=True)
+            return Response({
+                'error': 'Failed to load conversations',
+                'detail': str(e)
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
     
     def post(self, request):
         serializer = ConversationCreateSerializer(

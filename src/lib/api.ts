@@ -1038,9 +1038,9 @@ class ApiService {
     }
   }
 
-  async createUser(userData: {username: string; email: string; password: string; first_name?: string; last_name?: string; role?: string; status?: string}): Promise<ApiResponse<User>> {
+  async createUser(userData: {username: string; email: string; password: string; first_name?: string; last_name?: string; role?: string; status?: string; father_name?: string; position?: string; phone_number?: string; id_card_number?: string; national_id_card_number?: string; description?: string}): Promise<ApiResponse<User>> {
     try {
-      return this.request('/admin/users/create/', {
+      return this.request('/users/admin/users/', {
         method: 'POST',
         body: JSON.stringify(userData),
       });

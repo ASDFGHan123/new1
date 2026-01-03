@@ -54,17 +54,24 @@ class TrashViewSet(viewsets.ModelViewSet):
             trash_item = TrashItem.objects.get(id=item_id)
             
             if item_type == 'user':
-                # Recreate user from stored data
                 user_data = trash_item.item_data
                 User.objects.create_user(
                     username=user_data['username'],
                     email=user_data['email'],
-                    password='',  # Password is not stored, user will need to reset
+                    password='',
                     first_name=user_data.get('first_name', ''),
                     last_name=user_data.get('last_name', ''),
                     role=user_data.get('role', 'user'),
                     status=user_data.get('status', 'active'),
                     is_active=True,
+                )
+            elif item_type == 'department':
+                from users.models_organization import Department
+                dept_data = trash_item.item_data
+                Department.objects.create(
+                    id=trash_item.item_id,
+                    name=dept_data['name'],
+                    description=dept_data.get('description', '')
                 )
             
             trash_item.delete()

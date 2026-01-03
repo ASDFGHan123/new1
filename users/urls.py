@@ -14,6 +14,8 @@ from rest_framework.permissions import IsAuthenticated
 from . import views
 from .views import user_management_views
 from .trash_views import TrashViewSet
+from .notification_views import NotificationViewSet
+from .organization_views import DepartmentViewSet, OfficeViewSet, DepartmentOfficeUserViewSet
 
 class PermissionSerializer(serializers.ModelSerializer):
     class Meta:
@@ -40,6 +42,10 @@ router = DefaultRouter()
 router.register(r'trash', TrashViewSet, basename='trash')
 router.register(r'permissions', PermissionViewSet, basename='permission')
 router.register(r'groups', GroupViewSet, basename='group')
+router.register(r'notifications', NotificationViewSet, basename='notification')
+router.register(r'departments', DepartmentViewSet, basename='department')
+router.register(r'offices', OfficeViewSet, basename='office')
+router.register(r'department-office-users', DepartmentOfficeUserViewSet, basename='department_office_user')
 
 urlpatterns = router.urls + [
     # Authentication endpoints
@@ -74,7 +80,7 @@ urlpatterns = router.urls + [
     # path('management/statuses/', user_management_views.user_statuses_view, name='user_statuses'),
     
     # Legacy admin endpoints (for backward compatibility)
-    path('admin/users/', views.AdminUserListView.as_view(), name='admin_user_list'),
+    path('admin/users/', views.AdminUserCreateView.as_view(), name='admin_user_create'),
     path('admin/users/<int:user_id>/', views.AdminUserDetailView.as_view(), name='admin_user_detail'),
     path('admin/users/<int:user_id>/approve/', views.AdminApproveUserView.as_view(), name='admin_approve_user'),
     path('admin/users/<int:user_id>/suspend/', views.AdminSuspendUserView.as_view(), name='admin_suspend_user'),

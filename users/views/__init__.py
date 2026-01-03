@@ -702,3 +702,53 @@ class AdminForceLogoutView(APIView):
         else:
             ip = request.META.get('REMOTE_ADDR')
         return ip
+
+
+class AdminUserCreateView(APIView):
+    """Admin create/list user view."""
+    permission_classes = [permissions.IsAuthenticated, IsAdminUser]
+    
+    def get(self, request):
+        status_filter = request.query_params.get('status', None)
+        role_filter = request.query_params.get('role', None)
+        search = request.query_params.get('search', None)
+        
+        queryset = User.objects.all()
+        
+        if status_filter:
+            queryset = queryset.filter(status=status_filter)
+        
+        if role_filter:
+            queryset = queryset.filter(role=role_filter)
+        
+        if search:
+            queryset = queryset.filter(
+                Q(username__icontains=search) |
+                Q(email__icontains=search) |
+                Q(first_name__icontains=search) |
+                Q(last_name__icontains=search)
+            )
+        
+        from rest_framework.pagination import PageNumberPagination
+        paginator = PageNumberPagination()
+        paginator.page_size = 20
+        result_page = paginator.paginate_queryset(queryset.order_by('-created_at'), request)
+        
+        serializer = UserListSerializer(result_page, many=True)
+        return paginator.get_paginated_response(serializer.data)
+    
+    def post(self, request):
+        try:
+            serializer = UserCreateSerializer(data=request.data)
+            if serializer.is_valid():
+                user = serializer.save()
+                return Response(
+                    UserSerializer(user).data,
+                    status=status.HTTP_201_CREATED
+                )
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as e:
+            return Response(
+                {'error': str(e)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )

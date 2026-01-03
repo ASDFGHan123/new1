@@ -12,6 +12,8 @@ import { TrashManager } from './TrashManager';
 import { SettingsManager } from './SettingsManager';
 import { PermissionsManager } from './PermissionsManager';
 import { ModerationPanel } from './ModerationPanel';
+import { DepartmentPanel } from './DepartmentPanel';
+import { UserAssignmentPanel } from './UserAssignmentPanel';
 import { Button } from '@/components/ui/button';
 import { Loading } from '@/components/ui/loading';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
@@ -55,10 +57,16 @@ export function AdminContent({ user }: AdminContentProps = {}) {
         return <UserManagement onUserDeleted={handleUserDeleted} />;
       case 'analytics':
         return <MessageAnalytics />;
-      case 'moderation':
+      case 'departments':
         return (
           <ErrorBoundary>
-            <ModerationPanel />
+            <DepartmentPanel />
+          </ErrorBoundary>
+        );
+      case 'assignments':
+        return (
+          <ErrorBoundary>
+            <UserAssignmentPanel />
           </ErrorBoundary>
         );
       case 'data':
@@ -83,6 +91,8 @@ export function AdminContent({ user }: AdminContentProps = {}) {
             </Suspense>
           </ErrorBoundary>
         );
+      case 'moderation':
+        return <ModerationPanel />;
       case 'permissions':
         return <PermissionsManager />;
       case 'settings':

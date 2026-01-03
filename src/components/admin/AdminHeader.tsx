@@ -5,6 +5,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { LanguageSwitcher } from '@/components/LanguageSwitcher';
+import { NotificationCenter } from '@/components/NotificationCenter';
 import { EditProfileDialog } from './EditProfileDialog';
 import { LogOut, Settings } from 'lucide-react';
 
@@ -33,6 +34,7 @@ export function AdminHeader({ user, onLogout }: AdminHeaderProps) {
         <div className="flex items-center space-x-4">
           <LanguageSwitcher />
           <ThemeToggle />
+          <NotificationCenter />
           
           {user && (
             <div className="flex items-center space-x-3">

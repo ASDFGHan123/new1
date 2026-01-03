@@ -77,7 +77,7 @@ class SystemSettingsBulkUpdateView(APIView):
             try:
                 AuditLoggingService.log_admin_action(
                     action_type=AuditLog.ActionType.SYSTEM_SETTINGS_CHANGED,
-                    description=f'Bulk updated {len(updated)} system settings',
+                    description=f'Updated {len(updated)} system settings',
                     admin_user=request.user,
                     target_type=AuditLog.TargetType.SYSTEM,
                     target_id='bulk_update',

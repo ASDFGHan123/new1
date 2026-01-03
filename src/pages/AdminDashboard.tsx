@@ -1,7 +1,7 @@
 import React, { useEffect } from 'react';
 import { AdminProvider, useAdmin } from '@/contexts/AdminContext';
 import { AdminDashboardLayout } from '@/components/admin/AdminDashboardLayout';
-import { User as ApiUser } from '@/lib/api';
+import { User as ApiUser, apiService } from '@/lib/api';
 import type { Role, Conversation, MessageTemplate } from '@/contexts/AdminContext';
 
 interface AdminDashboardProps {
@@ -19,23 +19,17 @@ interface AdminDashboardProps {
   onLogout?: () => void;
 }
 
-// Internal component that uses the context
 function AdminDashboardContent({ user, onLogout }: AdminDashboardProps) {
   const { dispatch } = useAdmin();
 
-  // Fetch real data from backend
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const { apiService } = await import('@/lib/api');
-        
-        // Fetch users
         const usersResponse = await apiService.getUsers();
         if (usersResponse.success && usersResponse.data) {
           dispatch({ type: 'SET_USERS', payload: usersResponse.data });
         }
         
-        // Set default roles (since we don't have role management backend yet)
         const defaultRoles: Role[] = [
           {
             id: "1",
@@ -63,7 +57,6 @@ function AdminDashboardContent({ user, onLogout }: AdminDashboardProps) {
           }
         ];
         
-        // Set default conversations (placeholder until chat backend is implemented)
         const defaultConversations: Conversation[] = [
           {
             id: "1",
@@ -78,7 +71,6 @@ function AdminDashboardContent({ user, onLogout }: AdminDashboardProps) {
           }
         ];
         
-        // Set default message templates
         const defaultTemplates: MessageTemplate[] = [
           {
             id: "1",
@@ -97,7 +89,6 @@ function AdminDashboardContent({ user, onLogout }: AdminDashboardProps) {
         dispatch({ type: 'SET_ROLES', payload: defaultRoles });
         dispatch({ type: 'SET_CONVERSATIONS', payload: defaultConversations });
         dispatch({ type: 'SET_MESSAGE_TEMPLATES', payload: defaultTemplates });
-        
       } catch (error) {
         console.error('Failed to fetch dashboard data:', error);
       }
@@ -109,7 +100,6 @@ function AdminDashboardContent({ user, onLogout }: AdminDashboardProps) {
   return <AdminDashboardLayout user={user} onLogout={onLogout} />;
 }
 
-// Main component with provider
 const AdminDashboard = (props: AdminDashboardProps) => {
   return (
     <AdminProvider>

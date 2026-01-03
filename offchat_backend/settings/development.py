@@ -110,6 +110,10 @@ SIMPLE_JWT['SIGNING_KEY'] = SECRET_KEY
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
 
+# File Upload Settings (Development)
+FILE_UPLOAD_MAX_MEMORY_SIZE = 2147483648  # 2048MB
+DATA_UPLOAD_MAX_MEMORY_SIZE = 2147483648  # 2048MB
+
 # Logging Configuration
 LOGGING = {
     'version': 1,

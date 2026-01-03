@@ -1,7 +1,8 @@
 """
-Serializers for chat app.
+Serializers for chat app - FIXED VERSION 2
 """
 from rest_framework import serializers
+from django.conf import settings
 from django.contrib.auth import get_user_model
 from .models import Group, GroupMember, Conversation, ConversationParticipant, Message, Attachment
 from users.serializers import UserSerializer
@@ -10,58 +11,46 @@ User = get_user_model()
 
 
 class GroupMemberSerializer(serializers.ModelSerializer):
-    """
-    Serializer for GroupMember model.
-    """
     user = serializers.StringRelatedField()
     
     class Meta:
         model = GroupMember
-        fields = [
-            'id', 'user', 'role', 'status', 'joined_at', 'last_activity'
-        ]
+        fields = ['id', 'user', 'role', 'status', 'joined_at', 'last_activity']
         read_only_fields = ['id', 'joined_at']
 
 
 class GroupSerializer(serializers.ModelSerializer):
-    """
-    Serializer for Group model.
-    """
     created_by = serializers.StringRelatedField()
-    members = GroupMemberSerializer(source='members.filter', many=True, read_only=True)
     member_count = serializers.ReadOnlyField()
     is_private = serializers.ReadOnlyField()
     can_manage = serializers.SerializerMethodField()
+    members = serializers.SerializerMethodField()
     
     class Meta:
         model = Group
-        fields = [
-            'id', 'name', 'description', 'avatar', 'group_type', 'created_by',
-            'created_at', 'updated_at', 'last_activity', 'is_deleted', 'deleted_at',
-            'member_count', 'is_private', 'can_manage', 'members'
-        ]
-        read_only_fields = [
-            'id', 'created_by', 'created_at', 'updated_at', 'last_activity',
-            'is_deleted', 'deleted_at'
-        ]
+        fields = ['id', 'name', 'description', 'avatar', 'group_type', 'created_by',
+                  'created_at', 'updated_at', 'last_activity', 'is_deleted', 'deleted_at',
+                  'member_count', 'is_private', 'can_manage', 'members']
+        read_only_fields = ['id', 'created_by', 'created_at', 'updated_at', 'last_activity',
+                            'is_deleted', 'deleted_at']
     
     def get_can_manage(self, obj):
         request = self.context.get('request')
         if request and request.user.is_authenticated:
             return obj.can_manage(request.user)
         return False
+    
+    def get_members(self, obj):
+        try:
+            members = obj.members.filter(status='active')
+            return GroupMemberSerializer(members, many=True).data
+        except Exception:
+            return []
 
 
 class GroupCreateSerializer(serializers.ModelSerializer):
-    """
-    Serializer for creating groups.
-    """
-    member_ids = serializers.ListField(
-        child=serializers.CharField(),
-        required=False,
-        write_only=True,
-        allow_empty=True
-    )
+    member_ids = serializers.ListField(child=serializers.CharField(), required=False,
+                                       write_only=True, allow_empty=True)
     
     class Meta:
         model = Group
@@ -70,50 +59,31 @@ class GroupCreateSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         member_ids = validated_data.pop('member_ids', [])
         validated_data['created_by'] = self.context['request'].user
-        
-        try:
-            group = Group.objects.create(**validated_data)
-        except Exception as e:
-            raise serializers.ValidationError(f"Failed to create group: {str(e)}")
-        
+        group = Group.objects.create(**validated_data)
         group.add_member(self.context['request'].user, 'owner')
         
-        if member_ids:
-            for member_id in member_ids:
-                try:
-                    user = User.objects.get(id=member_id)
-                    group.add_member(user)
-                except User.DoesNotExist:
-                    continue
+        for member_id in member_ids:
+            try:
+                user = User.objects.get(id=member_id)
+                group.add_member(user)
+            except User.DoesNotExist:
+                continue
         
-        Conversation.objects.create(
-            conversation_type='group',
-            group=group,
-            title=group.name,
-            description=group.description
-        )
-        
+        Conversation.objects.create(conversation_type='group', group=group,
+                                   title=group.name, description=group.description)
         return group
 
 
 class ConversationParticipantSerializer(serializers.ModelSerializer):
-    """
-    Serializer for ConversationParticipant model.
-    """
     user = serializers.StringRelatedField()
     
     class Meta:
         model = ConversationParticipant
-        fields = [
-            'id', 'user', 'joined_at', 'last_read_at', 'unread_count'
-        ]
+        fields = ['id', 'user', 'joined_at', 'last_read_at', 'unread_count']
         read_only_fields = ['id', 'joined_at']
 
 
 class AttachmentSerializer(serializers.ModelSerializer):
-    """
-    Serializer for Attachment model.
-    """
     message = serializers.StringRelatedField()
     file_size_mb = serializers.ReadOnlyField()
     is_image = serializers.ReadOnlyField()
@@ -121,18 +91,20 @@ class AttachmentSerializer(serializers.ModelSerializer):
     is_video = serializers.ReadOnlyField()
     is_document = serializers.ReadOnlyField()
     url = serializers.SerializerMethodField()
+    thumbnail_url = serializers.SerializerMethodField()
+    video_dimensions = serializers.ReadOnlyField()
+    duration_formatted = serializers.ReadOnlyField()
     
     class Meta:
         model = Attachment
-        fields = [
-            'id', 'message', 'file', 'file_name', 'file_type', 'file_size',
-            'mime_type', 'duration', 'uploaded_at', 'file_size_mb',
-            'is_image', 'is_audio', 'is_video', 'is_document', 'url'
-        ]
-        read_only_fields = [
-            'id', 'uploaded_at', 'file_size_mb', 'is_image', 'is_audio',
-            'is_video', 'is_document', 'url'
-        ]
+        fields = ['id', 'message', 'file', 'file_name', 'file_type', 'file_size',
+                  'mime_type', 'duration', 'uploaded_at', 'file_size_mb',
+                  'is_image', 'is_audio', 'is_video', 'is_document', 'url',
+                  'thumbnail', 'thumbnail_url', 'width', 'height', 'bitrate', 'codec',
+                  'video_dimensions', 'duration_formatted']
+        read_only_fields = ['id', 'uploaded_at', 'file_size_mb', 'is_image', 'is_audio',
+                            'is_video', 'is_document', 'url', 'thumbnail_url', 'video_dimensions',
+                            'duration_formatted']
     
     def get_url(self, obj):
         request = self.context.get('request')
@@ -142,12 +114,18 @@ class AttachmentSerializer(serializers.ModelSerializer):
                 return request.build_absolute_uri(url)
             return url
         return None
+    
+    def get_thumbnail_url(self, obj):
+        request = self.context.get('request')
+        if obj.thumbnail and hasattr(obj.thumbnail, 'url'):
+            url = obj.thumbnail.url
+            if request:
+                return request.build_absolute_uri(url)
+            return url
+        return None
 
 
 class MessageSerializer(serializers.ModelSerializer):
-    """
-    Serializer for Message model.
-    """
     sender = serializers.StringRelatedField()
     reply_to = serializers.StringRelatedField()
     forwarded_from = serializers.StringRelatedField()
@@ -155,21 +133,14 @@ class MessageSerializer(serializers.ModelSerializer):
     
     class Meta:
         model = Message
-        fields = [
-            'id', 'conversation', 'sender', 'content', 'message_type',
-            'reply_to', 'forwarded_from', 'is_edited', 'edited_at',
-            'is_deleted', 'deleted_at', 'timestamp', 'attachments'
-        ]
-        read_only_fields = [
-            'id', 'sender', 'is_edited', 'edited_at', 'is_deleted',
-            'deleted_at', 'timestamp', 'attachments'
-        ]
+        fields = ['id', 'conversation', 'sender', 'content', 'message_type',
+                  'reply_to', 'forwarded_from', 'is_edited', 'edited_at',
+                  'is_deleted', 'deleted_at', 'timestamp', 'attachments']
+        read_only_fields = ['id', 'sender', 'is_edited', 'edited_at', 'is_deleted',
+                            'deleted_at', 'timestamp', 'attachments']
 
 
 class MessageCreateSerializer(serializers.ModelSerializer):
-    """
-    Serializer for creating messages with attachments.
-    """
     attachments = serializers.ListField(child=serializers.FileField(), required=False, write_only=True)
     content = serializers.CharField(required=False, allow_blank=True)
     
@@ -185,25 +156,13 @@ class MessageCreateSerializer(serializers.ModelSerializer):
         
         for file in attachments:
             file_type = 'image' if file.content_type.startswith('image/') else 'document'
-            attachment = Attachment.objects.create(
-                message=message,
-                file=file,
-                file_name=file.name,
-                file_type=file_type,
-                file_size=0,
-                mime_type=file.content_type
-            )
-            attachment.file_size = attachment.file.size
-            attachment.save(update_fields=['file_size'])
-        
+            attachment = Attachment.objects.create(message=message, file=file, file_name=file.name,
+                                                  file_type=file_type, file_size=file.size,
+                                                  mime_type=file.content_type)
         return message
 
 
 class MessageUpdateSerializer(serializers.ModelSerializer):
-    """
-    Serializer for updating messages.
-    """
-    
     class Meta:
         model = Message
         fields = ['content']
@@ -215,9 +174,6 @@ class MessageUpdateSerializer(serializers.ModelSerializer):
 
 
 class ConversationSerializer(serializers.ModelSerializer):
-    """
-    Serializer for Conversation model.
-    """
     group = GroupSerializer(read_only=True)
     participants = serializers.SerializerMethodField()
     last_message = serializers.SerializerMethodField()
@@ -226,33 +182,46 @@ class ConversationSerializer(serializers.ModelSerializer):
     
     class Meta:
         model = Conversation
-        fields = [
-            'id', 'conversation_type', 'group', 'title', 'description',
-            'last_message_at', 'created_at', 'updated_at', 'is_deleted', 'deleted_at',
-            'participant_count', 'participants', 'last_message', 'message_count'
-        ]
-        read_only_fields = [
-            'id', 'last_message_at', 'created_at', 'updated_at',
-            'is_deleted', 'deleted_at'
-        ]
+        fields = ['id', 'conversation_type', 'group', 'title', 'description',
+                  'last_message_at', 'created_at', 'updated_at', 'is_deleted', 'deleted_at',
+                  'participant_count', 'participants', 'last_message', 'message_count']
+        read_only_fields = ['id', 'last_message_at', 'created_at', 'updated_at',
+                            'is_deleted', 'deleted_at']
     
     def get_participants(self, obj):
-        if obj.conversation_type == 'group':
-            members = obj.group.members.filter(status='active').select_related('user')
-            return [{
-                'id': str(m.user.id),
-                'username': (m.user.username and m.user.username.strip()) or m.user.first_name or m.user.email.split('@')[0] or 'Unknown',
-                'avatar': m.user.avatar.url if m.user.avatar else None,
-                'status': 'online'
-            } for m in members]
-        else:
-            participants = obj.participants.all()
-            return [{
-                'id': str(p.id),
-                'username': (p.username and p.username.strip()) or p.first_name or p.email.split('@')[0] or 'Unknown',
-                'avatar': p.avatar.url if p.avatar else None,
-                'status': getattr(p, 'online_status', 'offline')
-            } for p in participants]
+        try:
+            if obj.conversation_type == 'group':
+                if not obj.group:
+                    return []
+                members = obj.group.members.filter(status='active')
+                result = []
+                for m in members:
+                    try:
+                        result.append({
+                            'id': str(m.user.id),
+                            'username': m.user.username or m.user.first_name or m.user.email.split('@')[0] or 'Unknown',
+                            'avatar': m.user.avatar.url if m.user.avatar else None,
+                            'status': 'online'
+                        })
+                    except Exception:
+                        continue
+                return result
+            else:
+                participants = obj.participants.all()
+                result = []
+                for p in participants:
+                    try:
+                        result.append({
+                            'id': str(p.id),
+                            'username': p.username or p.first_name or p.email.split('@')[0] or 'Unknown',
+                            'avatar': p.avatar.url if p.avatar else None,
+                            'status': getattr(p, 'online_status', 'offline')
+                        })
+                    except Exception:
+                        continue
+                return result
+        except Exception:
+            return []
     
     def get_last_message(self, obj):
         last_msg = obj.last_message
@@ -265,14 +234,8 @@ class ConversationSerializer(serializers.ModelSerializer):
 
 
 class ConversationCreateSerializer(serializers.ModelSerializer):
-    """
-    Serializer for creating conversations.
-    """
-    participant_ids = serializers.ListField(
-        child=serializers.IntegerField(),
-        required=False,
-        write_only=True
-    )
+    participant_ids = serializers.ListField(child=serializers.IntegerField(),
+                                           required=False, write_only=True)
     group_data = serializers.DictField(required=False, write_only=True)
     
     class Meta:
@@ -281,7 +244,6 @@ class ConversationCreateSerializer(serializers.ModelSerializer):
     
     def validate(self, attrs):
         conversation_type = attrs.get('conversation_type', 'individual')
-        
         if conversation_type == 'individual':
             participant_ids = attrs.get('participant_ids', [])
             if len(participant_ids) > 1:
@@ -289,13 +251,11 @@ class ConversationCreateSerializer(serializers.ModelSerializer):
         elif conversation_type == 'group':
             if 'group_data' not in attrs:
                 raise serializers.ValidationError("Group data is required for group conversations.")
-        
         return attrs
     
     def create(self, validated_data):
         participant_ids = validated_data.pop('participant_ids', [])
         group_data = validated_data.pop('group_data', None)
-        
         conversation = Conversation.objects.create(**validated_data)
         
         if conversation.conversation_type == 'group' and group_data:
@@ -303,9 +263,7 @@ class ConversationCreateSerializer(serializers.ModelSerializer):
             group = Group.objects.create(**group_data)
             conversation.group = group
             conversation.save()
-            
             group.add_member(self.context['request'].user, 'owner')
-            
             for participant_id in participant_ids:
                 try:
                     user = User.objects.get(id=participant_id)
@@ -315,21 +273,16 @@ class ConversationCreateSerializer(serializers.ModelSerializer):
         else:
             request_user = self.context['request'].user
             conversation.add_participant(request_user)
-            
             for participant_id in participant_ids:
                 try:
                     user = User.objects.get(id=participant_id)
                     conversation.add_participant(user)
                 except User.DoesNotExist:
                     continue
-        
         return conversation
 
 
 class SearchSerializer(serializers.Serializer):
-    """
-    Serializer for search results.
-    """
     query = serializers.CharField(max_length=255)
     conversations = ConversationSerializer(many=True, read_only=True)
     messages = MessageSerializer(many=True, read_only=True)

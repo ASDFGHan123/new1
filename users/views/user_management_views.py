@@ -149,7 +149,17 @@ def approve_user_view(request, user_id):
     Approve a pending user.
     """
     try:
+        from users.notification_utils import send_notification
         result = UserManagementService.approve_user(user_id)
+        user = result.get('user')
+        if user:
+            send_notification(
+                user=user,
+                notification_type='user_approved',
+                title='Account Approved',
+                message='Your account has been approved! You can now login.',
+                data={'user_id': user_id}
+            )
         return Response(result, status=status.HTTP_200_OK)
         
     except ValidationError as e:

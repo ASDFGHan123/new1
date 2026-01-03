@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 class InputValidationMiddleware(MiddlewareMixin):
     """Validate and sanitize incoming requests."""
     
-    MAX_BODY_SIZE = 1024 * 1024  # 1MB
+    MAX_BODY_SIZE = 2147483648  # 2048MB
     DANGEROUS_PATTERNS = [
         '<script',
         'javascript:',

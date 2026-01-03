@@ -1,0 +1,17 @@
+# Video Processing Requirements
+# Add these to your main requirements.txt
+
+# Core dependencies
+Django>=4.2
+djangorestframework>=3.14
+Pillow>=9.0
+
+# Video processing
+# Note: ffmpeg and ffprobe must be installed separately on the system
+# Ubuntu/Debian: sudo apt-get install ffmpeg
+# macOS: brew install ffmpeg
+# Windows: choco install ffmpeg or download from https://ffmpeg.org/download.html
+
+# Optional: For advanced video processing
+opencv-python>=4.5.0  # For advanced video analysis
+moviepy>=1.0.0  # For video editing capabilities

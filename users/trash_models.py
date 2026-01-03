@@ -15,10 +15,12 @@ class TrashItem(models.Model):
         ('user', 'User'),
         ('message', 'Message'),
         ('conversation', 'Conversation'),
+        ('group', 'Group'),
+        ('department', 'Department'),
     ]
     
     item_type = models.CharField(max_length=20, choices=ITEM_TYPES)
-    item_id = models.IntegerField()
+    item_id = models.CharField(max_length=255)
     item_data = models.JSONField()  # Store original data
     deleted_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='deleted_items')
     deleted_at = models.DateTimeField(auto_now_add=True)
