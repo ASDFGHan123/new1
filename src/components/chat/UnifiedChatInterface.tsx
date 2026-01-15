@@ -23,6 +23,7 @@ import { ImageUpload } from "@/components/ui/image-upload";
 import { Label } from "@/components/ui/label";
 import { CreateGroupDialog } from "./CreateGroupDialog.tsx";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import { 
   Send, 
   Search, 
@@ -87,11 +88,15 @@ export const UnifiedChatInterface = ({ initialConversationId }: { initialConvers
   const fileInputRef = useRef<HTMLInputElement>(null);
   const formRef = useRef<HTMLFormElement>(null);
 
+  const currentConversation = chat.currentConversation;
+
   useEffect(() => {
     if (initialConversationId && chat.conversations.length > 0) {
       chat.selectConversation(initialConversationId);
     }
   }, [initialConversationId, chat.conversations.length]);
+
+
 
   const handleSendMessage = async (e?: React.FormEvent | React.KeyboardEvent) => {
     if (e) {
@@ -188,8 +193,6 @@ export const UnifiedChatInterface = ({ initialConversationId }: { initialConvers
       </div>
     );
   }
-
-  const currentConversation = chat.currentConversation;
 
   const addFiles = (files: FileList | null) => {
     if (!files) return;
@@ -326,19 +329,49 @@ export const UnifiedChatInterface = ({ initialConversationId }: { initialConvers
           onCreateIndividualChat={chat.createIndividualConversation}
           onDeleteConversation={chat.deleteConversation}
         />
-        <div className="flex-1 flex items-center justify-center">
-          <div className="text-center">
-            <MessageCircle className="h-16 w-16 mx-auto mb-4 text-muted-foreground" />
-            <h3 className="text-xl font-semibold mb-2">{t('chat.welcomeToOffChat')}</h3>
-            <p className="text-muted-foreground mb-6">
-              {t('chat.selectConversationToStart')}
-            </p>
-            <Button onClick={() => setShowSearch(true)}>
-              <Search className="h-4 w-4 mr-2" />
-              {t('chat.searchUsersAndGroups')}
-            </Button>
+        <div className="flex-1 flex flex-col">
+          <div className="p-6 border-b border-border/50 bg-card/30 backdrop-blur-sm">
+            <div className="flex items-center justify-between">
+              <h2 className="text-xl font-semibold">{t('chat.offChat')}</h2>
+              <div className="flex items-center gap-3">
+                <LanguageSwitcher />
+                <ThemeToggle />
+                <Button variant="ghost" size="sm" onClick={handleLogout}>
+                  <LogOut className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+          </div>
+          <div className="flex-1 flex items-center justify-center">
+            <div className="text-center">
+              <MessageCircle className="h-16 w-16 mx-auto mb-4 text-muted-foreground" />
+              <h3 className="text-xl font-semibold mb-2">{t('chat.welcomeToOffChat')}</h3>
+              <p className="text-muted-foreground mb-6">
+                {t('chat.selectConversationToStart')}
+              </p>
+              <Button onClick={() => setShowSearch(true)}>
+                <Search className="h-4 w-4 mr-2" />
+                {t('chat.searchUsersAndGroups')}
+              </Button>
+            </div>
           </div>
         </div>
+        <SearchDialog 
+          key={showSearch ? 'open' : 'closed'}
+          open={showSearch}
+          onOpenChange={setShowSearch}
+          onSelectUser={(user) => {
+            chat.createIndividualConversation(user.id);
+            setShowSearch(false);
+          }}
+          onSelectGroup={(groupId) => {
+            chat.selectConversation(`group-${groupId}`);
+            setShowSearch(false);
+          }}
+          searchUsers={chat.searchUsers}
+          searchGroups={chat.searchGroups}
+          searchConversations={chat.searchConversations}
+        />
       </div>
     );
   }
@@ -406,6 +439,7 @@ export const UnifiedChatInterface = ({ initialConversationId }: { initialConvers
             </div>
 
             <div className="flex items-center gap-3">
+              <LanguageSwitcher />
               <ThemeToggle />
               <Dialog open={settingsOpen} onOpenChange={setSettingsOpen}>
                 <DialogTrigger asChild>
@@ -732,6 +766,7 @@ export const UnifiedChatInterface = ({ initialConversationId }: { initialConvers
       </Dialog>
 
       <SearchDialog 
+        key={showSearch ? 'open' : 'closed'}
         open={showSearch}
         onOpenChange={setShowSearch}
         onSelectUser={(user) => {

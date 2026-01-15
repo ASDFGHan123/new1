@@ -18,7 +18,7 @@ class Migration(migrations.Migration):
         migrations.RenameIndex(
             model_name='department',
             new_name='departments_head_id_90aa66_idx',
-            old_name='departments_head_idx',
+            old_name='departments_head_idx',   
         ),
         migrations.RenameIndex(
             model_name='departmentofficeuser',

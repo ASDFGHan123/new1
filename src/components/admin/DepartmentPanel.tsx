@@ -153,7 +153,7 @@ export function DepartmentPanel() {
                 <div className="flex gap-4 mt-2 text-xs text-gray-500">
                   <span>Manager: {dept.manager}</span>
                   <span>Code: {dept.code}</span>
-                  <span>Offices: {dept.office_count}</span>
+                  <button onClick={(e) => { e.stopPropagation(); setExpandedDept(expandedDept === dept.id ? null : dept.id); }} className="text-blue-600 hover:underline cursor-pointer">Offices: {dept.office_count}</button>
                   <span>Members: {dept.member_count}</span>
                   {dept.head_username && <span>Head: {dept.head_username}</span>}
                 </div>
@@ -170,7 +170,8 @@ export function DepartmentPanel() {
             </div>
 
             {expandedDept === dept.id && (
-              <div className="mt-4 pt-4 border-t">
+              <div className="mt-4 pt-4 border-t space-y-4">
+                <DepartmentMembers departmentId={dept.id} />
                 <OfficeList departmentId={dept.id} />
               </div>
             )}
@@ -203,6 +204,45 @@ export function DepartmentPanel() {
   );
 }
 
+function DepartmentMembers({ departmentId }: { departmentId: string }) {
+  const [members, setMembers] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    fetchMembers();
+  }, [departmentId]);
+
+  const fetchMembers = async () => {
+    setLoading(true);
+    try {
+      const response = await fetch(`/api/departments/${departmentId}/members/`);
+      const data = await response.json();
+      setMembers(Array.isArray(data) ? data : data.results || []);
+    } catch (err) {
+      console.error('Error fetching members:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div>
+      <h4 className="font-semibold text-sm mb-2">Department Members</h4>
+      {loading ? (
+        <p className="text-xs text-gray-500">Loading...</p>
+      ) : members.length > 0 ? (
+        <div className="space-y-1">
+          {members.map((member) => (
+            <p key={member.id} className="text-xs text-gray-700">• {member.user_username}</p>
+          ))}
+        </div>
+      ) : (
+        <p className="text-xs text-gray-500">No members</p>
+      )}
+    </div>
+  );
+}
+
 function OfficeList({ departmentId }: { departmentId: string }) {
   const [offices, setOffices] = useState<any[]>([]);
   const [showForm, setShowForm] = useState(false);
@@ -210,6 +250,7 @@ function OfficeList({ departmentId }: { departmentId: string }) {
   const [error, setError] = useState('');
   const [editingId, setEditingId] = useState<string | null>(null);
   const [deleteDialog, setDeleteDialog] = useState<{ open: boolean; officeId: string | null }>({ open: false, officeId: null });
+  const [expandedOffice, setExpandedOffice] = useState<string | null>(null);
 
   useEffect(() => {
     fetchOffices();
@@ -324,23 +365,35 @@ function OfficeList({ departmentId }: { departmentId: string }) {
 
       <div className="space-y-2">
         {offices.map((office) => (
-          <div key={office.id} className="bg-white border p-3 rounded flex justify-between items-start">
-            <div className="flex-1">
-              <p className="font-medium text-sm text-gray-900">{office.name}</p>
-              <p className="text-xs text-gray-700">Manager: {office.manager}</p>
-              {office.code && <p className="text-xs text-gray-700">Code: {office.code}</p>}
-              <p className="text-xs text-gray-700 mt-1">Members: {office.member_count}</p>
+          <div key={office.id}>
+            <div className="bg-white border p-3 rounded flex justify-between items-start">
+              <div className="flex-1">
+                <p className="font-medium text-sm text-gray-900">{office.name}</p>
+                <p className="text-xs text-gray-700">Manager: {office.manager}</p>
+                {office.code && <p className="text-xs text-gray-700">Code: {office.code}</p>}
+                <button onClick={() => setExpandedOffice(expandedOffice === office.id ? null : office.id)} className="text-xs text-blue-600 hover:underline cursor-pointer mt-1">Members: {office.member_count}</button>
+              </div>
+              <div className="flex gap-1">
+                <Button variant="ghost" size="sm" onClick={() => handleEdit(office)} className="text-blue-600 hover:bg-blue-100">
+                  <Edit2 className="w-4 h-4 mr-1" />
+                  Edit
+                </Button>
+                <Button variant="ghost" size="sm" onClick={() => handleDelete(office.id)} className="text-red-600 hover:bg-red-100">
+                  <Trash2 className="w-4 h-4 mr-1" />
+                  Delete
+                </Button>
+              </div>
             </div>
-            <div className="flex gap-1">
-              <Button variant="ghost" size="sm" onClick={() => handleEdit(office)} className="text-blue-600 hover:bg-blue-100">
-                <Edit2 className="w-4 h-4 mr-1" />
-                Edit
-              </Button>
-              <Button variant="ghost" size="sm" onClick={() => handleDelete(office.id)} className="text-red-600 hover:bg-red-100">
-                <Trash2 className="w-4 h-4 mr-1" />
-                Delete
-              </Button>
-            </div>
+            {expandedOffice === office.id && office.members && office.members.length > 0 && (
+              <div className="bg-gray-50 p-3 rounded mt-2 ml-4">
+                <p className="text-xs font-semibold mb-2">Members:</p>
+                <div className="space-y-1">
+                  {office.members.map((member: any) => (
+                    <p key={member.id} className="text-xs text-gray-700">• {member.name || member.username}</p>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         ))}
       </div>

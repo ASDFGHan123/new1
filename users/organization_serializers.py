@@ -22,10 +22,11 @@ class DepartmentSerializer(serializers.ModelSerializer):
 class OfficeSerializer(serializers.ModelSerializer):
     department_name = serializers.SerializerMethodField()
     member_count = serializers.SerializerMethodField()
+    members = serializers.SerializerMethodField()
     
     class Meta:
         model = Office
-        fields = ['id', 'department', 'department_name', 'name', 'manager', 'code', 'member_count', 'description', 'created_at', 'updated_at']
+        fields = ['id', 'department', 'department_name', 'name', 'manager', 'code', 'member_count', 'members', 'description', 'created_at', 'updated_at']
     
     def get_department_name(self, obj):
         try:
@@ -40,6 +41,10 @@ class OfficeSerializer(serializers.ModelSerializer):
     
     def get_member_count(self, obj):
         return obj.member_count
+    
+    def get_members(self, obj):
+        members = obj.members.filter(status='active').select_related('user')
+        return [{'id': m.user.id, 'username': m.user.username, 'name': m.user.full_name} for m in members]
 
 
 class DepartmentOfficeUserSerializer(serializers.ModelSerializer):

@@ -39,6 +39,7 @@ export const SearchDialog = ({
   searchGroups,
   searchConversations
 }: SearchDialogProps) => {
+  const { t } = useTranslation();
   const [searchQuery, setSearchQuery] = useState("");
   const [activeTab, setActiveTab] = useState("users");
 
@@ -46,9 +47,9 @@ export const SearchDialog = ({
     setSearchQuery(query);
   };
 
-  const filteredUsers = searchQuery ? searchUsers(searchQuery) : [];
-  const filteredGroups = searchQuery ? searchGroups(searchQuery) : [];
-  const filteredConversations = searchQuery ? searchConversations(searchQuery) : [];
+  const filteredUsers = searchUsers(searchQuery.trim() || '');
+  const filteredGroups = searchGroups(searchQuery.trim() || '');
+  const filteredConversations = searchConversations(searchQuery.trim() || '');
 
   const getStatusColor = (status: User["status"]) => {
     switch (status) {
@@ -83,11 +84,12 @@ export const SearchDialog = ({
     return `${conversation.participants.length} member${conversation.participants.length !== 1 ? 's' : ''}`;
   };
 
-  if (!open) return null;
-
   return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <div className="bg-background rounded-lg border w-full max-w-2xl max-h-[80vh] flex flex-col">
+    <>
+      {open && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => onOpenChange(false)} />
+          <div className="bg-background rounded-lg border w-11/12 h-[90vh] flex flex-col overflow-hidden relative z-50">
         {/* Header */}
         <div className="p-6 border-b">
           <div className="flex items-center justify-between mb-4">
@@ -111,8 +113,8 @@ export const SearchDialog = ({
         </div>
 
         {/* Search Results */}
-        <div className="flex-1 overflow-hidden">
-          {searchQuery ? (
+        <div className="flex-1 overflow-hidden min-h-0">
+          {filteredUsers.length > 0 || filteredGroups.length > 0 || filteredConversations.length > 0 || !searchQuery.trim() ? (
             <Tabs value={activeTab} onValueChange={setActiveTab} className="flex flex-col h-full">
               <TabsList className="grid w-full grid-cols-3 mx-6 mt-4">
                 <TabsTrigger value="users">
@@ -160,7 +162,10 @@ export const SearchDialog = ({
                             </div>
                             <Button 
                               size="sm"
-                              onClick={() => {
+                              className="relative z-10"
+                              onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
                                 onSelectUser(user);
                                 onOpenChange(false);
                               }}
@@ -227,7 +232,10 @@ export const SearchDialog = ({
                             </div>
                             <Button 
                               size="sm"
-                              onClick={() => {
+                              className="relative z-10"
+                              onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
                                 if (conversation.groupId) {
                                   onSelectGroup(conversation.groupId);
                                   onOpenChange(false);
@@ -288,7 +296,10 @@ export const SearchDialog = ({
                               </div>
                               <Button 
                                 size="sm"
-                                onClick={() => {
+                                className="relative z-10"
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
                                   onSelectGroup(conversation.groupId || conversation.id);
                                   onOpenChange(false);
                                 }}
@@ -305,45 +316,48 @@ export const SearchDialog = ({
               </div>
             </Tabs>
           ) : (
-            /* No search query - show suggestions */
-            <div className="flex-1 flex items-center justify-center p-6">
-              <div className="text-center max-w-md">
-                <Search className="h-16 w-16 mx-auto mb-4 text-muted-foreground opacity-50" />
-                <h3 className="text-lg font-semibold mb-2">{t('searchDialog.searchOffChat')}</h3>
-                <p className="text-muted-foreground mb-6">
-                  {t('searchDialog.searchDescription')}
-                </p>
-                
-                <div className="grid gap-3 text-left">
-                  <div className="flex items-center gap-3 p-3 bg-muted rounded-lg">
-                    <UserIcon className="h-5 w-5 text-primary" />
-                    <div>
-                      <p className="font-medium">{t('chat.users')}</p>
-                      <p className="text-sm text-muted-foreground">{t('searchDialog.findUsers')}</p>
-                    </div>
-                  </div>
+            <ScrollArea className="h-full">
+              <div className="p-6">
+                <div className="text-center max-w-md mx-auto">
+                  <Search className="h-16 w-16 mx-auto mb-4 text-muted-foreground opacity-50" />
+                  <h3 className="text-lg font-semibold mb-2">{t('searchDialog.searchOffChat')}</h3>
+                  <p className="text-muted-foreground mb-6">
+                    {t('searchDialog.searchDescription')}
+                  </p>
                   
-                  <div className="flex items-center gap-3 p-3 bg-muted rounded-lg">
-                    <Users className="h-5 w-5 text-primary" />
-                    <div>
-                      <p className="font-medium">{t('chat.groups')}</p>
-                      <p className="text-sm text-muted-foreground">{t('searchDialog.discoverGroups')}</p>
+                  <div className="grid gap-3 text-left">
+                    <div className="flex items-center gap-3 p-3 bg-muted rounded-lg">
+                      <UserIcon className="h-5 w-5 text-primary" />
+                      <div>
+                        <p className="font-medium">{t('chat.users')}</p>
+                        <p className="text-sm text-muted-foreground">{t('searchDialog.findUsers')}</p>
+                      </div>
                     </div>
-                  </div>
-                  
-                  <div className="flex items-center gap-3 p-3 bg-muted rounded-lg">
-                    <MessageCircle className="h-5 w-5 text-primary" />
-                    <div>
-                      <p className="font-medium">{t('conversations.conversationList')}</p>
-                      <p className="text-sm text-muted-foreground">{t('searchDialog.searchChats')}</p>
+                    
+                    <div className="flex items-center gap-3 p-3 bg-muted rounded-lg">
+                      <Users className="h-5 w-5 text-primary" />
+                      <div>
+                        <p className="font-medium">{t('chat.groups')}</p>
+                        <p className="text-sm text-muted-foreground">{t('searchDialog.discoverGroups')}</p>
+                      </div>
+                    </div>
+                    
+                    <div className="flex items-center gap-3 p-3 bg-muted rounded-lg">
+                      <MessageCircle className="h-5 w-5 text-primary" />
+                      <div>
+                        <p className="font-medium">{t('conversations.conversationList')}</p>
+                        <p className="text-sm text-muted-foreground">{t('searchDialog.searchChats')}</p>
+                      </div>
                     </div>
                   </div>
                 </div>
               </div>
-            </div>
+            </ScrollArea>
           )}
         </div>
-      </div>
-    </div>
+          </div>
+        </div>
+      )}
+    </>
   );
 };
