@@ -207,6 +207,7 @@ export function DepartmentPanel() {
 function DepartmentMembers({ departmentId }: { departmentId: string }) {
   const [members, setMembers] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
 
   useEffect(() => {
     fetchMembers();
@@ -214,12 +215,15 @@ function DepartmentMembers({ departmentId }: { departmentId: string }) {
 
   const fetchMembers = async () => {
     setLoading(true);
+    setError('');
     try {
       const response = await fetch(`/api/departments/${departmentId}/members/`);
+      if (!response.ok) throw new Error('Failed to fetch members');
       const data = await response.json();
       setMembers(Array.isArray(data) ? data : data.results || []);
     } catch (err) {
       console.error('Error fetching members:', err);
+      setError('Failed to load members');
     } finally {
       setLoading(false);
     }
@@ -230,6 +234,8 @@ function DepartmentMembers({ departmentId }: { departmentId: string }) {
       <h4 className="font-semibold text-sm mb-2">Department Members</h4>
       {loading ? (
         <p className="text-xs text-gray-500">Loading...</p>
+      ) : error ? (
+        <p className="text-xs text-red-500">{error}</p>
       ) : members.length > 0 ? (
         <div className="space-y-1">
           {members.map((member) => (
@@ -237,7 +243,7 @@ function DepartmentMembers({ departmentId }: { departmentId: string }) {
           ))}
         </div>
       ) : (
-        <p className="text-xs text-gray-500">No members</p>
+        <p className="text-xs text-gray-500">No members assigned</p>
       )}
     </div>
   );

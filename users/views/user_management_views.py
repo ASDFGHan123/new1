@@ -395,6 +395,52 @@ def user_statuses_view(request):
         )
 
 
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def activity_stats_view(request):
+    """
+    Get user activity statistics (active/inactive/online/offline counts).
+    """
+    try:
+        from users.services.user_activity_tracker import UserActivityTracker
+        stats = UserActivityTracker.get_activity_stats()
+        return Response(stats, status=status.HTTP_200_OK)
+        
+    except Exception as e:
+        logger.error(f"Error getting activity stats: {str(e)}")
+        return Response(
+            {'error': 'Failed to retrieve activity statistics'},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def user_activity_summary_view(request, user_id):
+    """
+    Get activity summary for a specific user.
+    """
+    try:
+        from users.models import User
+        from users.services.user_activity_tracker import UserActivityTracker
+        
+        user = User.objects.get(id=user_id)
+        summary = UserActivityTracker.get_user_activity_summary(user)
+        return Response(summary, status=status.HTTP_200_OK)
+        
+    except User.DoesNotExist:
+        return Response(
+            {'error': 'User not found'},
+            status=status.HTTP_404_NOT_FOUND
+        )
+    except Exception as e:
+        logger.error(f"Error getting user activity summary: {str(e)}")
+        return Response(
+            {'error': 'Failed to retrieve user activity summary'},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def upload_profile_image_view(request):
@@ -461,5 +507,44 @@ def upload_profile_image_view(request):
         logger.error(f"Error uploading profile image: {str(e)}", exc_info=True)
         return Response(
             {'error': 'Failed to upload profile image'},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def set_user_online_status_view(request, user_id):
+    """
+    Manually set user online status.
+    """
+    try:
+        from users.models import User
+        status_val = request.data.get('status', 'offline')
+        
+        if status_val not in ['online', 'away', 'offline']:
+            return Response(
+                {'error': 'Invalid status. Must be online, away, or offline'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        user = User.objects.get(id=user_id)
+        user.online_status = status_val
+        user.save(update_fields=['online_status'])
+        
+        return Response({
+            'message': f'User online status set to {status_val}',
+            'user_id': user_id,
+            'online_status': status_val
+        }, status=status.HTTP_200_OK)
+        
+    except User.DoesNotExist:
+        return Response(
+            {'error': 'User not found'},
+            status=status.HTTP_404_NOT_FOUND
+        )
+    except Exception as e:
+        logger.error(f"Error setting user online status: {str(e)}")
+        return Response(
+            {'error': 'Failed to set user online status'},
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )

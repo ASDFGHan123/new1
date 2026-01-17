@@ -105,6 +105,10 @@ def login_view(request):
                 status=status.HTTP_403_FORBIDDEN
             )
         
+        # Set user online status
+        user.online_status = 'online'
+        user.save(update_fields=['online_status'])
+        
         # Generate tokens
         refresh = RefreshToken.for_user(user)
         
@@ -174,8 +178,12 @@ def signup_view(request):
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def logout_view(request):
-    """Logout endpoint - blacklist refresh token."""
+    """Logout endpoint - blacklist refresh token and set offline."""
     try:
+        # Set user offline status
+        request.user.online_status = 'offline'
+        request.user.save(update_fields=['online_status'])
+        
         refresh_token = request.data.get('refresh')
         if refresh_token:
             BlacklistedToken.blacklist_token(

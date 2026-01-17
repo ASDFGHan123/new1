@@ -39,8 +39,8 @@ class UserManagementService:
             Dict containing users list and pagination info
         """
         try:
-            # Build base query - exclude inactive users
-            queryset = User.objects.filter(is_active=True).select_related()
+            # Build base query - include all users regardless of is_active status
+            queryset = User.objects.all().select_related()
             
             # Apply search filter
             search = request_params.get('search', '').strip()

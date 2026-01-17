@@ -67,7 +67,7 @@ class DepartmentViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['get'])
     def members(self, request, pk=None):
         department = self.get_object()
-        members = department.members.filter(status='active')
+        members = department.members.filter(status='active').select_related('user')
         serializer = DepartmentOfficeUserSerializer(members, many=True)
         return Response(serializer.data)
 
@@ -109,7 +109,7 @@ class OfficeViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['get'])
     def members(self, request, pk=None):
         office = self.get_object()
-        members = office.members.filter(status='active')
+        members = office.members.filter(status='active').select_related('user')
         serializer = DepartmentOfficeUserSerializer(members, many=True)
         return Response(serializer.data)
 

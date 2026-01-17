@@ -3,6 +3,7 @@ import { Bell, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
+import { apiService } from '@/lib/api';
 
 interface Notification {
   id: string;
@@ -26,15 +27,11 @@ export function NotificationCenter() {
 
   const fetchNotifications = async () => {
     try {
-      const token = localStorage.getItem('access_token');
-      const response = await fetch('http://localhost:8000/api/users/notifications/', {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-      if (response.ok) {
-        const data = await response.json();
-        setNotifications(Array.isArray(data) ? data : data.results || []);
-        const unread = (Array.isArray(data) ? data : data.results || []).filter((n: Notification) => !n.is_read).length;
-        setUnreadCount(unread);
+      const response = await apiService.httpRequest<any>('/users/notifications/');
+      if (response.success && response.data) {
+        const data = Array.isArray(response.data) ? response.data : response.data.results || [];
+        setNotifications(data);
+        setUnreadCount(data.filter((n: Notification) => !n.is_read).length);
       }
     } catch (err) {
       console.error('Error fetching notifications:', err);
@@ -43,10 +40,8 @@ export function NotificationCenter() {
 
   const markAsRead = async (id: string) => {
     try {
-      const token = localStorage.getItem('access_token');
-      await fetch(`http://localhost:8000/api/users/notifications/${id}/mark_as_read/`, {
+      await apiService.httpRequest(`/users/notifications/${id}/mark_as_read/`, {
         method: 'POST',
-        headers: { 'Authorization': `Bearer ${token}` }
       });
       fetchNotifications();
     } catch (err) {
@@ -56,15 +51,8 @@ export function NotificationCenter() {
 
   const markAllAsRead = async () => {
     try {
-      const token = localStorage.getItem('access_token');
-      const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
-      await fetch('http://localhost:8000/api/users/notifications/mark_all_as_read/', {
+      await apiService.httpRequest('/users/notifications/mark_all_as_read/', {
         method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'X-CSRFToken': csrfToken,
-          'Content-Type': 'application/json'
-        }
       });
       fetchNotifications();
     } catch (err) {

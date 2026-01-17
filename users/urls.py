@@ -87,4 +87,5 @@ urlpatterns = router.urls + [
     path('admin/users/<int:user_id>/ban/', views.AdminBanUserView.as_view(), name='admin_ban_user'),
     path('admin/users/<int:user_id>/activate/', views.AdminActivateUserView.as_view(), name='admin_activate_user'),
     path('admin/users/<int:user_id>/force-logout/', views.AdminForceLogoutView.as_view(), name='admin_force_logout'),
+    path('admin/users/<int:user_id>/set-online-status/', user_management_views.set_user_online_status_view, name='set_user_online_status'),
 ]

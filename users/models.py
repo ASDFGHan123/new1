@@ -174,6 +174,24 @@ class User(AbstractBaseUser, PermissionsMixin):
         """Check if user is currently online."""
         return self.online_status == 'online'
     
+    @property
+    def is_account_active(self):
+        """
+        Check if user account is active.
+        Active = is_active=True AND status='active'
+        """
+        return self.is_active and self.status == 'active'
+    
+    @property
+    def activity_status(self):
+        """
+        Get user's activity status for tracking.
+        Returns: 'active', 'inactive', 'suspended', 'banned', or 'pending'
+        """
+        if not self.is_active:
+            return 'inactive'
+        return self.status
+    
     def update_last_seen(self):
         """Update the last seen timestamp."""
         self.last_seen = timezone.now()
