@@ -65,6 +65,10 @@ class ConversationListCreateView(APIView):
                 Q(conversation_type='group', group__members__user=request.user, group__members__status='active')
             ).distinct().order_by('-last_message_at', '-created_at')
             
+            # Update status for each conversation based on participant online status
+            for conv in conversations:
+                conv.update_status()
+            
             from rest_framework.pagination import PageNumberPagination
             paginator = PageNumberPagination()
             paginator.page_size = 20
@@ -124,6 +128,9 @@ class ConversationDetailView(APIView):
                 return Response({
                     'error': 'Permission denied'
                 }, status=status.HTTP_403_FORBIDDEN)
+            
+            # Update status based on current participant online status
+            conversation.update_status()
             
             serializer = ConversationSerializer(conversation, context={'request': request})
             return Response(serializer.data)
@@ -210,6 +217,9 @@ class MessageListCreateView(APIView):
             conversation = Conversation.objects.get(id=conversation_id)
             self.check_object_permissions(request, conversation)
             
+            # Update conversation status
+            conversation.update_status()
+            
             # Get messages for this conversation
             messages = conversation.messages.filter(is_deleted=False).order_by('-timestamp')
             
@@ -238,6 +248,13 @@ class MessageListCreateView(APIView):
             )
             if serializer.is_valid():
                 message = serializer.save()
+                
+                # Increment user's message count
+                request.user.increment_message_count()
+                
+                # Update conversation activity and status
+                conversation.update_activity()
+                conversation.update_status()
                 
                 # Log user activity
                 UserActivity.objects.create(

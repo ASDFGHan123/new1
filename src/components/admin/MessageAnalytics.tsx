@@ -80,6 +80,7 @@ export const MessageAnalytics = ({ detailed = false }: MessageAnalyticsProps) =>
         setError(null);
       }
       
+      apiService.initializeAuth();
       const response = await apiService.getAnalytics();
       
       if (response.success && response.data) {

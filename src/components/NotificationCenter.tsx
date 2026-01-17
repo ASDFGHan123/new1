@@ -27,6 +27,7 @@ export function NotificationCenter() {
 
   const fetchNotifications = async () => {
     try {
+      apiService.initializeAuth();
       const response = await apiService.httpRequest<any>('/users/notifications/');
       if (response.success && response.data) {
         const data = Array.isArray(response.data) ? response.data : response.data.results || [];
@@ -70,11 +71,11 @@ export function NotificationCenter() {
 
   const getNotificationColor = (type: string) => {
     switch (type) {
-      case 'message': return 'bg-blue-100 text-blue-800';
-      case 'user_approved': return 'bg-green-100 text-green-800';
-      case 'user_rejected': return 'bg-red-100 text-red-800';
-      case 'system': return 'bg-yellow-100 text-yellow-800';
-      default: return 'bg-gray-100 text-gray-800';
+      case 'message': return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200';
+      case 'user_approved': return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200';
+      case 'user_rejected': return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200';
+      case 'system': return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200';
+      default: return 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200';
     }
   };
 
@@ -95,39 +96,49 @@ export function NotificationCenter() {
       </Button>
 
       {isOpen && (
-        <div className="absolute right-0 mt-2 w-96 bg-white rounded-lg shadow-lg z-50 max-h-96 overflow-y-auto">
-          <div className="p-4 border-b flex justify-between items-center">
-            <h3 className="font-semibold">Notifications</h3>
-            <Button variant="ghost" size="sm" onClick={() => setIsOpen(false)}>
+        <div className="fixed inset-0 z-40" onClick={() => setIsOpen(false)} />
+      )}
+
+      {isOpen && (
+        <div className="absolute right-0 top-full mt-2 w-96 bg-white dark:bg-slate-950 rounded-lg shadow-2xl z-50 max-h-96 overflow-hidden flex flex-col border border-gray-200 dark:border-slate-800">
+          <div className="p-4 border-b border-gray-200 dark:border-slate-800 flex justify-between items-center bg-gray-50 dark:bg-slate-900 flex-shrink-0">
+            <h3 className="font-semibold text-gray-900 dark:text-white">Notifications</h3>
+            <Button variant="ghost" size="sm" onClick={() => setIsOpen(false)} className="text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white">
               <X className="w-4 h-4" />
             </Button>
           </div>
 
           {notifications.length === 0 ? (
-            <div className="p-8 text-center text-gray-500">No notifications</div>
+            <div className="p-8 text-center text-gray-500 dark:text-gray-400 flex-1 flex items-center justify-center">
+              No notifications
+            </div>
           ) : (
-            <div className="space-y-2 p-2">
+            <div className="overflow-y-auto flex-1 space-y-1 p-2">
               {notifications.map(notif => (
                 <Card
                   key={notif.id}
-                  className={`p-3 cursor-pointer hover:bg-gray-50 ${!notif.is_read ? 'bg-blue-50' : ''}`}
+                  className={`p-3 cursor-pointer transition-colors ${
+                    !notif.is_read 
+                      ? 'bg-blue-50 dark:bg-blue-950 hover:bg-blue-100 dark:hover:bg-blue-900' 
+                      : 'bg-white dark:bg-slate-950 hover:bg-gray-50 dark:hover:bg-slate-900'
+                  } border border-gray-200 dark:border-slate-800`}
                   onClick={() => markAsRead(notif.id)}
                 >
-                  <div className="flex justify-between items-start">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2">
-                        <h4 className="font-medium text-sm">{notif.title}</h4>
-                        <Badge className={`text-xs ${getNotificationColor(notif.notification_type)}`}>
+                  <div className="flex justify-between items-start gap-2">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <h4 className="font-medium text-sm text-gray-900 dark:text-white">{notif.title}</h4>
+                        <Badge className={`text-xs whitespace-nowrap ${getNotificationColor(notif.notification_type)}`}>
                           {notif.notification_type}
                         </Badge>
                       </div>
-                      <p className="text-xs text-gray-600 mt-1">{notif.message}</p>
-                      <p className="text-xs text-gray-400 mt-1">
+                      <p className="text-xs text-gray-600 dark:text-gray-400 mt-1 break-words">{notif.message}</p>
+                      <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
                         {new Date(notif.created_at).toLocaleString()}
                       </p>
                     </div>
                     {!notif.is_read && (
-                      <div className="w-2 h-2 bg-blue-500 rounded-full mt-1"></div>
+                      <div className="w-2 h-2 bg-blue-500 rounded-full mt-1 flex-shrink-0"></div>
                     )}
                   </div>
                 </Card>

@@ -208,11 +208,12 @@ class ApiService {
     retries: number = 3
   ): Promise<Response> {
     try {
-      console.log(`[API] Fetching: ${url}`);
+      console.log('[API] Fetching:', url.replace(this.baseURL, ''));
       const response = await fetch(url, options);
-      console.log(`[API] Response status: ${response.status}`);
+      console.log('[API] Response status:', response.status);
       
-      if (response.status === 401 && this.refreshToken && !options.headers?.['Authorization']?.includes('refresh')) {
+      const authHeader = typeof options.headers === 'object' ? (options.headers as Record<string, string>)?.['Authorization'] : '';
+      if (response.status === 401 && this.refreshToken && !authHeader?.includes('refresh')) {
         try {
           const newToken = await this.refreshAccessToken();
           const newOptions = {
@@ -226,9 +227,9 @@ class ApiService {
         } catch (refreshError) {
           this.authToken = null;
           this.refreshToken = null;
-          localStorage.removeItem('access_token');
-          localStorage.removeItem('refresh_token');
-          localStorage.removeItem('offchat_user');
+          sessionStorage.removeItem('access_token');
+          sessionStorage.removeItem('refresh_token');
+          sessionStorage.removeItem('offchat_user');
           this.notifyAuthExpired();
           throw new Error('AUTHENTICATION_EXPIRED');
         }
@@ -236,9 +237,9 @@ class ApiService {
       
       if (response.status === 401 && !this.refreshToken) {
         this.authToken = null;
-        localStorage.removeItem('access_token');
-        localStorage.removeItem('refresh_token');
-        localStorage.removeItem('offchat_user');
+        sessionStorage.removeItem('access_token');
+        sessionStorage.removeItem('refresh_token');
+        sessionStorage.removeItem('offchat_user');
         this.notifyAuthExpired();
       }
       
@@ -248,9 +249,9 @@ class ApiService {
       
       if (response.status === 401) {
         this.authToken = null;
-        localStorage.removeItem('access_token');
-        localStorage.removeItem('refresh_token');
-        localStorage.removeItem('offchat_user');
+        sessionStorage.removeItem('access_token');
+        sessionStorage.removeItem('refresh_token');
+        sessionStorage.removeItem('offchat_user');
         this.notifyAuthExpired();
       }
       
@@ -262,7 +263,7 @@ class ApiService {
       
       return response;
     } catch (error) {
-      console.error(`[API] Fetch error: ${error.message}`);
+      console.error('[API] Fetch error:', error instanceof Error ? error.message : 'Unknown error');
       if (retries > 0 && error.message !== 'AUTHENTICATION_EXPIRED') {
         const delay = Math.pow(2, 3 - retries) * 1000;
         await new Promise(resolve => setTimeout(resolve, delay));
@@ -301,31 +302,32 @@ class ApiService {
       ...options.headers,
     };
 
-    let token = this.authToken;
     if (typeof window !== 'undefined') {
-      const accessToken = localStorage.getItem('access_token');
+      let accessToken = sessionStorage.getItem('access_token');
+      if (!accessToken) {
+        accessToken = localStorage.getItem('access_token');
+      }
       if (accessToken) {
-        token = accessToken;
         this.authToken = accessToken;
       }
     }
 
-    if (token) {
-      headers['Authorization'] = `Bearer ${token}`;
+    if (this.authToken) {
+      headers['Authorization'] = `Bearer ${this.authToken}`;
     }
 
     try {
-      console.log(`[API] Request: ${options.method || 'GET'} ${url}`);
+      console.log('[API] Request:', options.method || 'GET', url.replace(this.baseURL, ''));
       const response = await this.fetchWithRetry(url, {
         ...options,
         headers,
       });
 
       const data = await response.json().catch(() => ({}));
-      console.log(`[API] Response: ${response.status}`, data);
+      console.log('[API] Response:', response.status, data);
 
       if (!response.ok) {
-        console.error(`[API] Error ${response.status}:`, data);
+        console.error('[API] Error', response.status, ':', data);
         if (response.status === 401) {
           throw new Error('Authentication required');
         } else if (response.status === 403) {
@@ -351,10 +353,10 @@ class ApiService {
         success: true,
       };
     } catch (error) {
-      console.error(`[API] Request failed for ${endpoint}:`, error);
+      console.error('[API] Request failed for', endpoint, ':', error);
       
       if (error instanceof TypeError) {
-        console.error('[API] Network error:', error.message);
+        console.error('[API] Network error:', error instanceof Error ? error.message : 'Unknown error');
         return {
           data: null as T,
           success: false,
@@ -404,8 +406,8 @@ class ApiService {
         this.refreshToken = refreshToken;
         
         if (typeof window !== 'undefined') {
-          localStorage.setItem('access_token', accessToken);
-          localStorage.setItem('refresh_token', refreshToken);
+          sessionStorage.setItem('access_token', accessToken);
+          sessionStorage.setItem('refresh_token', refreshToken);
         }
         
         return {
@@ -458,8 +460,8 @@ class ApiService {
         this.refreshToken = refreshToken;
         
         if (typeof window !== 'undefined') {
-          localStorage.setItem('access_token', accessToken);
-          localStorage.setItem('refresh_token', refreshToken);
+          sessionStorage.setItem('access_token', accessToken);
+          sessionStorage.setItem('refresh_token', refreshToken);
         }
         
         return {
@@ -499,9 +501,9 @@ class ApiService {
       this.refreshPromise = null;
       
       if (typeof window !== 'undefined') {
-        localStorage.removeItem('access_token');
-        localStorage.removeItem('refresh_token');
-        localStorage.removeItem('offchat_user');
+        sessionStorage.removeItem('access_token');
+        sessionStorage.removeItem('refresh_token');
+        sessionStorage.removeItem('offchat_user');
       }
     }
     
@@ -510,12 +512,20 @@ class ApiService {
 
   initializeAuth() {
     if (typeof window !== 'undefined') {
-      const accessToken = localStorage.getItem('access_token');
-      const refreshToken = localStorage.getItem('refresh_token');
+      let accessToken = sessionStorage.getItem('access_token');
+      let refreshToken = sessionStorage.getItem('refresh_token');
+      
+      // Fallback to localStorage if sessionStorage is empty
+      if (!accessToken) {
+        accessToken = localStorage.getItem('access_token');
+      }
+      if (!refreshToken) {
+        refreshToken = localStorage.getItem('refresh_token');
+      }
       
       if (accessToken) {
         this.authToken = accessToken;
-        console.log('Auth token loaded from localStorage');
+        console.log('Auth token loaded from storage');
       }
       if (refreshToken) {
         this.refreshToken = refreshToken;
@@ -526,7 +536,7 @@ class ApiService {
   setAuthToken(token: string) {
     this.authToken = token;
     if (typeof window !== 'undefined') {
-      localStorage.setItem('access_token', token);
+      sessionStorage.setItem('access_token', token);
     }
   }
 
@@ -559,7 +569,7 @@ class ApiService {
       
       if (response.success && response.data) {
         const users = Array.isArray(response.data) ? response.data : response.data.results || [];
-        console.log('Loaded users:', users);
+        console.log('[API] Loaded users count:', users.length);
         return {
           success: true,
           data: users
@@ -572,7 +582,7 @@ class ApiService {
         error: response.error || 'Failed to load users'
       };
     } catch (error) {
-      console.error('Error loading users:', error);
+      console.error('[API] Error loading users:', error instanceof Error ? error.message : 'Unknown error');
       return {
         success: false,
         data: [],
@@ -688,21 +698,21 @@ class ApiService {
           conversations = response.data.data;
         }
         
-        console.log('Loaded conversations:', conversations);
+        console.log('[API] Loaded conversations count:', conversations.length);
         return {
           success: true,
           data: conversations
         };
       }
       
-      console.warn('Failed to load conversations:', response.error);
+      console.warn('[API] Failed to load conversations:', response.error);
       return {
         success: false,
         data: [],
         error: response.error || 'Failed to load conversations'
       };
     } catch (error) {
-      console.error('Error loading conversations:', error);
+      console.error('[API] Error loading conversations:', error instanceof Error ? error.message : 'Unknown error');
       return {
         data: [],
         success: false,
@@ -777,21 +787,21 @@ class ApiService {
           messages = response.data.data;
         }
         
-        console.log('Loaded messages:', messages);
+        console.log('[API] Loaded messages count:', messages.length);
         return {
           success: true,
           data: messages
         };
       }
       
-      console.warn('Failed to load messages:', response.error);
+      console.warn('[API] Failed to load messages:', response.error);
       return {
         success: false,
         data: [],
         error: response.error || 'Failed to load messages'
       };
     } catch (error) {
-      console.error('Error loading messages:', error);
+      console.error('[API] Error loading messages:', error instanceof Error ? error.message : 'Unknown error');
       return {
         data: [],
         success: false,
@@ -812,16 +822,17 @@ class ApiService {
       }
       
       const headers: HeadersInit = {};
-      let token = this.authToken;
       if (typeof window !== 'undefined') {
-        const accessToken = localStorage.getItem('access_token');
+        let accessToken = sessionStorage.getItem('access_token');
+        if (!accessToken) {
+          accessToken = localStorage.getItem('access_token');
+        }
         if (accessToken) {
-          token = accessToken;
           this.authToken = accessToken;
         }
       }
-      if (token) {
-        headers['Authorization'] = `Bearer ${token}`;
+      if (this.authToken) {
+        headers['Authorization'] = `Bearer ${this.authToken}`;
       }
       
       const response = await this.fetchWithRetry(url, {
@@ -988,7 +999,10 @@ class ApiService {
       
       let token = this.authToken;
       if (typeof window !== 'undefined') {
-        const accessToken = localStorage.getItem('access_token');
+        let accessToken = sessionStorage.getItem('access_token');
+        if (!accessToken) {
+          accessToken = localStorage.getItem('access_token');
+        }
         if (accessToken) {
           token = accessToken;
           this.authToken = accessToken;

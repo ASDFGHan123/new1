@@ -477,8 +477,8 @@ export const UserManagement = React.memo(({ users: propUsers = [], approveUser, 
 
   return (
     <Card className="bg-gradient-card border-border/50">
-      <CardHeader>
-        <div className="flex items-center justify-between">
+      <CardHeader className="space-y-4">
+        <div className="flex items-center justify-between flex-wrap gap-4">
           <div>
             <CardTitle className="text-xl">{t('admin.userManagement')}</CardTitle>
             <CardDescription>
@@ -486,25 +486,6 @@ export const UserManagement = React.memo(({ users: propUsers = [], approveUser, 
             </CardDescription>
           </div>
           <div className="flex items-center space-x-2">
-            {error && (
-              <Alert variant="destructive" className="mr-2">
-                <AlertCircle className="h-4 w-4" />
-                <AlertDescription className="flex items-center justify-between">
-                  <span>{error}</span>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={handleRetry}
-                    disabled={retryCount >= 3}
-                    className="ml-2"
-                  >
-                    <RefreshCw className={`h-3 w-3 mr-1 ${retryCount > 0 ? 'animate-spin' : ''}`} />
-                    {t('common.retry')} ({retryCount}/3)
-                  </Button>
-                </AlertDescription>
-              </Alert>
-            )}
-            
             <Button 
               onClick={handlePrintUsers}
               variant="outline"
@@ -767,12 +748,12 @@ export const UserManagement = React.memo(({ users: propUsers = [], approveUser, 
           </div>
         </div>
         
-        <div className="flex items-center space-x-4 mt-4">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
+        <div className="w-full space-y-2">
+          <div className="relative w-full">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4 pointer-events-none" />
             <Input
               placeholder="Search users by username or email..."
-              className="pl-10 bg-input border-border"
+              className="pl-10 w-full"
               value={search}
               onChange={e => setSearch(e.target.value)}
               disabled={loading}

@@ -49,7 +49,6 @@ export const StatsCards = () => {
     setError(null);
     
     try {
-      // Fetch users data to calculate stats
       const usersResponse = await apiService.getUsers();
       
       if (usersResponse.success && usersResponse.data) {
@@ -63,20 +62,20 @@ export const StatsCards = () => {
           {
             title: t('stats.totalUsers'),
             value: totalUsers,
-            change: 15.2, // Mock growth percentage
+            change: 15.2,
             icon: Users,
             color: "admin-primary",
           },
           {
             title: t('conversations.activeConversations'),
-            value: Math.floor(activeUsers / 2), // Estimate based on active users
+            value: Math.floor(activeUsers / 2),
             change: 8.5,
             icon: MessageSquare,
             color: "admin-secondary",
           },
           {
             title: t('stats.totalMessages'),
-            value: Math.floor(totalMessages / 10), // Estimate daily messages
+            value: totalMessages,
             change: 23.1,
             icon: Activity,
             color: "admin-warning",
@@ -95,18 +94,16 @@ export const StatsCards = () => {
     } catch (err) {
       console.error('Failed to load dashboard stats:', err);
       setError(err instanceof Error ? err.message : 'Failed to load statistics');
-      
-      // Set stats to 0 if API fails
       setStats(getInitialStats(t));
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     loadStats();
-    // Removed auto-refresh to prevent repeated API calls
-    // Users can manually refresh using the refresh button
+    const interval = setInterval(loadStats, 5000);
+    return () => clearInterval(interval);
   }, [loadStats]);
 
   const handlePrintStats = () => {
@@ -119,7 +116,6 @@ export const StatsCards = () => {
 
   return (
     <div className="space-y-4">
-      {/* Header with Print and Refresh Buttons */}
       <div className="flex justify-end gap-2">
         <Button 
           onClick={loadStats}

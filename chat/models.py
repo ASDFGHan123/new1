@@ -126,6 +126,10 @@ class Conversation(models.Model):
         INDIVIDUAL = 'individual', 'Individual'
         GROUP = 'group', 'Group'
     
+    class ConversationStatus(models.TextChoices):
+        ACTIVE = 'active', 'Active'
+        INACTIVE = 'inactive', 'Inactive'
+    
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     conversation_type = models.CharField(max_length=20, choices=ConversationType.choices, default=ConversationType.INDIVIDUAL)
     group = models.OneToOneField(Group, on_delete=models.CASCADE, null=True, blank=True, related_name='conversation')
@@ -133,6 +137,7 @@ class Conversation(models.Model):
     title = models.CharField(max_length=100, blank=True)
     description = models.TextField(blank=True)
     last_message_at = models.DateTimeField(null=True, blank=True)
+    conversation_status = models.CharField(max_length=20, choices=ConversationStatus.choices, default=ConversationStatus.INACTIVE)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     is_deleted = models.BooleanField(default=False)
@@ -143,7 +148,7 @@ class Conversation(models.Model):
         verbose_name = 'Conversation'
         verbose_name_plural = 'Conversations'
         ordering = ['-last_message_at', '-created_at']
-        indexes = [models.Index(fields=['conversation_type']), models.Index(fields=['last_message_at']), models.Index(fields=['created_at']), models.Index(fields=['is_deleted'])]
+        indexes = [models.Index(fields=['conversation_type']), models.Index(fields=['last_message_at']), models.Index(fields=['created_at']), models.Index(fields=['is_deleted']), models.Index(fields=['conversation_status'])]
     
     def __str__(self):
         if self.conversation_type == self.ConversationType.GROUP:
@@ -191,9 +196,23 @@ class Conversation(models.Model):
     
     def update_activity(self):
         self.last_message_at = timezone.now()
-        self.save(update_fields=['last_message_at'])
+        self.conversation_status = self.ConversationStatus.ACTIVE
+        self.save(update_fields=['last_message_at', 'conversation_status'])
         if self.conversation_type == self.ConversationType.GROUP and self.group:
             self.group.update_activity()
+    
+    def is_active(self):
+        """Check if conversation is active (any participant is online)."""
+        active_participants = self.participants.filter(online_status='online')
+        return active_participants.exists()
+    
+    def update_status(self):
+        """Update conversation status based on participant online status."""
+        if self.is_active():
+            self.conversation_status = self.ConversationStatus.ACTIVE
+        else:
+            self.conversation_status = self.ConversationStatus.INACTIVE
+        self.save(update_fields=['conversation_status'])
     
     def soft_delete(self):
         now = timezone.now()

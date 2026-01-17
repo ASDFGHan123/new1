@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Plus, Edit2, Trash2, ChevronDown } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import {
@@ -24,7 +25,23 @@ interface Department {
   created_at: string;
 }
 
+interface Member {
+  id: string;
+  user_username: string;
+}
+
+interface Office {
+  id: string;
+  name: string;
+  manager: string;
+  code: string;
+  description: string;
+  member_count: number;
+  members?: Member[];
+}
+
 export function DepartmentPanel() {
+  const { t } = useTranslation();
   const [departments, setDepartments] = useState<Department[]>([]);
   const [expandedDept, setExpandedDept] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
@@ -96,9 +113,9 @@ export function DepartmentPanel() {
   return (
     <div className="space-y-4">
       <div className="flex justify-between items-center">
-        <h2 className="text-2xl font-bold">Departments</h2>
+        <h2 className="text-2xl font-bold">{t('departments.departments')}</h2>
         <Button onClick={() => setShowForm(!showForm)} size="sm">
-          <Plus className="w-4 h-4 mr-2" /> Add Department
+          <Plus className="w-4 h-4 mr-2" /> {t('departments.addDepartment')}
         </Button>
       </div>
 
@@ -106,27 +123,27 @@ export function DepartmentPanel() {
         <Card className="p-4">
           <input
             type="text"
-            placeholder="Department name"
+            placeholder={t('departments.departmentName')}
             value={formData.name}
             onChange={(e) => setFormData({ ...formData, name: e.target.value })}
             className="w-full px-3 py-2 border rounded mb-2"
           />
           <input
             type="text"
-            placeholder="Manager"
+            placeholder={t('departments.manager')}
             value={formData.manager}
             onChange={(e) => setFormData({ ...formData, manager: e.target.value })}
             className="w-full px-3 py-2 border rounded mb-2"
           />
           <input
             type="text"
-            placeholder="Code"
+            placeholder={t('departments.code')}
             value={formData.code}
             onChange={(e) => setFormData({ ...formData, code: e.target.value })}
             className="w-full px-3 py-2 border rounded mb-2"
           />
           <textarea
-            placeholder="Description"
+            placeholder={t('departments.description')}
             value={formData.description}
             onChange={(e) => setFormData({ ...formData, description: e.target.value })}
             className="w-full px-3 py-2 border rounded mb-2"
@@ -134,10 +151,10 @@ export function DepartmentPanel() {
           />
           <div className="flex gap-2">
             <Button onClick={handleCreate} disabled={loading} size="sm">
-              {editingId ? 'Update' : 'Create'}
+              {editingId ? t('departments.update') : t('departments.create')}
             </Button>
             <Button onClick={handleCancel} variant="outline" size="sm">
-              Cancel
+              {t('departments.cancel')}
             </Button>
           </div>
         </Card>
@@ -151,11 +168,11 @@ export function DepartmentPanel() {
                 <h3 className="font-semibold">{dept.name}</h3>
                 <p className="text-sm text-gray-600">{dept.description}</p>
                 <div className="flex gap-4 mt-2 text-xs text-gray-500">
-                  <span>Manager: {dept.manager}</span>
-                  <span>Code: {dept.code}</span>
-                  <button onClick={(e) => { e.stopPropagation(); setExpandedDept(expandedDept === dept.id ? null : dept.id); }} className="text-blue-600 hover:underline cursor-pointer">Offices: {dept.office_count}</button>
-                  <span>Members: {dept.member_count}</span>
-                  {dept.head_username && <span>Head: {dept.head_username}</span>}
+                  <span>{t('departments.manager')}: {dept.manager}</span>
+                  <span>{t('departments.code')}: {dept.code}</span>
+                  <button onClick={(e) => { e.stopPropagation(); setExpandedDept(expandedDept === dept.id ? null : dept.id); }} className="text-blue-600 hover:underline cursor-pointer">{t('departments.officeCount')}: {dept.office_count}</button>
+                  <span>{t('departments.memberCount')}: {dept.member_count}</span>
+                  {dept.head_username && <span>{t('departments.head')}: {dept.head_username}</span>}
                 </div>
               </div>
               <div className="flex items-center gap-2">
@@ -182,20 +199,20 @@ export function DepartmentPanel() {
       <Dialog open={deleteDialog.open} onOpenChange={(open) => setDeleteDialog({ ...deleteDialog, open })}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Delete Department</DialogTitle>
+            <DialogTitle>{t('departments.deleteDepartment')}</DialogTitle>
             <DialogDescription>
-              Choose how to delete this department
+              {t('departments.chooseDeleteMethod')}
             </DialogDescription>
           </DialogHeader>
           <div className="flex gap-2 justify-end mt-4">
             <Button variant="outline" onClick={() => setDeleteDialog({ open: false, deptId: null })}>
-              Cancel
+              {t('common.cancel')}
             </Button>
             <Button variant="outline" onClick={() => confirmDelete('trash')}>
-              Move to Trash
+              {t('departments.moveToTrash')}
             </Button>
             <Button variant="destructive" onClick={() => confirmDelete('permanent')}>
-              Permanently Delete
+              {t('departments.permanentlyDelete')}
             </Button>
           </div>
         </DialogContent>
@@ -204,119 +221,129 @@ export function DepartmentPanel() {
   );
 }
 
-function DepartmentMembers({ departmentId }: { departmentId: string }) {
-  const [members, setMembers] = useState<any[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
+interface DepartmentMembersProps {
+  departmentId: string;
+}
+
+function DepartmentMembers({ departmentId }: DepartmentMembersProps) {
+  const { t } = useTranslation();
+  const [departmentMembers, setDepartmentMembers] = useState<Member[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
 
   useEffect(() => {
-    fetchMembers();
+    loadDepartmentMembers();
   }, [departmentId]);
 
-  const fetchMembers = async () => {
-    setLoading(true);
-    setError('');
+  const loadDepartmentMembers = async () => {
+    setIsLoading(true);
+    setErrorMessage('');
     try {
       const response = await fetch(`/api/departments/${departmentId}/members/`);
       if (!response.ok) throw new Error('Failed to fetch members');
       const data = await response.json();
-      setMembers(Array.isArray(data) ? data : data.results || []);
+      setDepartmentMembers(Array.isArray(data) ? data : data.results || []);
     } catch (err) {
       console.error('Error fetching members:', err);
-      setError('Failed to load members');
+      setErrorMessage(t('departments.failedToLoadMembers'));
     } finally {
-      setLoading(false);
+      setIsLoading(false);
     }
   };
 
   return (
     <div>
-      <h4 className="font-semibold text-sm mb-2">Department Members</h4>
-      {loading ? (
-        <p className="text-xs text-gray-500">Loading...</p>
-      ) : error ? (
-        <p className="text-xs text-red-500">{error}</p>
-      ) : members.length > 0 ? (
+      <h4 className="font-semibold text-sm mb-2">{t('departments.departmentMembers')}</h4>
+      {isLoading ? (
+        <p className="text-xs text-gray-500">{t('common.loading')}</p>
+      ) : errorMessage ? (
+        <p className="text-xs text-red-500">{errorMessage}</p>
+      ) : departmentMembers.length > 0 ? (
         <div className="space-y-1">
-          {members.map((member) => (
+          {departmentMembers.map((member) => (
             <p key={member.id} className="text-xs text-gray-700">• {member.user_username}</p>
           ))}
         </div>
       ) : (
-        <p className="text-xs text-gray-500">No members assigned</p>
+        <p className="text-xs text-gray-500">{t('departments.noMembers')}</p>
       )}
     </div>
   );
 }
 
-function OfficeList({ departmentId }: { departmentId: string }) {
-  const [offices, setOffices] = useState<any[]>([]);
-  const [showForm, setShowForm] = useState(false);
-  const [formData, setFormData] = useState({ name: '', manager: '', code: '', description: '' });
-  const [error, setError] = useState('');
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [deleteDialog, setDeleteDialog] = useState<{ open: boolean; officeId: string | null }>({ open: false, officeId: null });
-  const [expandedOffice, setExpandedOffice] = useState<string | null>(null);
+interface OfficeListProps {
+  departmentId: string;
+}
+
+function OfficeList({ departmentId }: OfficeListProps) {
+  const { t } = useTranslation();
+  const [officeList, setOfficeList] = useState<Office[]>([]);
+  const [isFormVisible, setIsFormVisible] = useState(false);
+  const [officeFormData, setOfficeFormData] = useState({ name: '', manager: '', code: '', description: '' });
+  const [errorMessage, setErrorMessage] = useState('');
+  const [editingOfficeId, setEditingOfficeId] = useState<string | null>(null);
+  const [deleteDialogState, setDeleteDialogState] = useState<{ open: boolean; officeId: string | null }>({ open: false, officeId: null });
+  const [expandedOfficeId, setExpandedOfficeId] = useState<string | null>(null);
 
   useEffect(() => {
-    fetchOffices();
+    loadOffices();
   }, [departmentId]);
 
-  const fetchOffices = async () => {
+  const loadOffices = async () => {
     try {
       const data = await organizationApi.getDepartmentOffices(departmentId);
-      setOffices(Array.isArray(data) ? data : data.results || []);
+      setOfficeList(Array.isArray(data) ? data : data.results || []);
     } catch (err) {
       console.error('Error fetching offices:', err);
     }
   };
 
-  const handleCreate = async () => {
-    if (!formData.name.trim()) return;
-    setError('');
+  const handleCreateOffice = async () => {
+    if (!officeFormData.name.trim()) return;
+    setErrorMessage('');
     try {
-      if (editingId) {
-        await organizationApi.updateOffice(editingId, { ...formData, department: departmentId });
-        setEditingId(null);
+      if (editingOfficeId) {
+        await organizationApi.updateOffice(editingOfficeId, { ...officeFormData, department: departmentId });
+        setEditingOfficeId(null);
       } else {
-        await organizationApi.createOffice({ ...formData, department: departmentId });
+        await organizationApi.createOffice({ ...officeFormData, department: departmentId });
       }
-      setFormData({ name: '', manager: '', code: '', description: '' });
-      setShowForm(false);
-      fetchOffices();
+      setOfficeFormData({ name: '', manager: '', code: '', description: '' });
+      setIsFormVisible(false);
+      loadOffices();
     } catch (err: any) {
       try {
         const errorData = JSON.parse(err.message);
         const errorMsg = Object.values(errorData).flat().join(', ');
-        setError(errorMsg);
+        setErrorMessage(errorMsg);
       } catch {
-        setError(err.message || 'Failed to save office');
+        setErrorMessage(err.message || 'Failed to save office');
       }
     }
   };
 
-  const handleEdit = (office: any) => {
-    setFormData({ name: office.name, manager: office.manager, code: office.code, description: office.description });
-    setEditingId(office.id);
-    setShowForm(true);
+  const handleEditOffice = (office: Office) => {
+    setOfficeFormData({ name: office.name, manager: office.manager, code: office.code, description: office.description });
+    setEditingOfficeId(office.id);
+    setIsFormVisible(true);
   };
 
-  const handleCancel = () => {
-    setShowForm(false);
-    setEditingId(null);
-    setFormData({ name: '', manager: '', code: '', description: '' });
+  const handleCancelForm = () => {
+    setIsFormVisible(false);
+    setEditingOfficeId(null);
+    setOfficeFormData({ name: '', manager: '', code: '', description: '' });
   };
 
-  const handleDelete = (id: string) => {
-    setDeleteDialog({ open: true, officeId: id });
+  const handleDeleteOffice = (id: string) => {
+    setDeleteDialogState({ open: true, officeId: id });
   };
 
-  const confirmDelete = async (action: 'trash' | 'permanent') => {
-    if (!deleteDialog.officeId) return;
+  const confirmDeleteOffice = async (action: 'trash' | 'permanent') => {
+    if (!deleteDialogState.officeId) return;
     try {
-      await organizationApi.deleteOffice(deleteDialog.officeId, { action });
-      setDeleteDialog({ open: false, officeId: null });
-      fetchOffices();
+      await organizationApi.deleteOffice(deleteDialogState.officeId, { action });
+      setDeleteDialogState({ open: false, officeId: null });
+      loadOffices();
     } catch (err) {
       console.error('Error deleting office:', err);
     }
@@ -325,77 +352,77 @@ function OfficeList({ departmentId }: { departmentId: string }) {
   return (
     <div className="space-y-3">
       <div className="flex justify-between items-center">
-        <h4 className="font-semibold text-sm">Offices</h4>
-        <Button onClick={() => setShowForm(!showForm)} size="sm" variant="outline">
-          <Plus className="w-3 h-3 mr-1" /> Add Office
+        <h4 className="font-semibold text-sm">{t('departments.offices')}</h4>
+        <Button onClick={() => setIsFormVisible(!isFormVisible)} size="sm" variant="outline">
+          <Plus className="w-3 h-3 mr-1" /> {t('departments.addOffice')}
         </Button>
       </div>
 
-      {showForm && (
+      {isFormVisible && (
         <div className="bg-gray-50 p-3 rounded space-y-2">
-          {error && <p className="text-red-600 text-sm">{error}</p>}
+          {errorMessage && <p className="text-red-600 text-sm">{errorMessage}</p>}
           <input
             type="text"
-            placeholder="Office name"
-            value={formData.name}
-            onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+            placeholder={t('departments.officeName')}
+            value={officeFormData.name}
+            onChange={(e) => setOfficeFormData({ ...officeFormData, name: e.target.value })}
             className="w-full px-2 py-1 border rounded text-sm"
           />
           <input
             type="text"
-            placeholder="Manager"
-            value={formData.manager}
-            onChange={(e) => setFormData({ ...formData, manager: e.target.value })}
+            placeholder={t('departments.manager')}
+            value={officeFormData.manager}
+            onChange={(e) => setOfficeFormData({ ...officeFormData, manager: e.target.value })}
             className="w-full px-2 py-1 border rounded text-sm"
           />
           <input
             type="text"
-            placeholder="Code"
-            value={formData.code}
-            onChange={(e) => setFormData({ ...formData, code: e.target.value })}
+            placeholder={t('departments.code')}
+            value={officeFormData.code}
+            onChange={(e) => setOfficeFormData({ ...officeFormData, code: e.target.value })}
             className="w-full px-2 py-1 border rounded text-sm"
           />
           <textarea
-            placeholder="Description"
-            value={formData.description}
-            onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+            placeholder={t('departments.description')}
+            value={officeFormData.description}
+            onChange={(e) => setOfficeFormData({ ...officeFormData, description: e.target.value })}
             className="w-full px-2 py-1 border rounded text-sm"
             rows={2}
           />
           <div className="flex gap-2">
-            <Button onClick={handleCreate} size="sm">{editingId ? 'Update' : 'Create'}</Button>
-            <Button onClick={handleCancel} variant="outline" size="sm">Cancel</Button>
+            <Button onClick={handleCreateOffice} size="sm">{editingOfficeId ? t('departments.update') : t('departments.create')}</Button>
+            <Button onClick={handleCancelForm} variant="outline" size="sm">{t('common.cancel')}</Button>
           </div>
         </div>
       )}
 
       <div className="space-y-2">
-        {offices.map((office) => (
+        {officeList.map((office) => (
           <div key={office.id}>
             <div className="bg-white border p-3 rounded flex justify-between items-start">
               <div className="flex-1">
                 <p className="font-medium text-sm text-gray-900">{office.name}</p>
-                <p className="text-xs text-gray-700">Manager: {office.manager}</p>
-                {office.code && <p className="text-xs text-gray-700">Code: {office.code}</p>}
-                <button onClick={() => setExpandedOffice(expandedOffice === office.id ? null : office.id)} className="text-xs text-blue-600 hover:underline cursor-pointer mt-1">Members: {office.member_count}</button>
+                <p className="text-xs text-gray-700">{t('departments.manager')}: {office.manager}</p>
+                {office.code && <p className="text-xs text-gray-700">{t('departments.code')}: {office.code}</p>}
+                <button onClick={() => setExpandedOfficeId(expandedOfficeId === office.id ? null : office.id)} className="text-xs text-blue-600 hover:underline cursor-pointer mt-1">{t('departments.members')}: {office.member_count}</button>
               </div>
               <div className="flex gap-1">
-                <Button variant="ghost" size="sm" onClick={() => handleEdit(office)} className="text-blue-600 hover:bg-blue-100">
+                <Button variant="ghost" size="sm" onClick={() => handleEditOffice(office)} className="text-blue-600 hover:bg-blue-100">
                   <Edit2 className="w-4 h-4 mr-1" />
-                  Edit
+                  {t('common.edit')}
                 </Button>
-                <Button variant="ghost" size="sm" onClick={() => handleDelete(office.id)} className="text-red-600 hover:bg-red-100">
+                <Button variant="ghost" size="sm" onClick={() => handleDeleteOffice(office.id)} className="text-red-600 hover:bg-red-100">
                   <Trash2 className="w-4 h-4 mr-1" />
-                  Delete
+                  {t('common.delete')}
                 </Button>
               </div>
             </div>
-            {expandedOffice === office.id && office.members && office.members.length > 0 && (
+            {expandedOfficeId === office.id && office.members && office.members.length > 0 && (
               <div className="bg-gray-50 p-3 rounded mt-2 ml-4">
-                <p className="text-xs font-semibold mb-2">Members:</p>
+                <p className="text-xs font-semibold mb-2">{t('departments.members')}:</p>
                 <div className="space-y-1">
-                  {office.members.map((member: any) => (
-                    <p key={member.id} className="text-xs text-gray-700">• {member.name || member.username}</p>
+                  {office.members.map((member: Member) => (
+                    <p key={member.id} className="text-xs text-gray-700">• {member.user_username}</p>
                   ))}
                 </div>
               </div>
@@ -404,23 +431,23 @@ function OfficeList({ departmentId }: { departmentId: string }) {
         ))}
       </div>
 
-      <Dialog open={deleteDialog.open} onOpenChange={(open) => setDeleteDialog({ ...deleteDialog, open })}>
+      <Dialog open={deleteDialogState.open} onOpenChange={(open) => setDeleteDialogState({ ...deleteDialogState, open })}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Delete Office</DialogTitle>
+            <DialogTitle>{t('departments.deleteOffice')}</DialogTitle>
             <DialogDescription>
-              Choose how to delete this office
+              {t('departments.chooseDeleteMethod')}
             </DialogDescription>
           </DialogHeader>
           <div className="flex gap-2 justify-end mt-4">
-            <Button variant="outline" onClick={() => setDeleteDialog({ open: false, officeId: null })}>
-              Cancel
+            <Button variant="outline" onClick={() => setDeleteDialogState({ open: false, officeId: null })}>
+              {t('common.cancel')}
             </Button>
-            <Button variant="outline" onClick={() => confirmDelete('trash')}>
-              Move to Trash
+            <Button variant="outline" onClick={() => confirmDeleteOffice('trash')}>
+              {t('departments.moveToTrash')}
             </Button>
-            <Button variant="destructive" onClick={() => confirmDelete('permanent')}>
-              Permanently Delete
+            <Button variant="destructive" onClick={() => confirmDeleteOffice('permanent')}>
+              {t('departments.permanentlyDelete')}
             </Button>
           </div>
         </DialogContent>

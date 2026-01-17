@@ -137,7 +137,7 @@ export const ConversationMonitor = ({ onTrashConversation }: ConversationMonitor
           lastMessage: lastMessageText,
           lastActivity: actTime ? new Date(actTime).toLocaleString() : t('common.noData'),
           messageCount: conv.message_count || 0,
-          isActive: true,
+          isActive: conv.conversation_status === 'active' || conv.is_active || false,
           messages: conv.messages || []
         };
       });

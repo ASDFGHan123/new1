@@ -77,6 +77,9 @@ export const useGroupChat = (currentUserId: string = "1") => {
       setError(null);
       
       try {
+        // Initialize auth from session storage
+        apiService.initializeAuth();
+        
         // Only load all users if user has admin access
         const authToken = apiService.getAuthToken();
         if (authToken) {
@@ -109,13 +112,15 @@ export const useGroupChat = (currentUserId: string = "1") => {
       }
     };
 
+    // Ensure auth is initialized before loading data
+    apiService.initializeAuth();
     loadData();
 
     return () => {
       if (loadTimeoutRef.current) clearTimeout(loadTimeoutRef.current);
       if (sendMessageTimeoutRef.current) clearTimeout(sendMessageTimeoutRef.current);
     };
-  }, [currentUserId, loadConversations]);
+  }, [currentUserId, loadConversations, apiService]);
 
   const currentGroup = groups.find(g => g.id === currentGroupId);
   const currentGroupMessages = messages[currentGroupId] || [];
@@ -134,6 +139,7 @@ export const useGroupChat = (currentUserId: string = "1") => {
     setError(null);
     
     try {
+      apiService.initializeAuth();
       const response = await apiService.createGroup({
         name: groupData.name,
         description: groupData.description,
@@ -241,6 +247,7 @@ export const useGroupChat = (currentUserId: string = "1") => {
     setError(null);
     
     try {
+      apiService.initializeAuth();
       await apiService.request(`/chat/groups/${groupId}/`, {
         method: 'DELETE'
       });
@@ -270,6 +277,7 @@ export const useGroupChat = (currentUserId: string = "1") => {
     setError(null);
     
     try {
+      apiService.initializeAuth();
       const response = await apiService.sendMessage(groupId, content.trim());
       
       if (response.success && response.data) {

@@ -537,7 +537,13 @@ const queryClient = new QueryClient();
 
         <Route
           path="/chat"
-          element={<UnifiedChatPage />}
+          element={
+            user ? (
+              <UnifiedChatPage />
+            ) : (
+              <AdminLogin onLogin={handleAdminLogin} />
+            )
+          }
         />
         {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
         <Route path="*" element={<NotFound />} />
