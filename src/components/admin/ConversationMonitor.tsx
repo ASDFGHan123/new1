@@ -91,7 +91,13 @@ export const ConversationMonitor = ({ onTrashConversation }: ConversationMonitor
   const fetchConversations = async () => {
     setLoading(true);
     try {
-      const token = localStorage.getItem('access_token');
+      let token = localStorage.getItem('admin_access_token');
+      if (!token) {
+        token = localStorage.getItem('chat_access_token');
+      }
+      if (!token) {
+        token = localStorage.getItem('access_token');
+      }
       const headers: Record<string, string> = { 'Content-Type': 'application/json' };
       if (token) {
         headers['Authorization'] = `Bearer ${token}`;
@@ -215,7 +221,13 @@ export const ConversationMonitor = ({ onTrashConversation }: ConversationMonitor
 
   const handleViewMessageHistory = async (conversation: any) => {
     try {
-      const token = localStorage.getItem('access_token');
+      let token = localStorage.getItem('admin_access_token');
+      if (!token) {
+        token = localStorage.getItem('chat_access_token');
+      }
+      if (!token) {
+        token = localStorage.getItem('access_token');
+      }
       const headers: Record<string, string> = { 'Content-Type': 'application/json' };
       if (token) headers['Authorization'] = `Bearer ${token}`;
       const res = await fetch(`http://localhost:8000/api/chat/conversations/${conversation.id}/messages/`, { headers });
@@ -241,7 +253,13 @@ export const ConversationMonitor = ({ onTrashConversation }: ConversationMonitor
 
   const handleViewParticipants = async (conversation: any) => {
     try {
-      const token = localStorage.getItem('access_token');
+      let token = localStorage.getItem('admin_access_token');
+      if (!token) {
+        token = localStorage.getItem('chat_access_token');
+      }
+      if (!token) {
+        token = localStorage.getItem('access_token');
+      }
       const headers: Record<string, string> = { 'Content-Type': 'application/json' };
       if (token) headers['Authorization'] = `Bearer ${token}`;
       const res = await fetch(`http://localhost:8000/api/chat/conversations/${conversation.id}/`, { headers });
@@ -271,7 +289,13 @@ export const ConversationMonitor = ({ onTrashConversation }: ConversationMonitor
 
     if (action === "delete") {
       try {
-        const token = localStorage.getItem('access_token');
+        let token = localStorage.getItem('admin_access_token');
+        if (!token) {
+          token = localStorage.getItem('chat_access_token');
+        }
+        if (!token) {
+          token = localStorage.getItem('access_token');
+        }
         const headers: Record<string, string> = { 'Content-Type': 'application/json' };
         if (token) {
           headers['Authorization'] = `Bearer ${token}`;

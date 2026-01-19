@@ -180,24 +180,6 @@ export const MessageAnalytics = ({ detailed = false }: MessageAnalyticsProps) =>
               <RefreshCw className={`w-4 h-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
               {loading ? 'Refreshing...' : 'Refresh'}
             </Button>
-            <Button 
-              onClick={handleBackupAnalytics}
-              variant="outline"
-              size="sm"
-              className="bg-green-50 hover:bg-green-100 border-green-200 text-green-700"
-            >
-              <Download className="w-4 h-4 mr-2" />
-              Backup Data
-            </Button>
-            <Button 
-              onClick={handlePrintAnalytics}
-              variant="outline"
-              size="sm"
-              className="bg-blue-50 hover:bg-blue-100 border-blue-200 text-blue-700"
-            >
-              <Printer className="w-4 h-4 mr-2" />
-              Print Analytics
-            </Button>
           </div>
         </div>
         
@@ -216,14 +198,58 @@ export const MessageAnalytics = ({ detailed = false }: MessageAnalyticsProps) =>
             <ResponsiveContainer width="100%" minWidth="600px" height={300}>
               <LineChart data={messageData}>
                 <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                <XAxis dataKey="time" stroke="hsl(var(--muted-foreground))" />
-                <YAxis stroke="hsl(var(--muted-foreground))" />
+                <XAxis 
+                  dataKey="time" 
+                  stroke="hsl(var(--muted-foreground))" 
+                  label={{ value: 'Time (Kabul)', position: 'insideBottomRight', offset: -5 }}
+                  tickFormatter={(time) => {
+                    if (typeof time === 'string' && time.includes(':')) {
+                      const [hours, minutes] = time.split(':');
+                      let h = parseInt(hours);
+                      let m = parseInt(minutes);
+                      // Add 5 hours and 30 minutes for Kabul timezone
+                      m += 30;
+                      if (m >= 60) {
+                        h += 1;
+                        m -= 60;
+                      }
+                      h = (h + 5) % 24;
+                      const ampm = h >= 12 ? 'PM' : 'AM';
+                      const h12 = h % 12 || 12;
+                      return `${Math.floor(h12)}:${String(m).padStart(2, '0')} ${ampm}`;
+                    }
+                    return time;
+                  }}
+                />
+                <YAxis 
+                  stroke="hsl(var(--muted-foreground))" 
+                  label={{ value: 'Message Count', angle: -90, position: 'insideLeft' }}
+                  allowDecimals={false}
+                />
                 <Tooltip 
                   contentStyle={{ 
                     backgroundColor: "hsl(var(--card))", 
                     border: "1px solid hsl(var(--border))",
                     borderRadius: "6px"
-                  }} 
+                  }}
+                  formatter={(value) => [Math.round(Number(value)), 'Messages']}
+                  labelFormatter={(label) => {
+                    if (typeof label === 'string' && label.includes(':')) {
+                      const [hours, minutes] = label.split(':');
+                      let h = parseInt(hours);
+                      let m = parseInt(minutes);
+                      m += 30;
+                      if (m >= 60) {
+                        h += 1;
+                        m -= 60;
+                      }
+                      h = (h + 5) % 24;
+                      const ampm = h >= 12 ? 'PM' : 'AM';
+                      const h12 = h % 12 || 12;
+                      return `${Math.floor(h12)}:${String(m).padStart(2, '0')} ${ampm}`;
+                    }
+                    return label;
+                  }}
                 />
                 <Line 
                   type="monotone" 
@@ -231,6 +257,7 @@ export const MessageAnalytics = ({ detailed = false }: MessageAnalyticsProps) =>
                   stroke="hsl(var(--admin-primary))" 
                   strokeWidth={2}
                   dot={{ fill: "hsl(var(--admin-primary))" }}
+                  name="Messages"
                 />
               </LineChart>
             </ResponsiveContainer>

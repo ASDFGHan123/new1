@@ -60,12 +60,24 @@ class InputValidationMiddleware(MiddlewareMixin):
 class RateLimitMiddleware(MiddlewareMixin):
     """Simple rate limiting middleware."""
     
+    # Endpoints exempt from rate limiting
+    EXEMPT_PATHS = [
+        '/api/users/all-users/',
+        '/api/users/heartbeat/',
+        '/api/auth/login/',
+        '/api/auth/register/',
+    ]
+    
     def __init__(self, get_response):
         self.get_response = get_response
         self.request_counts = {}
         super().__init__(get_response)
     
     def process_request(self, request):
+        # Skip rate limiting for exempt paths
+        if any(request.path.startswith(path) for path in self.EXEMPT_PATHS):
+            return None
+        
         # Get client IP
         x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
         if x_forwarded_for:
@@ -73,14 +85,14 @@ class RateLimitMiddleware(MiddlewareMixin):
         else:
             ip = request.META.get('REMOTE_ADDR')
         
-        # Simple rate limiting: 1000 requests per minute per IP (development friendly)
+        # Rate limiting: 5000 requests per minute per IP (increased for development)
         import time
         current_time = int(time.time() / 60)
         key = f"{ip}:{current_time}"
         
         self.request_counts[key] = self.request_counts.get(key, 0) + 1
         
-        if self.request_counts[key] > 1000:
+        if self.request_counts[key] > 5000:
             logger.warning(f"Rate limit exceeded for IP: {ip}")
             return JsonResponse(
                 {'error': 'Rate limit exceeded'},

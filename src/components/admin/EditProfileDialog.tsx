@@ -82,7 +82,9 @@ export const EditProfileDialog: React.FC<EditProfileDialogProps> = ({
         });
         handleClose();
       } else {
-        throw new Error(response.error || t('errors.failedToUpdate'));
+        // Handle validation errors from backend
+        const errorMsg = response.error || t('errors.failedToUpdate');
+        throw new Error(errorMsg);
       }
     } catch (error) {
       toast({

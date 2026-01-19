@@ -4,6 +4,7 @@ Comprehensive user management API views.
 import logging
 import os
 from django.http import JsonResponse
+from django.utils import timezone
 from rest_framework import status, permissions
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated, IsAdminUser
@@ -273,6 +274,8 @@ def change_user_role_view(request, user_id):
         return Response(
             {'error': 'Failed to change user role'},
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
+ 
+ 
         )
 
 
@@ -515,36 +518,104 @@ def upload_profile_image_view(request):
 @permission_classes([IsAuthenticated])
 def set_user_online_status_view(request, user_id):
     """
-    Manually set user online status.
+    Set user online status.
     """
     try:
-        from users.models import User
         status_val = request.data.get('status', 'offline')
+        result = UserManagementService.set_user_online_status(user_id, status_val)
+        return Response(result, status=status.HTTP_200_OK)
         
-        if status_val not in ['online', 'away', 'offline']:
-            return Response(
-                {'error': 'Invalid status. Must be online, away, or offline'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-        
-        user = User.objects.get(id=user_id)
-        user.online_status = status_val
-        user.save(update_fields=['online_status'])
-        
-        return Response({
-            'message': f'User online status set to {status_val}',
-            'user_id': user_id,
-            'online_status': status_val
-        }, status=status.HTTP_200_OK)
-        
-    except User.DoesNotExist:
+    except ValidationError as e:
         return Response(
-            {'error': 'User not found'},
-            status=status.HTTP_404_NOT_FOUND
+            {'error': str(e)},
+            status=status.HTTP_400_BAD_REQUEST
         )
     except Exception as e:
         logger.error(f"Error setting user online status: {str(e)}")
         return Response(
             {'error': 'Failed to set user online status'},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_user_online_status_view(request, user_id):
+    """
+    Get user online status.
+    """
+    try:
+        result = UserManagementService.get_user_online_status(user_id)
+        return Response(result, status=status.HTTP_200_OK)
+        
+    except ValidationError as e:
+        return Response(
+            {'error': str(e)},
+            status=status.HTTP_404_NOT_FOUND
+        )
+    except Exception as e:
+        logger.error(f"Error getting user online status: {str(e)}")
+        return Response(
+            {'error': 'Failed to get user online status'},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_online_users_view(request):
+    """
+    Get list of online users.
+    """
+    try:
+        from users.models import User
+        users = User.objects.filter(online_status='online').values(
+            'id', 'username', 'email', 'online_status', 'last_seen', 'role', 'status'
+        ).order_by('-last_seen')
+        
+        return Response({
+            'online_users': list(users),
+            'count': len(list(users))
+        }, status=status.HTTP_200_OK)
+        
+    except Exception as e:
+        logger.error(f"Error getting online users: {str(e)}")
+        return Response(
+            {'error': 'Failed to retrieve online users'},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def user_heartbeat_view(request):
+    """
+    Update user activity heartbeat - keeps user online and updates last_seen.
+    """
+    try:
+        from users.services.simple_online_status import update_user_last_seen, mark_user_online
+        from users.models import User
+        user = request.user
+        
+        # Check if account is active
+        if not user.is_active or user.status in ['inactive', 'suspended', 'banned']:
+            return Response({
+                'message': 'Account is not active',
+                'online_status': 'offline',
+            }, status=status.HTTP_403_FORBIDDEN)
+        
+        update_user_last_seen(user.id)
+        mark_user_online(user.id)
+        
+        return Response({
+            'message': 'Heartbeat recorded',
+            'online_status': 'online',
+            'last_seen': timezone.now().isoformat(),
+        }, status=status.HTTP_200_OK)
+        
+    except Exception as e:
+        logger.error(f"Error recording heartbeat: {str(e)}")
+        return Response(
+            {'error': 'Failed to record heartbeat'},
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )

@@ -19,14 +19,17 @@ os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'offchat_backend.settings')
 # is populated before importing code that may need it.
 django_asgi_app = get_asgi_application()
 
-from chat.routing import websocket_urlpatterns
+from chat.routing import websocket_urlpatterns as chat_urlpatterns
+from users.routing import websocket_urlpatterns as presence_urlpatterns
+
+combined_urlpatterns = chat_urlpatterns + presence_urlpatterns
 
 application = ProtocolTypeRouter({
     "http": django_asgi_app,
     "websocket": AllowedHostsOriginValidator(
         AuthMiddlewareStack(
             URLRouter(
-                websocket_urlpatterns
+                combined_urlpatterns
             )
         )
     ),

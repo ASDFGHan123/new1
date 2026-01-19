@@ -149,7 +149,7 @@ export const generatePrintHTML = (printData: PrintData): string => {
         </div>
         
         <div class="footer">
-          <p>© 2024 OffChat Admin Dashboard - Confidential Report</p>
+          <p>© 2026 OffChat Admin Dashboard - Confidential Report</p>
         </div>
       </body>
     </html>

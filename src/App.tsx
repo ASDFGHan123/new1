@@ -4,12 +4,13 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { ThemeProvider } from "next-themes";
-import { Suspense, lazy, useState, useEffect } from "react";
+import { Suspense, lazy, useState, useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { LoadingPage } from "@/components/ui/loading";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { NotificationProvider } from "@/hooks/useNotifications";
 import { useRTL } from "@/hooks/useRTL";
+import { usePresenceTracking } from "@/hooks/usePresenceTracking";
 import { apiService, User, Conversation, MessageTemplate, Role } from "@/lib/api";
 
 // Initialize auth tokens from localStorage on app start
@@ -77,6 +78,10 @@ const queryClient = new QueryClient();
   const AppContent = () => {
     const { t } = useTranslation();
     useRTL();
+    usePresenceTracking();
+    const heartbeatIntervalRef = useRef<NodeJS.Timeout | null>(null);
+    const refreshIntervalRef = useRef<NodeJS.Timeout | null>(null);
+    
   // Admin force logout user
   const handleForceLogoutUser = (id: string) => {
     let username = id;
@@ -115,8 +120,8 @@ const queryClient = new QueryClient();
   const [user, setUser] = useState<null | { id: string; username: string; avatar?: string; status: "online" | "away" | "offline"; role?: string }>(() => {
     // Try to restore user from localStorage on app start
     try {
-      const savedUser = localStorage.getItem('offchat_user');
-      const accessToken = localStorage.getItem('access_token');
+      const savedUser = localStorage.getItem('admin_user');
+      const accessToken = localStorage.getItem('admin_access_token');
       // Only restore user if we have a valid token
       return (savedUser && accessToken) ? JSON.parse(savedUser) : null;
     } catch {
@@ -172,7 +177,7 @@ const queryClient = new QueryClient();
         "send_messages", "manage_conversations", "view_analytics"
       ],
       isDefault: true,
-      createdAt: "2024-01-01"
+      createdAt: "2026-01-01"
     },
     {
       id: "moderator",
@@ -183,7 +188,7 @@ const queryClient = new QueryClient();
         "send_messages", "view_analytics"
       ],
       isDefault: true,
-      createdAt: "2024-01-01"
+      createdAt: "2026-01-01"
     },
     {
       id: "user",
@@ -191,7 +196,7 @@ const queryClient = new QueryClient();
       description: "Basic user access",
       permissions: ["send_messages", "manage_conversations"],
       isDefault: true,
-      createdAt: "2024-01-01"
+      createdAt: "2026-01-01"
     }
   ]);
 
@@ -200,46 +205,79 @@ const queryClient = new QueryClient();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Load users from API (only after authentication)
+  // Heartbeat effect
   useEffect(() => {
-    const loadUsers = async () => {
-      try {
-        setLoading(true);
-        setError(null);
-        
-        // Check if we have an auth token and are authenticated
-        const authToken = apiService.getAuthToken();
-        if (!authToken) {
-          // Not authenticated yet, no data
-          setUsers([]);
-          setLoading(false);
-          return;
-        }
+    const token = localStorage.getItem('admin_access_token');
+    if (!token || !user) return;
 
-        const response = await apiService.getUsers();
-        if (response.success && response.data) {
-          setUsers(response.data as AppUser[]);
-        } else if (response.error === 'Authentication failed. Please log in again.') {
-          // Authentication expired, clear tokens
-          apiService.logout();
-          setUsers([]);
-          setError('Session expired. Please log in again.');
-        } else {
-          setError('Failed to load users: ' + (response.error || 'Unknown error'));
-          setUsers([]);
+    const sendHeartbeat = async () => {
+      try {
+        const response = await fetch('http://localhost:8000/api/users/heartbeat/', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+        });
+        if (!response.ok) {
+          console.error('Heartbeat failed:', response.status);
         }
-      } catch (err) {
-        console.error('Error loading users:', err);
-        setError('Failed to connect to server');
-        setUsers([]);
-      } finally {
-        setLoading(false);
+      } catch (error) {
+        console.error('Heartbeat error:', error);
       }
     };
 
-    // Only load users if we have a logged in admin user
+    // Send initial heartbeat immediately
+    sendHeartbeat();
+
+    // Send heartbeat every 30 seconds
+    heartbeatIntervalRef.current = setInterval(sendHeartbeat, 30000);
+
+    return () => {
+      if (heartbeatIntervalRef.current) clearInterval(heartbeatIntervalRef.current);
+    };
+  }, [user]);
+
+  // Load users from API
+  const loadUsers = async () => {
+    try {
+      const authToken = localStorage.getItem('admin_access_token');
+      if (!authToken) {
+        setUsers([]);
+        return;
+      }
+      apiService.setAuthToken(authToken);
+
+      const response = await apiService.getUsers();
+      if (response.success && response.data) {
+        setUsers(response.data as AppUser[]);
+      } else if (response.error === 'Authentication failed. Please log in again.') {
+        apiService.logout();
+        setUsers([]);
+        setError('Session expired. Please log in again.');
+      } else {
+        setError('Failed to load users: ' + (response.error || 'Unknown error'));
+        setUsers([]);
+      }
+    } catch (err) {
+      console.error('Error loading users:', err);
+      setError('Failed to connect to server');
+      setUsers([]);
+    }
+  };
+
+  // Initial load and auto-refresh
+  useEffect(() => {
     if (user && user.role === 'admin') {
-      loadUsers();
+      setLoading(true);
+      loadUsers().finally(() => setLoading(false));
+
+      // Auto-refresh every 10 seconds
+      refreshIntervalRef.current = setInterval(loadUsers, 10000);
+
+      return () => {
+        if (refreshIntervalRef.current) clearInterval(refreshIntervalRef.current);
+      };
     } else {
       setLoading(false);
     }
@@ -282,9 +320,8 @@ const queryClient = new QueryClient();
       
       if (response.success && response.data) {
         const userData = response.data;
-        localStorage.setItem('access_token', userData.access);
-        localStorage.setItem('refresh_token', userData.refresh);
-        apiService.setAuthToken(userData.access);
+        localStorage.setItem('chat_access_token', userData.access);
+        localStorage.setItem('chat_refresh_token', userData.refresh);
         
         const userObj = { 
           id: String(userData.user.id), 
@@ -293,8 +330,7 @@ const queryClient = new QueryClient();
           role: userData.user.role,
           avatar: userData.user.avatar 
         };
-        setUser(userObj);
-        localStorage.setItem('offchat_user', JSON.stringify(userObj));
+        localStorage.setItem('chat_user', JSON.stringify(userObj));
         return true;
       } else {
         throw new Error(response.error || "Login failed");
@@ -325,9 +361,11 @@ const queryClient = new QueryClient();
   };
 
   const handleLogout = () => {
-    localStorage.removeItem('access_token');
-    localStorage.removeItem('refresh_token');
-    localStorage.removeItem('offchat_user');
+    localStorage.removeItem('admin_access_token');
+    localStorage.removeItem('admin_refresh_token');
+    localStorage.removeItem('admin_user');
+    if (heartbeatIntervalRef.current) clearInterval(heartbeatIntervalRef.current);
+    if (refreshIntervalRef.current) clearInterval(refreshIntervalRef.current);
     setUser(null);
   };
 
@@ -344,8 +382,8 @@ const queryClient = new QueryClient();
           throw new Error("Access denied. Admin privileges required.");
         }
         
-        localStorage.setItem('access_token', userData.access);
-        localStorage.setItem('refresh_token', userData.refresh);
+        localStorage.setItem('admin_access_token', userData.access);
+        localStorage.setItem('admin_refresh_token', userData.refresh);
         apiService.setAuthToken(userData.access);
         
         const userObj = { 
@@ -356,7 +394,7 @@ const queryClient = new QueryClient();
           avatar: userData.user.avatar 
         };
         setUser(userObj);
-        localStorage.setItem('offchat_user', JSON.stringify(userObj));
+        localStorage.setItem('admin_user', JSON.stringify(userObj));
         
         const usersResponse = await apiService.getUsers();
         if (usersResponse.success && usersResponse.data) {
@@ -483,39 +521,36 @@ const queryClient = new QueryClient();
   return (
     <Suspense fallback={<LoadingPage message="Loading page..." />}>
       <Routes>
-        <Route path="/" element={<AdminLogin onLogin={handleAdminLogin} />} />
+        <Route path="/" element={<UnifiedChatPage />} />
         <Route path="/admin-login" element={<AdminLogin onLogin={handleAdminLogin} />} />
-        <Route 
-          path="/admin" 
-          element={
-            user && user.role === "admin" ? (
-              <AdminDashboard
-                users={users}
-                roles={roles}
-                conversations={conversations}
-                messageTemplates={messageTemplates}
-                user={user}
-                approveUser={approveUser}
-                rejectUser={rejectUser}
-                addUser={handleAddUser}
-                updateUser={updateUser}
-                addRole={addRole}
-                updateRole={updateRole}
-                deleteRole={deleteRole}
-                hasPermission={hasPermission}
-                sendSystemMessage={sendSystemMessage}
-                sendBulkMessage={sendBulkMessage}
-                addMessageTemplate={addMessageTemplate}
-                deleteMessageTemplate={deleteMessageTemplate}
-                forceLogoutUser={handleForceLogoutUser}
-                deleteUser={handleDeleteUser}
-                onLogout={handleLogout}
-              />
-            ) : (
-              <AdminLogin onLogin={handleAdminLogin} />
-            )
-          }
-        />
+        <Route path="/admin" element={
+          user && user.role === "admin" ? (
+            <AdminDashboard
+              users={users}
+              roles={roles}
+              conversations={conversations}
+              messageTemplates={messageTemplates}
+              user={user}
+              approveUser={approveUser}
+              rejectUser={rejectUser}
+              addUser={handleAddUser}
+              updateUser={updateUser}
+              addRole={addRole}
+              updateRole={updateRole}
+              deleteRole={deleteRole}
+              hasPermission={hasPermission}
+              sendSystemMessage={sendSystemMessage}
+              sendBulkMessage={sendBulkMessage}
+              addMessageTemplate={addMessageTemplate}
+              deleteMessageTemplate={deleteMessageTemplate}
+              forceLogoutUser={handleForceLogoutUser}
+              deleteUser={handleDeleteUser}
+              onLogout={handleLogout}
+            />
+          ) : (
+            <AdminLogin onLogin={handleAdminLogin} />
+          )
+        } />
         <Route
           path="/login"
           element={
@@ -537,13 +572,7 @@ const queryClient = new QueryClient();
 
         <Route
           path="/chat"
-          element={
-            user ? (
-              <UnifiedChatPage />
-            ) : (
-              <AdminLogin onLogin={handleAdminLogin} />
-            )
-          }
+          element={<UnifiedChatPage />}
         />
         {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
         <Route path="*" element={<NotFound />} />

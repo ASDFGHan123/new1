@@ -239,9 +239,7 @@ function DepartmentMembers({ departmentId }: DepartmentMembersProps) {
     setIsLoading(true);
     setErrorMessage('');
     try {
-      const response = await fetch(`/api/departments/${departmentId}/members/`);
-      if (!response.ok) throw new Error('Failed to fetch members');
-      const data = await response.json();
+      const data = await organizationApi.getDepartmentMembers(departmentId);
       setDepartmentMembers(Array.isArray(data) ? data : data.results || []);
     } catch (err) {
       console.error('Error fetching members:', err);

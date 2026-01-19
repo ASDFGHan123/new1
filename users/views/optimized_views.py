@@ -16,7 +16,7 @@ def admin_users_list_optimized(request):
     try:
         # Single query with select_related for foreign keys
         users = User.objects.all().select_related().only(
-            'id', 'username', 'email', 'status', 'role', 
+            'id', 'username', 'email', 'status', 'role', 'is_active', 'online_status',
             'report_count', 'last_seen', 'created_at'
         ).order_by('-created_at')[:500]
         
@@ -25,6 +25,8 @@ def admin_users_list_optimized(request):
             'username': u.username,
             'email': u.email,
             'status': u.status,
+            'is_active': u.is_active,
+            'online_status': u.online_status,
             'role': u.role,
             'report_count': u.report_count,
             'last_seen': u.last_seen.isoformat() if u.last_seen else None,

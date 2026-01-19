@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Bell, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -18,14 +18,22 @@ export function NotificationCenter() {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [isOpen, setIsOpen] = useState(false);
+  const isFetchingRef = useRef<boolean>(false);
+  const lastFetchRef = useRef<number>(0);
 
   useEffect(() => {
-    fetchNotifications();
-    const interval = setInterval(fetchNotifications, 5000);
-    return () => clearInterval(interval);
-  }, []);
+    if (isOpen) {
+      fetchNotifications();
+    }
+  }, [isOpen]);
 
   const fetchNotifications = async () => {
+    const now = Date.now();
+    if (isFetchingRef.current || now - lastFetchRef.current < 3000) return;
+    
+    isFetchingRef.current = true;
+    lastFetchRef.current = now;
+    
     try {
       apiService.initializeAuth();
       const response = await apiService.httpRequest<any>('/users/notifications/');
@@ -36,6 +44,8 @@ export function NotificationCenter() {
       }
     } catch (err) {
       console.error('Error fetching notifications:', err);
+    } finally {
+      isFetchingRef.current = false;
     }
   };
 
@@ -44,7 +54,8 @@ export function NotificationCenter() {
       await apiService.httpRequest(`/users/notifications/${id}/mark_as_read/`, {
         method: 'POST',
       });
-      fetchNotifications();
+      setNotifications(prev => prev.map(n => n.id === id ? { ...n, is_read: true } : n));
+      setUnreadCount(prev => Math.max(0, prev - 1));
     } catch (err) {
       console.error('Error marking notification as read:', err);
     }
@@ -55,7 +66,8 @@ export function NotificationCenter() {
       await apiService.httpRequest('/users/notifications/mark_all_as_read/', {
         method: 'POST',
       });
-      fetchNotifications();
+      setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
+      setUnreadCount(0);
     } catch (err) {
       console.error('Error marking all as read:', err);
     }
@@ -63,7 +75,6 @@ export function NotificationCenter() {
 
   const handleOpen = () => {
     setIsOpen(true);
-    setUnreadCount(0);
     if (notifications.some(n => !n.is_read)) {
       markAllAsRead();
     }

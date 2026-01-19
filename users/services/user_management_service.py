@@ -155,7 +155,7 @@ class UserManagementService:
                 first_name=user_data.get('first_name', ''),
                 last_name=user_data.get('last_name', ''),
                 role=user_data.get('role', 'user'),
-                status=user_data.get('status', 'pending'),
+                status=user_data.get('status', 'active'),
                 is_active=user_data.get('is_active', True),
             )
             
@@ -625,3 +625,100 @@ class UserManagementService:
         except Exception as e:
             logger.error(f"Error getting user activities: {str(e)}")
             raise
+    
+    @classmethod
+    def set_user_online_status(cls, user_id: int, status: str) -> Dict[str, Any]:
+        """
+        Set user online status.
+        
+        Args:
+            user_id: User ID
+            status: Online status ('online', 'away', 'offline')
+            
+        Returns:
+            Dict with updated user data
+        """
+        try:
+            user = User.objects.get(id=user_id)
+            
+            if status not in dict(User.ONLINE_STATUS_CHOICES):
+                raise ValidationError(f"Invalid online status: {status}")
+            
+            if status == 'online':
+                user.set_online()
+            elif status == 'away':
+                user.set_away()
+            elif status == 'offline':
+                user.set_offline()
+            
+            return {
+                'message': f'User online status updated to {status}',
+                'user_id': user.id,
+                'online_status': user.online_status,
+                'last_seen': user.last_seen.isoformat() if user.last_seen else None,
+            }
+            
+        except User.DoesNotExist:
+            raise ValidationError("User not found")
+    
+    @classmethod
+    def get_online_users(cls, page: int = 1, per_page: int = 50) -> Dict[str, Any]:
+        """
+        Get list of online users.
+        
+        Args:
+            page: Page number
+            per_page: Items per page
+            
+        Returns:
+            Dict with online users and pagination
+        """
+        try:
+            queryset = User.objects.filter(online_status='online').order_by('-last_seen')
+            
+            paginator = Paginator(queryset, per_page)
+            users_page = paginator.get_page(page)
+            
+            users_data = [cls._serialize_user(user) for user in users_page]
+            
+            return {
+                'online_users': users_data,
+                'online_count': queryset.count(),
+                'pagination': {
+                    'page': users_page.number,
+                    'per_page': per_page,
+                    'total_pages': paginator.num_pages,
+                    'total_count': paginator.count,
+                    'has_next': users_page.has_next(),
+                    'has_previous': users_page.has_previous(),
+                }
+            }
+            
+        except Exception as e:
+            logger.error(f"Error getting online users: {str(e)}")
+            raise
+    
+    @classmethod
+    def get_user_online_status(cls, user_id: int) -> Dict[str, Any]:
+        """
+        Get user online status.
+        
+        Args:
+            user_id: User ID
+            
+        Returns:
+            Dict with user online status info
+        """
+        try:
+            user = User.objects.get(id=user_id)
+            
+            return {
+                'user_id': user.id,
+                'username': user.username,
+                'online_status': user.online_status,
+                'last_seen': user.last_seen.isoformat() if user.last_seen else None,
+                'is_online': user.is_online,
+            }
+            
+        except User.DoesNotExist:
+            raise ValidationError("User not found")

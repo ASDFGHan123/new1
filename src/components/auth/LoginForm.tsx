@@ -39,18 +39,13 @@ export const LoginForm = ({ onToggleMode, onLogin, error }: LoginFormProps) => {
       const success = await onLogin(identifier, password);
       if (success) {
         navigate("/chat");
+      } else {
+        setLocalError(t('auth.loginFailed'));
       }
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : t('auth.loginFailed');
-      if (errorMsg.includes('pending')) {
-        setLocalError(t('auth.accountPending'));
-      } else if (errorMsg.includes('suspended')) {
-        setLocalError(t('auth.accountSuspended'));
-      } else if (errorMsg.includes('banned')) {
-        setLocalError(t('auth.accountBanned'));
-      } else {
-        setLocalError(errorMsg);
-      }
+      setLocalError(errorMsg);
+      console.error('Login error:', err);
     } finally {
       setIsLoading(false);
     }

@@ -15,18 +15,25 @@ class UserSerializer(serializers.ModelSerializer):
     full_name = serializers.ReadOnlyField()
     is_approved = serializers.ReadOnlyField()
     is_online = serializers.ReadOnlyField()
+    display_status = serializers.SerializerMethodField()
+    
+    def get_display_status(self, obj):
+        """Return display status based on is_active and status fields."""
+        if not obj.is_active:
+            return 'inactive'
+        return obj.status
     
     class Meta:
         model = User
         fields = [
             'id', 'username', 'email', 'first_name', 'last_name', 'full_name',
-            'avatar', 'bio', 'role', 'status', 'online_status', 'last_seen',
+            'avatar', 'bio', 'role', 'status', 'display_status', 'is_active', 'online_status', 'last_seen',
             'join_date', 'message_count', 'report_count', 'email_verified',
             'is_approved', 'is_online', 'created_at', 'updated_at'
         ]
         read_only_fields = [
             'id', 'message_count', 'report_count',
-            'is_approved', 'is_online', 'created_at', 'updated_at'
+            'is_approved', 'is_online', 'display_status', 'created_at', 'updated_at'
         ]
 
 
@@ -36,19 +43,26 @@ class UserListSerializer(serializers.ModelSerializer):
     """
     full_name = serializers.ReadOnlyField()
     join_date = serializers.SerializerMethodField()
+    display_status = serializers.SerializerMethodField()
     
     def get_join_date(self, obj):
         return obj.join_date or obj.created_at
+    
+    def get_display_status(self, obj):
+        """Return display status based on is_active and status fields."""
+        if not obj.is_active:
+            return 'inactive'
+        return obj.status
     
     class Meta:
         model = User
         fields = [
             'id', 'username', 'email', 'first_name', 'last_name', 'full_name',
-            'avatar', 'role', 'status', 'online_status', 'last_seen', 'join_date',
+            'avatar', 'role', 'status', 'display_status', 'is_active', 'online_status', 'last_seen', 'join_date',
             'message_count', 'email_verified', 'created_at'
         ]
         read_only_fields = [
-            'id', 'message_count', 'email_verified', 'created_at'
+            'id', 'message_count', 'email_verified', 'display_status', 'created_at'
         ]
 
 
@@ -87,15 +101,49 @@ class UserProfileUpdateSerializer(serializers.ModelSerializer):
     """
     Serializer for updating user profile.
     """
+    current_password = serializers.CharField(write_only=True, required=False)
+    new_password = serializers.CharField(write_only=True, required=False, min_length=8)
     
     class Meta:
         model = User
-        fields = ['first_name', 'last_name', 'bio']
+        fields = ['first_name', 'last_name', 'bio', 'current_password', 'new_password']
+    
+    def validate(self, attrs):
+        current_password = attrs.get('current_password')
+        new_password = attrs.get('new_password')
+        
+        # If new_password is provided, current_password must be provided
+        if new_password and not current_password:
+            raise serializers.ValidationError("Current password is required to set a new password.")
+        
+        # If current_password is provided, verify it
+        if current_password:
+            user = self.instance
+            if not user.check_password(current_password):
+                raise serializers.ValidationError("Current password is incorrect.")
+        
+        return attrs
     
     def validate_bio(self, value):
         if len(value) > 500:
             raise serializers.ValidationError("Bio cannot exceed 500 characters.")
         return value
+    
+    def update(self, instance, validated_data):
+        # Remove password fields from validated_data
+        new_password = validated_data.pop('new_password', None)
+        validated_data.pop('current_password', None)
+        
+        # Update other fields
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        
+        # Update password if provided
+        if new_password:
+            instance.set_password(new_password)
+        
+        instance.save()
+        return instance
 
 
 class UserSessionSerializer(serializers.ModelSerializer):

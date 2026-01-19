@@ -1,120 +1,114 @@
 """
-WebSocket consumers for real-time user status tracking.
+WebSocket consumer for real-time user presence tracking.
 """
-import json
 from channels.generic.websocket import AsyncWebsocketConsumer
 from channels.db import database_sync_to_async
-from users.models import User
+from django.contrib.auth import get_user_model
 from django.utils import timezone
+from rest_framework_simplejwt.tokens import AccessToken
+import json
+
+User = get_user_model()
 
 
-class UserStatusConsumer(AsyncWebsocketConsumer):
-    """Track user online/offline status in real-time."""
-    
+class PresenceConsumer(AsyncWebsocketConsumer):
     async def connect(self):
-        """Handle WebSocket connection."""
-        self.user = self.scope["user"]
+        # Get token from query string
+        query_string = self.scope.get("query_string", b"").decode()
+        token = None
         
-        if not self.user.is_authenticated:
+        if "token=" in query_string:
+            token = query_string.split("token=")[1].split("&")[0]
+        
+        if not token:
+            await self.close()
+            return
+        
+        try:
+            access_token = AccessToken(token)
+            user_id = access_token['user_id']
+            self.user = await self.get_user(user_id)
+            
+            if not self.user:
+                await self.close()
+                return
+        except Exception as e:
+            print(f"Token validation error: {e}")
             await self.close()
             return
         
         self.user_id = str(self.user.id)
-        self.group_name = f"user_status_{self.user_id}"
+        self.group_name = f"presence_{self.user_id}"
         
-        # Join user status group
         await self.channel_layer.group_add(self.group_name, self.channel_name)
+        await self.channel_layer.group_add("presence_broadcast", self.channel_name)
         await self.accept()
         
-        # Set user as online
+        # Set user online
         await self.set_user_online()
         
-        # Broadcast user came online
+        # Broadcast user online
         await self.channel_layer.group_send(
-            "all_users_status",
+            "presence_broadcast",
             {
-                "type": "user_status_changed",
+                "type": "user_status_change",
                 "user_id": self.user_id,
-                "status": "online",
-                "timestamp": timezone.now().isoformat()
+                "username": self.user.username,
+                "online_status": "online",
             }
         )
     
     async def disconnect(self, close_code):
-        """Handle WebSocket disconnection."""
-        if self.user.is_authenticated:
-            # Set user as offline
+        if hasattr(self, 'user_id'):
             await self.set_user_offline()
-            
-            # Broadcast user went offline
             await self.channel_layer.group_send(
-                "all_users_status",
+                "presence_broadcast",
                 {
-                    "type": "user_status_changed",
+                    "type": "user_status_change",
                     "user_id": self.user_id,
-                    "status": "offline",
-                    "timestamp": timezone.now().isoformat()
+                    "username": self.user.username,
+                    "online_status": "offline",
                 }
             )
+            await self.channel_layer.group_discard(self.group_name, self.channel_name)
         
-        # Leave group
-        await self.channel_layer.group_discard(self.group_name, self.channel_name)
+        await self.channel_layer.group_discard("presence_broadcast", self.channel_name)
     
     async def receive(self, text_data):
-        """Handle incoming WebSocket messages."""
         try:
             data = json.loads(text_data)
-            message_type = data.get("type")
-            
-            if message_type == "ping":
-                # Keep-alive ping
-                await self.send(json.dumps({"type": "pong"}))
+            if data.get("type") == "ping":
                 await self.update_last_seen()
-            
-            elif message_type == "set_away":
-                await self.set_user_away()
-            
-            elif message_type == "set_online":
-                await self.set_user_online()
-        
-        except json.JSONDecodeError:
+                await self.send(text_data=json.dumps({"type": "pong"}))
+        except:
             pass
     
-    async def user_status_changed(self, event):
-        """Broadcast user status change to all connected clients."""
-        await self.send(json.dumps({
-            "type": "user_status_changed",
+    async def user_status_change(self, event):
+        await self.send(text_data=json.dumps({
+            "type": "user_status_change",
             "user_id": event["user_id"],
-            "status": event["status"],
-            "timestamp": event["timestamp"]
+            "username": event["username"],
+            "online_status": event["online_status"],
         }))
     
     @database_sync_to_async
+    def get_user(self, user_id):
+        try:
+            return User.objects.get(id=user_id)
+        except User.DoesNotExist:
+            return None
+    
+    @database_sync_to_async
     def set_user_online(self):
-        """Set user as online."""
-        User.objects.filter(id=self.user.id).update(
-            online_status='online',
-            last_seen=timezone.now()
-        )
+        user = User.objects.get(id=self.user.id)
+        user.set_online()
     
     @database_sync_to_async
     def set_user_offline(self):
-        """Set user as offline."""
-        User.objects.filter(id=self.user.id).update(
-            online_status='offline',
-            last_seen=timezone.now()
-        )
-    
-    @database_sync_to_async
-    def set_user_away(self):
-        """Set user as away."""
-        User.objects.filter(id=self.user.id).update(
-            online_status='away'
-        )
+        user = User.objects.get(id=self.user.id)
+        user.set_offline()
     
     @database_sync_to_async
     def update_last_seen(self):
-        """Update user's last seen timestamp."""
-        User.objects.filter(id=self.user.id).update(
-            last_seen=timezone.now()
-        )
+        user = User.objects.get(id=self.user.id)
+        user.update_last_seen()

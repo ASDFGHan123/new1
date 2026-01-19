@@ -13,6 +13,9 @@ from rest_framework import viewsets, serializers
 from rest_framework.permissions import IsAuthenticated
 from . import views
 from .views import user_management_views
+from .views.simple_users_view import get_all_users_with_status
+from .views.status_refresh_view import refresh_user_status_view
+from .views.debug_heartbeat_view import debug_user_heartbeat_view
 from .trash_views import TrashViewSet
 from .notification_views import NotificationViewSet
 from .organization_views import DepartmentViewSet, OfficeViewSet, DepartmentOfficeUserViewSet
@@ -62,6 +65,12 @@ urlpatterns = router.urls + [
     path('activity/', views.UserActivityView.as_view(), name='user_activity'),
     path('statistics/', views.UserStatisticsView.as_view(), name='user_statistics'),
     
+    # Online status endpoints
+    path('heartbeat/', user_management_views.user_heartbeat_view, name='user_heartbeat'),
+    path('refresh-status/', refresh_user_status_view, name='refresh_user_status'),
+    path('debug/heartbeat/<str:username>/', debug_user_heartbeat_view, name='debug_user_heartbeat'),
+    path('all-users/', get_all_users_with_status, name='get_all_users_with_status'),
+    
     # Comprehensive user management endpoints (Admin) - Temporarily disabled for migration
     # path('management/list/', user_management_views.users_list_view, name='users_list'),
     # path('management/create/', user_management_views.create_user_view, name='create_user'),
@@ -88,4 +97,6 @@ urlpatterns = router.urls + [
     path('admin/users/<int:user_id>/activate/', views.AdminActivateUserView.as_view(), name='admin_activate_user'),
     path('admin/users/<int:user_id>/force-logout/', views.AdminForceLogoutView.as_view(), name='admin_force_logout'),
     path('admin/users/<int:user_id>/set-online-status/', user_management_views.set_user_online_status_view, name='set_user_online_status'),
+    path('admin/users/<int:user_id>/online-status/', user_management_views.get_user_online_status_view, name='get_user_online_status'),
+    path('admin/users/online/', user_management_views.get_online_users_view, name='get_online_users'),
 ]

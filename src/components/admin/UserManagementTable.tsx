@@ -28,38 +28,7 @@ export function UserManagementTable({
   onForceLogout,
   onDelete,
 }: UserManagementTableProps) {
-  const [statusLoading, setStatusLoading] = useState<Record<string, boolean>>({});
   const { toast } = useToast();
-
-  const handleToggleOnlineStatus = async (userId: string, currentStatus: string) => {
-    setStatusLoading(prev => ({ ...prev, [userId]: true }));
-    try {
-      const newStatus = currentStatus === 'online' ? 'offline' : 'online';
-      const response = await apiService.setUserOnlineStatus(userId, newStatus as 'online' | 'offline');
-      
-      if (response.success) {
-        toast({
-          title: 'Status Updated',
-          description: `User status set to ${newStatus}`,
-        });
-        onEdit({ ...filteredUsers.find(u => u.id === userId)!, online_status: newStatus as any });
-      } else {
-        toast({
-          title: 'Error',
-          description: response.error || 'Failed to update status',
-          variant: 'destructive',
-        });
-      }
-    } catch (error) {
-      toast({
-        title: 'Error',
-        description: 'Failed to update user status',
-        variant: 'destructive',
-      });
-    } finally {
-      setStatusLoading(prev => ({ ...prev, [userId]: false }));
-    }
-  };
 
   return (
     <Table>
@@ -164,42 +133,6 @@ export function UserManagementTable({
                   disabled={actionLoading[user.id]}
                 >
                   Edit
-                </Button>
-                {user.is_active ? (
-                  <Button 
-                    size="sm" 
-                    variant="destructive" 
-                    onClick={() => {
-                      const updatedUser = { ...user, is_active: false };
-                      onEdit(updatedUser);
-                    }}
-                    disabled={actionLoading[user.id]}
-                  >
-                    Deactivate
-                  </Button>
-                ) : (
-                  <Button 
-                    size="sm" 
-                    variant="default" 
-                    onClick={() => {
-                      const updatedUser = { ...user, is_active: true };
-                      onEdit(updatedUser);
-                    }}
-                    disabled={actionLoading[user.id]}
-                  >
-                    Activate
-                  </Button>
-                )}
-                <Button 
-                  size="sm" 
-                  variant="outline" 
-                  onClick={() => handleToggleOnlineStatus(user.id, user.online_status)}
-                  disabled={statusLoading[user.id]}
-                >
-                  {statusLoading[user.id] ? (
-                    <Loader2 className="w-3 h-3 mr-1 animate-spin" />
-                  ) : null}
-                  Set {user.online_status === 'online' ? 'Offline' : 'Online'}
                 </Button>
                 <Button 
                   size="sm" 

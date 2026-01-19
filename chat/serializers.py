@@ -198,11 +198,17 @@ class ConversationSerializer(serializers.ModelSerializer):
                 result = []
                 for m in members:
                     try:
+                        user = m.user
+                        display_status = 'inactive' if not user.is_active else user.status
                         result.append({
-                            'id': str(m.user.id),
-                            'username': m.user.username or m.user.first_name or m.user.email.split('@')[0] or 'Unknown',
-                            'avatar': m.user.avatar.url if m.user.avatar else None,
-                            'status': 'online'
+                            'id': str(user.id),
+                            'username': user.username or user.first_name or user.email.split('@')[0] or 'Unknown',
+                            'email': user.email,
+                            'avatar': user.avatar.url if user.avatar else None,
+                            'status': user.status,
+                            'display_status': display_status,
+                            'online_status': user.online_status,
+                            'is_active': user.is_active
                         })
                     except Exception:
                         continue
@@ -212,11 +218,16 @@ class ConversationSerializer(serializers.ModelSerializer):
                 result = []
                 for p in participants:
                     try:
+                        display_status = 'inactive' if not p.is_active else p.status
                         result.append({
                             'id': str(p.id),
                             'username': p.username or p.first_name or p.email.split('@')[0] or 'Unknown',
+                            'email': p.email,
                             'avatar': p.avatar.url if p.avatar else None,
-                            'status': getattr(p, 'online_status', 'offline')
+                            'status': p.status,
+                            'display_status': display_status,
+                            'online_status': p.online_status,
+                            'is_active': p.is_active
                         })
                     except Exception:
                         continue

@@ -75,7 +75,7 @@ class RegisterView(APIView):
                 username=username,
                 email=user_email,
                 password=password,
-                status='pending'
+                status='active'
             )
             
             # Generate tokens
@@ -143,6 +143,10 @@ class LoginView(APIView):
                     {'error': f'Your account is {user.status}'},
                     status=status.HTTP_403_FORBIDDEN
                 )
+            
+            # Mark user online
+            from users.services.simple_online_status import mark_user_online
+            mark_user_online(user.id)
             
             # Generate tokens
             refresh = RefreshToken.for_user(user)
@@ -215,7 +219,8 @@ class LogoutView(APIView):
                     pass
             
             # Update user's online status
-            request.user.set_offline()
+            from users.services.simple_online_status import mark_user_offline
+            mark_user_offline(request.user.id)
             
             # Log user activity
             UserActivity.objects.create(
@@ -675,10 +680,20 @@ class AdminForceLogoutView(APIView):
     def post(self, request, user_id):
         try:
             user = User.objects.get(id=user_id)
+            
+            # Set user offline
             user.set_offline()
             
+            # Invalidate all active sessions
             UserSession.objects.filter(user=user, is_active=True).update(is_active=False)
             
+            # Delete all active tokens
+            BlacklistedToken.objects.filter(
+                user=user, 
+                expires_at__gt=timezone.now()
+            ).delete()
+            
+            # Log admin action
             UserActivity.objects.create(
                 user=request.user,
                 action='admin_action',

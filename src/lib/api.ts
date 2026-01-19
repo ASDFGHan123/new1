@@ -303,10 +303,28 @@ class ApiService {
     };
 
     if (typeof window !== 'undefined') {
-      let accessToken = sessionStorage.getItem('access_token');
+      // Try chat token first (for chat app)
+      let accessToken = sessionStorage.getItem('chat_access_token');
       if (!accessToken) {
-        accessToken = localStorage.getItem('access_token');
+        accessToken = localStorage.getItem('chat_access_token');
       }
+      
+      // Fallback to admin token (for admin dashboard)
+      if (!accessToken) {
+        accessToken = sessionStorage.getItem('admin_access_token');
+        if (!accessToken) {
+          accessToken = localStorage.getItem('admin_access_token');
+        }
+      }
+      
+      // Fallback to old token format
+      if (!accessToken) {
+        accessToken = sessionStorage.getItem('access_token');
+        if (!accessToken) {
+          accessToken = localStorage.getItem('access_token');
+        }
+      }
+      
       if (accessToken) {
         this.authToken = accessToken;
       }
@@ -328,8 +346,11 @@ class ApiService {
 
       if (!response.ok) {
         console.error('[API] Error', response.status, ':', data);
+        
+        // For 401 errors, check if there's a specific error message from backend
         if (response.status === 401) {
-          throw new Error('Authentication required');
+          const errorMessage = data.error || data.detail || 'Authentication required';
+          throw new Error(errorMessage);
         } else if (response.status === 403) {
           throw new Error('Insufficient permissions');
         } else if (response.status === 404) {
@@ -512,14 +533,19 @@ class ApiService {
 
   initializeAuth() {
     if (typeof window !== 'undefined') {
-      let accessToken = sessionStorage.getItem('access_token');
-      let refreshToken = sessionStorage.getItem('refresh_token');
+      // Try chat token first (for chat app)
+      let accessToken = localStorage.getItem('chat_access_token');
+      let refreshToken = localStorage.getItem('chat_refresh_token');
       
-      // Fallback to localStorage if sessionStorage is empty
+      // Fallback to admin token (for admin dashboard)
+      if (!accessToken) {
+        accessToken = localStorage.getItem('admin_access_token');
+        refreshToken = localStorage.getItem('admin_refresh_token');
+      }
+      
+      // Fallback to old token format
       if (!accessToken) {
         accessToken = localStorage.getItem('access_token');
-      }
-      if (!refreshToken) {
         refreshToken = localStorage.getItem('refresh_token');
       }
       
@@ -565,10 +591,10 @@ class ApiService {
 
   async getUsers(): Promise<ApiResponse<User[]>> {
     try {
-      const response = await this.httpRequest<any>('/users/admin/users/');
+      const response = await this.httpRequest<any>('/users/all-users/');
       
       if (response.success && response.data) {
-        const users = Array.isArray(response.data) ? response.data : response.data.results || [];
+        const users = response.data.users || [];
         console.log('[API] Loaded users count:', users.length);
         return {
           success: true,
@@ -823,10 +849,28 @@ class ApiService {
       
       const headers: HeadersInit = {};
       if (typeof window !== 'undefined') {
-        let accessToken = sessionStorage.getItem('access_token');
+        // Try chat token first (for chat app)
+        let accessToken = sessionStorage.getItem('chat_access_token');
         if (!accessToken) {
-          accessToken = localStorage.getItem('access_token');
+          accessToken = localStorage.getItem('chat_access_token');
         }
+        
+        // Fallback to admin token (for admin dashboard)
+        if (!accessToken) {
+          accessToken = sessionStorage.getItem('admin_access_token');
+          if (!accessToken) {
+            accessToken = localStorage.getItem('admin_access_token');
+          }
+        }
+        
+        // Fallback to old token format
+        if (!accessToken) {
+          accessToken = sessionStorage.getItem('access_token');
+          if (!accessToken) {
+            accessToken = localStorage.getItem('access_token');
+          }
+        }
+        
         if (accessToken) {
           this.authToken = accessToken;
         }
@@ -997,19 +1041,35 @@ class ApiService {
       const url = `${this.baseURL}/users/profile/upload-image/`;
       const headers: HeadersInit = {};
       
-      let token = this.authToken;
       if (typeof window !== 'undefined') {
-        let accessToken = sessionStorage.getItem('access_token');
-        if (!accessToken) {
-          accessToken = localStorage.getItem('access_token');
+        // Try chat token first (for chat app)
+        let token = sessionStorage.getItem('chat_access_token');
+        if (!token) {
+          token = localStorage.getItem('chat_access_token');
         }
-        if (accessToken) {
-          token = accessToken;
-          this.authToken = accessToken;
+        
+        // Fallback to admin token (for admin dashboard)
+        if (!token) {
+          token = sessionStorage.getItem('admin_access_token');
+          if (!token) {
+            token = localStorage.getItem('admin_access_token');
+          }
+        }
+        
+        // Fallback to old token format
+        if (!token) {
+          token = sessionStorage.getItem('access_token');
+          if (!token) {
+            token = localStorage.getItem('access_token');
+          }
+        }
+        
+        if (token) {
+          this.authToken = token;
         }
       }
-      if (token) {
-        headers['Authorization'] = `Bearer ${token}`;
+      if (this.authToken) {
+        headers['Authorization'] = `Bearer ${this.authToken}`;
       }
       
       const response = await fetch(url, {
@@ -1039,7 +1099,7 @@ class ApiService {
 
   async updateProfile(data: {current_password?: string; new_password?: string}): Promise<ApiResponse<User>> {
     try {
-      return this.request('/users/profile/update/', {
+      return this.request('/users/profile/', {
         method: 'PUT',
         body: JSON.stringify(data),
       });

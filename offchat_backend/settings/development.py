@@ -73,9 +73,9 @@ CHANNEL_LAYERS = {
 # Redis Configuration
 REDIS_URL = 'redis://localhost:6379/0'
 
-# Celery Configuration (Eager execution for development)
-CELERY_TASK_ALWAYS_EAGER = True
-CELERY_TASK_EAGER_PROPAGATES = True
+# Celery Configuration
+CELERY_TASK_ALWAYS_EAGER = False
+CELERY_TASK_EAGER_PROPAGATES = False
 
 # Cache Configuration (Local memory for development)
 CACHES = {

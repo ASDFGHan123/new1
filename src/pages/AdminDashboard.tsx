@@ -37,7 +37,7 @@ function AdminDashboardContent({ user, onLogout }: AdminDashboardProps) {
             description: "Standard user with basic permissions",
             permissions: ["send_messages", "manage_conversations"],
             isDefault: true,
-            createdAt: "2024-01-01"
+            createdAt: "2026-01-01"
           },
           {
             id: "2",
@@ -45,7 +45,7 @@ function AdminDashboardContent({ user, onLogout }: AdminDashboardProps) {
             description: "User with moderation capabilities",
             permissions: ["send_messages", "manage_conversations", "moderate_content", "view_analytics"],
             isDefault: false,
-            createdAt: "2024-01-01"
+            createdAt: "2026-01-01"
           },
           {
             id: "3",
@@ -53,7 +53,7 @@ function AdminDashboardContent({ user, onLogout }: AdminDashboardProps) {
             description: "Full administrative access",
             permissions: ["user_management", "role_management", "send_messages", "manage_conversations", "message_monitoring", "system_settings", "audit_logs", "backup_management", "view_analytics", "moderate_content", "manage_templates"],
             isDefault: false,
-            createdAt: "2024-01-01"
+            createdAt: "2026-01-01"
           }
         ];
         
