@@ -1,4 +1,160 @@
 // Print utility functions for admin dashboard
+export type PrintLanguage = 'en' | 'ps' | 'prs';
+
+const translations: Record<PrintLanguage, Record<string, string>> = {
+  en: {
+    'report.generated': 'Generated',
+    'report.system': 'System',
+    'report.offchat': 'OffChat Admin Dashboard',
+    'report.confidential': '© 2026 OffChat Admin Dashboard - Confidential Report',
+    'report.date': 'Report Date',
+    'report.period': 'Report Period',
+    'conversation.title': 'Conversation Report',
+    'conversation.monitoring': 'Conversation Monitoring Report',
+    'conversation.total': 'Total Conversations',
+    'conversation.active': 'Active Conversations',
+    'table.title': 'Title',
+    'table.type': 'Type',
+    'table.participants': 'Participants',
+    'table.messages': 'Messages',
+    'table.status': 'Status',
+    'table.lastactivity': 'Last Activity',
+    'table.username': 'Username',
+    'table.email': 'Email',
+    'table.role': 'Role',
+    'table.joindate': 'Join Date',
+    'table.action': 'Action',
+    'table.actor': 'Actor',
+    'table.timestamp': 'Timestamp',
+    'table.description': 'Description',
+    'table.severity': 'Severity',
+    'table.content': 'Content',
+    'table.recipients': 'Recipients',
+    'table.priority': 'Priority',
+    'table.sentAt': 'Sent At',
+    'table.deletedAt': 'Deleted At',
+    'table.details': 'Details',
+    'report.users': 'User Management Report',
+    'report.analytics': 'Message Analytics Report',
+    'report.audit': 'Audit Logs Report',
+    'report.trash': 'Trash Management Report',
+    'report.backup': 'Backup Status Report',
+    'report.summary': 'Summary',
+    'report.totalItems': 'Total Items',
+    'report.activeItems': 'Active Items',
+    'report.inactiveItems': 'Inactive Items',
+    'stats.totalUsers': 'Total Users',
+    'stats.activeUsers': 'Active Users',
+    'stats.suspendedUsers': 'Suspended Users',
+    'stats.bannedUsers': 'Banned Users',
+    'stats.totalMessages': 'Total Messages',
+    'stats.todayMessages': 'Messages Today',
+    'stats.averageMessages': 'Average Messages',
+  },
+  ps: {
+    'report.generated': 'تیاری شوی',
+    'report.system': 'سیستم',
+    'report.offchat': 'OffChat ادمین ډیشبورډ',
+    'report.confidential': '© 2026 OffChat ادمین ډیشبورډ - محرمانه رپورٹ',
+    'report.date': 'د رپورٹ نېټه',
+    'report.period': 'د رپورٹ مودې',
+    'conversation.title': 'کالو کاري رپورٹ',
+    'conversation.monitoring': 'کالو کاري نظارت رپورٹ',
+    'conversation.total': 'ټول کالو کاري',
+    'conversation.active': 'فعال کالو کاري',
+    'table.title': 'عنوان',
+    'table.type': 'قسم',
+    'table.participants': 'شرکت کونکي',
+    'table.messages': 'پیغامونه',
+    'table.status': 'حالت',
+    'table.lastactivity': 'آخری فعالیت',
+    'table.username': 'د کارن نوم',
+    'table.email': 'بریښنالیک',
+    'table.role': 'رول',
+    'table.joindate': 'د غړیتوب نېټه',
+    'table.action': 'کړنه',
+    'table.actor': 'کارن',
+    'table.timestamp': 'وخت نېټه',
+    'table.description': 'تفصیل',
+    'table.severity': 'شدت',
+    'table.content': 'محتوا',
+    'table.recipients': 'ترلاسه کوونکي',
+    'table.priority': 'لومړیتوب',
+    'table.sentAt': 'لېږل شوی په',
+    'table.deletedAt': 'ړنګ شوی په',
+    'table.details': 'تفصیلات',
+    'report.users': 'د کارنانو مدیریت رپورٹ',
+    'report.analytics': 'د پیغام تحلیل رپورٹ',
+    'report.audit': 'د حسابرسی راپورونه رپورٹ',
+    'report.trash': 'د کثافاتو مدیریت رپورٹ',
+    'report.backup': 'د بیک اپ حالت رپورٹ',
+    'report.summary': 'خلاصه',
+    'report.totalItems': 'ټول توکي',
+    'report.activeItems': 'فعال توکي',
+    'report.inactiveItems': 'غیرفعال توکي',
+    'stats.totalUsers': 'ټول کارنان',
+    'stats.activeUsers': 'فعال کارنان',
+    'stats.suspendedUsers': 'تعلیق شوي کارنان',
+    'stats.bannedUsers': 'بند شوي کارنان',
+    'stats.totalMessages': 'ټول پیغامونه',
+    'stats.todayMessages': 'د امروز پیغامونه',
+    'stats.averageMessages': 'اوسط پیغامونه',
+  },
+  prs: {
+    'report.generated': 'تیار شده',
+    'report.system': 'سیستم',
+    'report.offchat': 'OffChat داشبورد ادمین',
+    'report.confidential': '© 2026 OffChat داشبورد ادمین - گزارش محرمانه',
+    'report.date': 'تاریخ گزارش',
+    'report.period': 'دوره گزارش',
+    'conversation.title': 'گزارش گفتگو',
+    'conversation.monitoring': 'گزارش نظارت گفتگو',
+    'conversation.total': 'کل گفتگو',
+    'conversation.active': 'گفتگوی فعال',
+    'table.title': 'عنوان',
+    'table.type': 'نوع',
+    'table.participants': 'شرکت کنندگان',
+    'table.messages': 'پیام ها',
+    'table.status': 'وضعیت',
+    'table.lastactivity': 'آخرین فعالیت',
+    'table.username': 'نام کاربری',
+    'table.email': 'ایمیل',
+    'table.role': 'نقش',
+    'table.joindate': 'تاریخ عضویت',
+    'table.action': 'عمل',
+    'table.actor': 'کاربر',
+    'table.timestamp': 'برچسب زمانی',
+    'table.description': 'توضیح',
+    'table.severity': 'شدت',
+    'table.content': 'محتوا',
+    'table.recipients': 'گیرندگان',
+    'table.priority': 'اولویت',
+    'table.sentAt': 'ارسال شده در',
+    'table.deletedAt': 'حذف شده در',
+    'table.details': 'جزئیات',
+    'report.users': 'گزارش مدیریت کاربران',
+    'report.analytics': 'گزارش تجزیه و تحلیل پیام',
+    'report.audit': 'گزارش گزارشات حسابرسی',
+    'report.trash': 'گزارش مدیریت زباله',
+    'report.backup': 'گزارش وضعیت پشتیبانگیری',
+    'report.summary': 'خلاصه',
+    'report.totalItems': 'کل موارد',
+    'report.activeItems': 'موارد فعال',
+    'report.inactiveItems': 'موارد غیرفعال',
+    'stats.totalUsers': 'کل کاربران',
+    'stats.activeUsers': 'کاربران فعال',
+    'stats.suspendedUsers': 'کاربران تعلیق شده',
+    'stats.bannedUsers': 'کاربران مسدود شده',
+    'stats.totalMessages': 'کل پیامها',
+    'stats.todayMessages': 'پیامهای امروز',
+    'stats.averageMessages': 'میانگین پیامها',
+  }
+};
+
+const t = (key: string, lang: PrintLanguage = 'en'): string => {
+  return translations[lang]?.[key] || translations['en'][key] || key;
+};
+
 export interface PrintOptions {
   title: string;
   subtitle?: string;
@@ -7,6 +163,7 @@ export interface PrintOptions {
   filename?: string;
   dateRange?: string;
   metadata?: Record<string, any>;
+  language?: PrintLanguage;
 }
 
 export interface PrintData {
@@ -14,22 +171,31 @@ export interface PrintData {
   content: string;
   subtitle?: string;
   filename?: string;
+  language?: PrintLanguage;
 }
 
 // Generate HTML content for printing
 export const generatePrintHTML = (printData: PrintData): string => {
+  const lang = printData.language || 'en';
+  const isRTL = lang === 'ps' || lang === 'prs';
+  const borderDir = isRTL ? 'right' : 'left';
+  const textAlign = isRTL ? 'right' : 'left';
+  const flexDir = isRTL ? 'row-reverse' : 'row';
+  
   return `
     <!DOCTYPE html>
-    <html>
+    <html dir="${isRTL ? 'rtl' : 'ltr'}" lang="${lang}">
       <head>
+        <meta charset="UTF-8">
         <title>${printData.title}</title>
         <style>
           body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            font-family: ${isRTL ? "'Segoe UI', 'Arial Unicode MS', sans-serif" : "'Segoe UI', Tahoma, Geneva, Verdana, sans-serif"};
             margin: 0;
             padding: 20px;
             color: #333;
             background: white;
+            direction: ${isRTL ? 'rtl' : 'ltr'};
           }
           .header {
             text-align: center;
@@ -53,12 +219,13 @@ export const generatePrintHTML = (printData: PrintData): string => {
             padding: 15px;
             border-radius: 8px;
             margin-bottom: 25px;
-            border-left: 4px solid #3b82f6;
+            border-${borderDir}: 4px solid #3b82f6;
           }
           .meta-row {
             display: flex;
             justify-content: space-between;
             margin-bottom: 8px;
+            flex-direction: ${flexDir};
           }
           .meta-label {
             font-weight: 600;
@@ -69,6 +236,7 @@ export const generatePrintHTML = (printData: PrintData): string => {
           }
           .content {
             line-height: 1.6;
+            text-align: ${textAlign};
           }
           .table {
             width: 100%;
@@ -79,7 +247,7 @@ export const generatePrintHTML = (printData: PrintData): string => {
           .table td {
             border: 1px solid #d1d5db;
             padding: 12px;
-            text-align: left;
+            text-align: ${textAlign};
           }
           .table th {
             background-color: #f3f4f6;
@@ -88,29 +256,6 @@ export const generatePrintHTML = (printData: PrintData): string => {
           }
           .table tr:nth-child(even) {
             background-color: #f9fafb;
-          }
-          .stats-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 20px;
-            margin: 20px 0;
-          }
-          .stat-card {
-            background: #f9fafb;
-            padding: 20px;
-            border-radius: 8px;
-            text-align: center;
-            border: 1px solid #e5e7eb;
-          }
-          .stat-value {
-            font-size: 24px;
-            font-weight: bold;
-            color: #1e40af;
-          }
-          .stat-label {
-            color: #6b7280;
-            font-size: 14px;
-            margin-top: 5px;
           }
           .footer {
             margin-top: 40px;
@@ -135,12 +280,12 @@ export const generatePrintHTML = (printData: PrintData): string => {
         
         <div class="meta-info">
           <div class="meta-row">
-            <span class="meta-label">Generated:</span>
-            <span class="meta-value">${new Date().toLocaleString()}</span>
+            <span class="meta-label">${t('report.generated', lang)}:</span>
+            <span class="meta-value">${new Date().toLocaleString(lang === 'ps' ? 'ps-AF' : lang === 'prs' ? 'fa-AF' : 'en-US')}</span>
           </div>
           <div class="meta-row">
-            <span class="meta-label">System:</span>
-            <span class="meta-value">OffChat Admin Dashboard</span>
+            <span class="meta-label">${t('report.system', lang)}:</span>
+            <span class="meta-value">${t('report.offchat', lang)}</span>
           </div>
         </div>
         
@@ -149,7 +294,7 @@ export const generatePrintHTML = (printData: PrintData): string => {
         </div>
         
         <div class="footer">
-          <p>© 2026 OffChat Admin Dashboard - Confidential Report</p>
+          <p>${t('report.confidential', lang)}</p>
         </div>
       </body>
     </html>
@@ -201,7 +346,6 @@ export const openPrintWindow = (printData: PrintData): void => {
     printWindow.document.write(generatePrintHTML(printData));
     printWindow.document.close();
     
-    // Wait for content to load before printing
     printWindow.onload = () => {
       printWindow.print();
     };
@@ -242,7 +386,7 @@ function getItemDetails(item: any, type: string): string {
 }
 
 // Specific print generators for different data types
-export const generateUserListHTML = (users: any[]) => {
+export const generateUserListHTML = (users: any[], language: PrintLanguage = 'en') => {
   const userData = users.map(user => ({
     username: user.username || user.name || 'N/A',
     email: user.email || 'N/A',
@@ -253,45 +397,47 @@ export const generateUserListHTML = (users: any[]) => {
   }));
   
   const content = generateTableHTML(
-    ['Username', 'Email', 'Status', 'Role', 'Join Date', 'Messages'],
+    [t('table.username', language), t('table.email', language), 'Status', t('table.role', language), t('table.joindate', language), t('table.messages', language)],
     userData
   );
   
   return {
-    title: 'User Management Report',
+    title: t('report.users', language),
     content: `
-      <h2>User List Summary</h2>
-      <p>Total Users: ${users.length}</p>
+      <h2>${t('report.summary', language)}</h2>
+      <p>${t('report.totalItems', language)}: ${users.length}</p>
       ${content}
     `,
-    filename: 'user_list_report'
+    filename: 'user_list_report',
+    language
   };
 };
 
-export const generateMessageAnalyticsHTML = (analytics: any) => {
+export const generateMessageAnalyticsHTML = (analytics: any, language: PrintLanguage = 'en') => {
   const stats = {
-    totalMessages: analytics.totalMessages || 0,
-    messagesToday: analytics.messagesToday || 0,
-    activeUsers: analytics.activeUsers || 0,
-    averageMessages: analytics.averageMessages || 0
+    [t('stats.totalMessages', language)]: analytics.totalMessages || 0,
+    [t('stats.todayMessages', language)]: analytics.messagesToday || 0,
+    [t('stats.activeUsers', language)]: analytics.activeUsers || 0,
+    [t('stats.averageMessages', language)]: analytics.averageMessages || 0
   };
   
   const content = `
-    <h2>Message Analytics Overview</h2>
+    <h2>${t('report.summary', language)}</h2>
     ${generateStatsHTML(stats)}
-    <h3>Detailed Analytics</h3>
-    <p>Message Type Distribution:</p>
-    ${analytics.messageTypes ? generateTableHTML(['Type', 'Count'], Object.entries(analytics.messageTypes).map(([type, count]) => ({ type, count }))) : 'No data'}
+    <h3>${t('table.type', language)} ${t('table.description', language)}</h3>
+    <p>${t('table.messages', language)}:</p>
+    ${analytics.messageTypes ? generateTableHTML([t('table.type', language), 'Count'], Object.entries(analytics.messageTypes).map(([type, count]) => ({ type, count }))) : 'No data'}
   `;
   
   return {
-    title: 'Message Analytics Report',
+    title: t('report.analytics', language),
     content,
-    filename: 'message_analytics_report'
+    filename: 'message_analytics_report',
+    language
   };
 };
 
-export const generateAuditLogsHTML = (logs: any[]) => {
+export const generateAuditLogsHTML = (logs: any[], language: PrintLanguage = 'en') => {
   const logData = logs.map(log => ({
     timestamp: log.timestamp || log.time || 'N/A',
     action: log.action || 'N/A',
@@ -301,49 +447,51 @@ export const generateAuditLogsHTML = (logs: any[]) => {
   }));
   
   const content = `
-    <h2>Audit Logs Report</h2>
-    <p>Total Log Entries: ${logs.length}</p>
+    <h2>${t('report.summary', language)}</h2>
+    <p>${t('report.totalItems', language)}: ${logs.length}</p>
     ${generateTableHTML(
-      ['Timestamp', 'Action', 'Actor', 'Description', 'Severity'],
+      [t('table.timestamp', language), t('table.action', language), t('table.actor', language), t('table.description', language), t('table.severity', language)],
       logData
     )}
   `;
   
   return {
-    title: 'Audit Logs Report',
+    title: t('report.audit', language),
     content,
-    filename: 'audit_logs_report'
+    filename: 'audit_logs_report',
+    language
   };
 };
 
-export const generateConversationReportHTML = (conversations: any[]) => {
+export const generateConversationReportHTML = (conversations: any[], language: PrintLanguage = 'en') => {
   const convData = conversations.map(conv => ({
     title: conv.title || 'N/A',
     type: conv.type || 'N/A',
     participants: conv.participants || 0,
     messages: conv.messageCount || 0,
     status: conv.isActive ? 'Active' : 'Inactive',
-    lastActivity: conv.lastActivity || 'N/A'
+    lastactivity: conv.lastActivity || 'N/A'
   }));
   
   const content = `
-    <h2>Conversation Monitoring Report</h2>
-    <p>Total Conversations: ${conversations.length}</p>
-    <p>Active Conversations: ${conversations.filter(c => c.isActive).length}</p>
+    <h2>${t('conversation.monitoring', language)}</h2>
+    <p>${t('conversation.total', language)}: ${conversations.length}</p>
+    <p>${t('conversation.active', language)}: ${conversations.filter(c => c.isActive).length}</p>
     ${generateTableHTML(
-      ['Title', 'Type', 'Participants', 'Messages', 'Status', 'Last Activity'],
+      [t('table.title', language), t('table.type', language), t('table.participants', language), t('table.messages', language), t('table.status', language), t('table.lastactivity', language)],
       convData
     )}
   `;
   
   return {
-    title: 'Conversation Report',
+    title: t('conversation.title', language),
     content,
-    filename: 'conversation_report'
+    filename: 'conversation_report',
+    language
   };
 };
 
-export const generateMessageHistoryHTML = (messages: any[]) => {
+export const generateMessageHistoryHTML = (messages: any[], language: PrintLanguage = 'en') => {
   const msgData = messages.map(msg => ({
     type: msg.type || 'N/A',
     content: (msg.content || '').substring(0, 100) + ((msg.content || '').length > 100 ? '...' : ''),
@@ -354,10 +502,10 @@ export const generateMessageHistoryHTML = (messages: any[]) => {
   }));
   
   const content = `
-    <h2>Message History Report</h2>
-    <p>Total Messages: ${messages.length}</p>
+    <h2>${t('report.summary', language)}</h2>
+    <p>${t('report.totalItems', language)}: ${messages.length}</p>
     ${generateTableHTML(
-      ['Type', 'Content', 'Recipients', 'Status', 'Priority', 'Sent At'],
+      [t('table.type', language), t('table.content', language), t('table.recipients', language), 'Status', t('table.priority', language), t('table.sentAt', language)],
       msgData
     )}
   `;
@@ -365,21 +513,22 @@ export const generateMessageHistoryHTML = (messages: any[]) => {
   return {
     title: 'Message History Report',
     content,
-    filename: 'message_history_report'
+    filename: 'message_history_report',
+    language
   };
 };
 
-export const generateBackupReportHTML = (backupInfo: any) => {
+export const generateBackupReportHTML = (backupInfo: any, language: PrintLanguage = 'en') => {
   const content = `
-    <h2>Backup Status Report</h2>
+    <h2>${t('report.summary', language)}</h2>
     ${generateStatsHTML({
-      lastBackup: backupInfo.lastBackup || 'N/A',
-      nextScheduled: backupInfo.nextScheduled || 'N/A',
-      backupSize: backupInfo.size || 'N/A',
-      status: backupInfo.status || 'N/A'
+      [t('report.date', language)]: backupInfo.lastBackup || 'N/A',
+      'Next Scheduled': backupInfo.nextScheduled || 'N/A',
+      'Backup Size': backupInfo.size || 'N/A',
+      'Status': backupInfo.status || 'N/A'
     })}
-    <h3>Backup Details</h3>
-    <p>Data Types Included:</p>
+    <h3>${t('table.details', language)}</h3>
+    <p>${t('table.type', language)}:</p>
     <ul>
       ${Object.entries(backupInfo.dataTypes || {}).map(([type, included]) => 
         `<li>${type}: ${included ? 'Included' : 'Excluded'}</li>`
@@ -388,13 +537,14 @@ export const generateBackupReportHTML = (backupInfo: any) => {
   `;
   
   return {
-    title: 'Backup Status Report',
+    title: t('report.backup', language),
     content,
-    filename: 'backup_report'
+    filename: 'backup_report',
+    language
   };
 };
 
-export const generateTrashReportHTML = (trashedItems: any[], type: string) => {
+export const generateTrashReportHTML = (trashedItems: any[], type: string, language: PrintLanguage = 'en') => {
   const itemsByType = trashedItems.reduce((acc, item) => {
     const itemType = item.itemType || 'Unknown';
     if (!acc[itemType]) acc[itemType] = [];
@@ -403,17 +553,17 @@ export const generateTrashReportHTML = (trashedItems: any[], type: string) => {
   }, {});
   
   let content = `
-    <h2>Trash Management Report</h2>
-    <p>Total Items in Trash: ${trashedItems.length}</p>
-    <p>Report Type: ${type}</p>
+    <h2>${t('report.summary', language)}</h2>
+    <p>${t('report.totalItems', language)}: ${trashedItems.length}</p>
+    <p>${t('table.type', language)}: ${type}</p>
   `;
   
   Object.entries(itemsByType).forEach(([itemType, items]) => {
     const typedItems = items as any[];
     content += `
-      <h3>${itemType} Items (${typedItems.length})</h3>
+      <h3>${itemType} ${t('report.totalItems', language)} (${typedItems.length})</h3>
       ${generateTableHTML(
-        ['Name/Title', 'ID', 'Deleted At', 'Details'],
+        ['Name/Title', 'ID', t('table.deletedAt', language), t('table.details', language)],
         typedItems.map((item: any) => ({
           name: item.username || item.title || item.name || 'Unknown',
           id: item.id,
@@ -425,13 +575,14 @@ export const generateTrashReportHTML = (trashedItems: any[], type: string) => {
   });
   
   return {
-    title: 'Trash Management Report',
+    title: t('report.trash', language),
     content,
-    filename: 'trash_management_report'
+    filename: 'trash_management_report',
+    language
   };
 };
 
-export const generateEnhancedUserListHTML = (users: any[]) => {
+export const generateEnhancedUserListHTML = (users: any[], language: PrintLanguage = 'en') => {
   const userData = users.map(user => ({
     username: user.username || 'N/A',
     email: user.email || 'N/A',
@@ -444,32 +595,33 @@ export const generateEnhancedUserListHTML = (users: any[]) => {
   }));
   
   const content = `
-    <h2>Enhanced User Management Report</h2>
-    <p>Total Users: ${users.length}</p>
-    <p>Active Users: ${users.filter(u => u.status === 'active').length}</p>
-    <p>Suspended Users: ${users.filter(u => u.status === 'suspended').length}</p>
-    <p>Banned Users: ${users.filter(u => u.status === 'banned').length}</p>
+    <h2>${t('report.summary', language)}</h2>
+    <p>${t('stats.totalUsers', language)}: ${users.length}</p>
+    <p>${t('stats.activeUsers', language)}: ${users.filter(u => u.status === 'active').length}</p>
+    <p>${t('stats.suspendedUsers', language)}: ${users.filter(u => u.status === 'suspended').length}</p>
+    <p>${t('stats.bannedUsers', language)}: ${users.filter(u => u.status === 'banned').length}</p>
     ${generateTableHTML(
-      ['Username', 'Email', 'Status', 'Role', 'Messages', 'Reports', 'Last Active', 'Join Date'],
+      [t('table.username', language), t('table.email', language), t('table.status', language), t('table.role', language), t('table.messages', language), 'Reports', 'Last Active', t('table.joindate', language)],
       userData
     )}
   `;
   
   return {
-    title: 'Enhanced User List Report',
+    title: t('report.users', language),
     content: content,
-    filename: 'enhanced_user_list_report'
+    filename: 'enhanced_user_list_report',
+    language
   };
 };
 
-export const generateStatsCardsHTML = (stats: any[]) => {
+export const generateStatsCardsHTML = (stats: any[], language: PrintLanguage = 'en') => {
   const statsMap = stats.reduce((acc, stat) => {
     acc[stat.title.toLowerCase().replace(' ', '')] = stat.value;
     return acc;
   }, {});
   
   const content = `
-    <h2>Dashboard Statistics Overview</h2>
+    <h2>${t('report.summary', language)}</h2>
     ${generateStatsHTML(statsMap)}
     <h3>Performance Indicators</h3>
     ${generateTableHTML(
@@ -485,6 +637,7 @@ export const generateStatsCardsHTML = (stats: any[]) => {
   return {
     title: 'Dashboard Statistics Report',
     content,
-    filename: 'dashboard_stats_report'
+    filename: 'dashboard_stats_report',
+    language
   };
 };

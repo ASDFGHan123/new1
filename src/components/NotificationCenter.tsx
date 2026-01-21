@@ -5,7 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
 import { apiService } from '@/lib/api';
 
-interface Notification {
+interface NotificationData {
   id: string;
   title: string;
   message: string;
@@ -14,8 +14,15 @@ interface Notification {
   created_at: string;
 }
 
+interface ApiResponse<T> {
+  success: boolean;
+  data?: T;
+  results?: T[];
+  error?: string;
+}
+
 export function NotificationCenter() {
-  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [notifications, setNotifications] = useState<NotificationData[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [isOpen, setIsOpen] = useState(false);
   const isFetchingRef = useRef<boolean>(false);
@@ -36,11 +43,15 @@ export function NotificationCenter() {
     
     try {
       apiService.initializeAuth();
-      const response = await apiService.httpRequest<any>('/users/notifications/');
+      const response = await apiService.httpRequest<ApiResponse<NotificationData[]>>('/users/notifications/');
       if (response.success && response.data) {
-        const data = Array.isArray(response.data) ? response.data : response.data.results || [];
-        setNotifications(data);
-        setUnreadCount(data.filter((n: Notification) => !n.is_read).length);
+        try {
+          const data = Array.isArray(response.data) ? response.data : response.data.results || [];
+          setNotifications(data);
+          setUnreadCount(data.filter((n: NotificationData) => !n.is_read).length);
+        } catch (parseError) {
+          console.error('Error parsing notification data:', parseError);
+        }
       }
     } catch (err) {
       console.error('Error fetching notifications:', err);
@@ -138,12 +149,12 @@ export function NotificationCenter() {
                   <div className="flex justify-between items-start gap-2">
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
-                        <h4 className="font-medium text-sm text-gray-900 dark:text-white">{notif.title}</h4>
+                        <h4 className="font-medium text-sm text-gray-900 dark:text-white" title={notif.title}>{notif.title}</h4>
                         <Badge className={`text-xs whitespace-nowrap ${getNotificationColor(notif.notification_type)}`}>
                           {notif.notification_type}
                         </Badge>
                       </div>
-                      <p className="text-xs text-gray-600 dark:text-gray-400 mt-1 break-words">{notif.message}</p>
+                      <p className="text-xs text-gray-600 dark:text-gray-400 mt-1 break-words" title={notif.message}>{notif.message}</p>
                       <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
                         {new Date(notif.created_at).toLocaleString()}
                       </p>

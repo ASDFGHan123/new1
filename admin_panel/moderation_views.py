@@ -14,9 +14,14 @@ class IsAdminRole(BasePermission):
 
 
 class PendingUsersViewSet(viewsets.ModelViewSet):
-    permission_classes = [IsAuthenticated, IsAdminRole]
+    permission_classes = [IsAuthenticated]
     queryset = User.objects.filter(status='pending').order_by('-created_at')
     serializer_class = UserSerializer
+    
+    def get_permissions(self):
+        if self.action in ['approve', 'reject']:
+            return [IsAuthenticated()]
+        return super().get_permissions()
     
     @action(detail=True, methods=['post'])
     def approve(self, request, pk=None):

@@ -19,9 +19,6 @@ cryptography==41.0.7
 Pillow==11.0.0
 django-imagekit==4.1.0
 
-# Database
-psycopg[binary]==3.3.2
-
 # Background Tasks
 celery==5.3.4
 django-celery-beat==2.5.0

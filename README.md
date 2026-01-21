@@ -15,7 +15,7 @@ A production-ready admin dashboard for managing an offline messaging platform. B
 ### Technical Features
 - **Frontend**: React 18 + TypeScript + Vite with ShadCN UI
 - **Backend**: Django 4.2 + DRF + Channels for WebSockets
-- **Database**: SQLite (dev) / PostgreSQL (prod)
+- **Database**: SQLite (all environments)
 - **Caching**: Redis with fallback to in-memory
 - **Background Tasks**: Celery with Redis broker
 - **State Management**: React Context with useReducer
@@ -25,8 +25,6 @@ A production-ready admin dashboard for managing an offline messaging platform. B
 
 - **Node.js** 18+ and npm
 - **Python** 3.9+
-- **Redis** (for production features)
-- **PostgreSQL** (for production)
 
 ## 🛠️ Quick Start
 
@@ -116,13 +114,6 @@ Create `.env` file:
 SECRET_KEY=your-secret-key
 DEBUG=False
 ALLOWED_HOSTS=yourdomain.com,www.yourdomain.com
-
-# Database
-DB_NAME=offchat_prod
-DB_USER=offchat_user
-DB_PASSWORD=secure_password
-DB_HOST=localhost
-DB_PORT=5432
 
 # Redis
 REDIS_URL=redis://localhost:6379/0

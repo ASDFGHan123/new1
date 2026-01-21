@@ -1,0 +1,57 @@
+{
+  "reports": {
+    "generated": "تیار شده",
+    "system": "سیستم",
+    "offchat": "OffChat داشبورد ادمین",
+    "confidential": "© 2026 OffChat داشبورد ادمین - گزارش محرمانه",
+    "date": "تاریخ گزارش",
+    "period": "دوره گزارش",
+    "users": "گزارش مدیریت کاربران",
+    "analytics": "گزارش تجزیه و تحلیل پیام",
+    "audit": "گزارش گزارشات حسابرسی",
+    "trash": "گزارش مدیریت زباله",
+    "backup": "گزارش وضعیت پشتیبانگیری",
+    "summary": "خلاصه",
+    "totalItems": "کل موارد",
+    "activeItems": "موارد فعال",
+    "inactiveItems": "موارد غیرفعال"
+  },
+  "tables": {
+    "title": "عنوان",
+    "type": "نوع",
+    "participants": "شرکت کنندگان",
+    "messages": "پیام ها",
+    "status": "وضعیت",
+    "lastactivity": "آخرین فعالیت",
+    "username": "نام کاربری",
+    "email": "ایمیل",
+    "role": "نقش",
+    "joindate": "تاریخ عضویت",
+    "action": "عمل",
+    "actor": "کاربر",
+    "timestamp": "برچسب زمانی",
+    "description": "توضیح",
+    "severity": "شدت",
+    "content": "محتوا",
+    "recipients": "گیرندگان",
+    "priority": "اولویت",
+    "sentAt": "ارسال شده در",
+    "deletedAt": "حذف شده در",
+    "details": "جزئیات"
+  },
+  "stats": {
+    "totalUsers": "کل کاربران",
+    "activeUsers": "کاربران فعال",
+    "suspendedUsers": "کاربران تعلیق شده",
+    "bannedUsers": "کاربران مسدود شده",
+    "totalMessages": "کل پیامها",
+    "todayMessages": "پیامهای امروز",
+    "averageMessages": "میانگین پیامها"
+  },
+  "conversations": {
+    "title": "گزارش گفتگو",
+    "monitoring": "گزارش نظارت گفتگو",
+    "total": "کل گفتگو",
+    "active": "گفتگوی فعال"
+  }
+}

@@ -303,30 +303,38 @@ class ApiService {
     };
 
     if (typeof window !== 'undefined') {
-      // Try chat token first (for chat app)
-      let accessToken = sessionStorage.getItem('chat_access_token');
-      if (!accessToken) {
-        accessToken = localStorage.getItem('chat_access_token');
-      }
-      
-      // Fallback to admin token (for admin dashboard)
-      if (!accessToken) {
-        accessToken = sessionStorage.getItem('admin_access_token');
+      // For admin endpoints, use admin token
+      if (endpoint.includes('/admin/') || endpoint.includes('/users/admin/')) {
+        let accessToken = sessionStorage.getItem('admin_access_token');
         if (!accessToken) {
           accessToken = localStorage.getItem('admin_access_token');
         }
-      }
-      
-      // Fallback to old token format
-      if (!accessToken) {
-        accessToken = sessionStorage.getItem('access_token');
+        // Fallback to regular access token
         if (!accessToken) {
-          accessToken = localStorage.getItem('access_token');
+          accessToken = sessionStorage.getItem('access_token');
+          if (!accessToken) {
+            accessToken = localStorage.getItem('access_token');
+          }
         }
-      }
-      
-      if (accessToken) {
-        this.authToken = accessToken;
+        if (accessToken) {
+          this.authToken = accessToken;
+        }
+      } else {
+        // For chat endpoints, use chat token
+        let accessToken = sessionStorage.getItem('chat_access_token');
+        if (!accessToken) {
+          accessToken = localStorage.getItem('chat_access_token');
+        }
+        // Fallback to regular access token
+        if (!accessToken) {
+          accessToken = sessionStorage.getItem('access_token');
+          if (!accessToken) {
+            accessToken = localStorage.getItem('access_token');
+          }
+        }
+        if (accessToken) {
+          this.authToken = accessToken;
+        }
       }
     }
 

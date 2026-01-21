@@ -1,0 +1,57 @@
+{
+  "reports": {
+    "generated": "تیاری شوی",
+    "system": "سیستم",
+    "offchat": "OffChat ادمین ډیشبورډ",
+    "confidential": "© 2026 OffChat ادمین ډیشبورډ - محرمانه رپورٹ",
+    "date": "د رپورٹ نېټه",
+    "period": "د رپورٹ مودې",
+    "users": "د کارنانو مدیریت رپورٹ",
+    "analytics": "د پیغام تحلیل رپورٹ",
+    "audit": "د حسابرسی راپورونه رپورٹ",
+    "trash": "د کثافاتو مدیریت رپورٹ",
+    "backup": "د بیک اپ حالت رپورٹ",
+    "summary": "خلاصه",
+    "totalItems": "ټول توکي",
+    "activeItems": "فعال توکي",
+    "inactiveItems": "غیرفعال توکي"
+  },
+  "tables": {
+    "title": "عنوان",
+    "type": "قسم",
+    "participants": "شرکت کونکي",
+    "messages": "پیغامونه",
+    "status": "حالت",
+    "lastactivity": "آخری فعالیت",
+    "username": "د کارن نوم",
+    "email": "بریښنالیک",
+    "role": "رول",
+    "joindate": "د غړیتوب نېټه",
+    "action": "کړنه",
+    "actor": "کارن",
+    "timestamp": "وخت نېټه",
+    "description": "تفصیل",
+    "severity": "شدت",
+    "content": "محتوا",
+    "recipients": "ترلاسه کوونکي",
+    "priority": "لومړیتوب",
+    "sentAt": "لېږل شوی په",
+    "deletedAt": "ړنګ شوی په",
+    "details": "تفصیلات"
+  },
+  "stats": {
+    "totalUsers": "ټول کارنان",
+    "activeUsers": "فعال کارنان",
+    "suspendedUsers": "تعلیق شوي کارنان",
+    "bannedUsers": "بند شوي کارنان",
+    "totalMessages": "ټول پیغامونه",
+    "todayMessages": "د امروز پیغامونه",
+    "averageMessages": "اوسط پیغامونه"
+  },
+  "conversations": {
+    "title": "کالو کاري رپورٹ",
+    "monitoring": "کالو کاري نظارت رپورٹ",
+    "total": "ټول کالو کاري",
+    "active": "فعال کالو کاري"
+  }
+}

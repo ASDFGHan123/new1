@@ -11,18 +11,33 @@ export interface Setting {
   updated_at?: string;
 }
 
+const getAuthHeaders = () => {
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  let token = localStorage.getItem('admin_access_token');
+  if (!token) {
+    token = localStorage.getItem('chat_access_token');
+  }
+  if (!token) {
+    token = localStorage.getItem('access_token');
+  }
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+  return headers;
+};
+
 export const settingsApi = {
   async getAll(category?: string) {
     const url = new URL(`${API_BASE_URL}/admin/settings/`);
     if (category) url.searchParams.append('category', category);
     
-    const response = await fetch(url.toString());
+    const response = await fetch(url.toString(), { headers: getAuthHeaders() });
     if (!response.ok) throw new Error('Failed to fetch settings');
     return response.json() as Promise<Setting[]>;
   },
 
   async getByKey(key: string) {
-    const response = await fetch(`${API_BASE_URL}/admin/settings/${key}/`);
+    const response = await fetch(`${API_BASE_URL}/admin/settings/${key}/`, { headers: getAuthHeaders() });
     if (!response.ok) throw new Error('Failed to fetch setting');
     return response.json() as Promise<Setting>;
   },
@@ -30,7 +45,7 @@ export const settingsApi = {
   async update(key: string, data: Partial<Setting>) {
     const response = await fetch(`${API_BASE_URL}/admin/settings/${key}/update/`, {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getAuthHeaders(),
       body: JSON.stringify(data),
     });
     if (!response.ok) throw new Error('Failed to update setting');
@@ -40,7 +55,7 @@ export const settingsApi = {
   async bulkUpdate(settings: Array<{ key: string; value: string }>) {
     const response = await fetch(`${API_BASE_URL}/admin/settings/bulk/update/`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getAuthHeaders(),
       body: JSON.stringify({ settings }),
     });
     if (!response.ok) throw new Error('Failed to bulk update settings');
@@ -50,6 +65,7 @@ export const settingsApi = {
   async delete(key: string) {
     const response = await fetch(`${API_BASE_URL}/admin/settings/${key}/`, {
       method: 'DELETE',
+      headers: getAuthHeaders(),
     });
     if (!response.ok) throw new Error('Failed to delete setting');
     return response.json();
@@ -58,7 +74,7 @@ export const settingsApi = {
   async reset(category?: string) {
     const response = await fetch(`${API_BASE_URL}/admin/settings/reset/`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getAuthHeaders(),
       body: JSON.stringify({ category }),
     });
     if (!response.ok) throw new Error('Failed to reset settings');

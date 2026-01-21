@@ -77,7 +77,13 @@ export const AuditLogs = () => {
   const fetchAuditLogs = async () => {
     setLoading(true);
     try {
-      const token = localStorage.getItem('access_token');
+      let token = localStorage.getItem('admin_access_token');
+      if (!token) {
+        token = localStorage.getItem('chat_access_token');
+      }
+      if (!token) {
+        token = localStorage.getItem('access_token');
+      }
       const response = await fetch('http://localhost:8000/api/admin/audit-logs/', {
         headers: token ? { 'Authorization': `Bearer ${token}` } : {}
       });
@@ -87,6 +93,7 @@ export const AuditLogs = () => {
       setCurrentPage(1);
     } catch (error) {
       console.error('Failed to load audit logs:', error);
+      setAuditLogs([]);
     } finally {
       setLoading(false);
     }

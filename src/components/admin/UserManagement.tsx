@@ -13,6 +13,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { UserManagementTable } from "./UserManagementTable";
+import { ModeratorAssignment } from "./ModeratorAssignment";
 import { openPrintWindow, generateUserListHTML } from "@/lib/printUtils";
 import { apiService, type User } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
@@ -728,6 +729,13 @@ export const UserManagement = React.memo(({ users: propUsers = [], approveUser, 
                       <option value="admin">Admin</option>
                     </select>
                   </div>
+                  {editingUser && (
+                    <ModeratorAssignment
+                      userId={editingUser.id}
+                      currentRole={editRole}
+                      onUpdate={() => loadUsers()}
+                    />
+                  )}
                   <div>
                     <Label>Profile Image</Label>
                     <ImageUpload value={editAvatar} onChange={setEditAvatar} disabled={editLoading} />

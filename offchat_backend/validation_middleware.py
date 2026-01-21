@@ -3,6 +3,7 @@ Input validation and sanitization middleware.
 """
 import json
 import logging
+import time
 from django.http import JsonResponse
 from django.utils.deprecation import MiddlewareMixin
 
@@ -85,14 +86,19 @@ class RateLimitMiddleware(MiddlewareMixin):
         else:
             ip = request.META.get('REMOTE_ADDR')
         
-        # Rate limiting: 5000 requests per minute per IP (increased for development)
-        import time
+        # Get rate limit from settings (default 5000 requests per minute)
+        try:
+            from admin_panel.services.settings_service import SettingsService
+            rate_limit = SettingsService.get_int('rate_limit_requests', 5000)
+        except Exception:
+            rate_limit = 5000
+        
         current_time = int(time.time() / 60)
         key = f"{ip}:{current_time}"
         
         self.request_counts[key] = self.request_counts.get(key, 0) + 1
         
-        if self.request_counts[key] > 5000:
+        if self.request_counts[key] > rate_limit:
             logger.warning(f"Rate limit exceeded for IP: {ip}")
             return JsonResponse(
                 {'error': 'Rate limit exceeded'},

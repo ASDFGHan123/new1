@@ -33,7 +33,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     });
     
     const savedUser = localStorage.getItem("offchat_user");
-    const accessToken = localStorage.getItem("access_token");
+    let accessToken = localStorage.getItem("access_token") || 
+                      localStorage.getItem("chat_access_token") || 
+                      localStorage.getItem("admin_access_token");
     
     if (savedUser && accessToken) {
       try {
@@ -43,11 +45,19 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         localStorage.removeItem("offchat_user");
         localStorage.removeItem("access_token");
         localStorage.removeItem("refresh_token");
+        localStorage.removeItem("chat_access_token");
+        localStorage.removeItem("chat_refresh_token");
+        localStorage.removeItem("admin_access_token");
+        localStorage.removeItem("admin_refresh_token");
       }
     } else if (savedUser || accessToken) {
       localStorage.removeItem("offchat_user");
       localStorage.removeItem("access_token");
       localStorage.removeItem("refresh_token");
+      localStorage.removeItem("chat_access_token");
+      localStorage.removeItem("chat_refresh_token");
+      localStorage.removeItem("admin_access_token");
+      localStorage.removeItem("admin_refresh_token");
     }
     setIsLoading(false);
   }, [navigate]);
@@ -80,6 +90,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         
         setUser(authUser);
         localStorage.setItem("offchat_user", JSON.stringify(authUser));
+        
+        // Store tokens with admin prefix if user is admin
+        if (authUser.role === 'admin' || authUser.is_staff) {
+          localStorage.setItem("admin_access_token", response.data.access);
+          localStorage.setItem("admin_refresh_token", response.data.refresh);
+        } else {
+          localStorage.setItem("chat_access_token", response.data.access);
+          localStorage.setItem("chat_refresh_token", response.data.refresh);
+        }
+        
         return authUser;
       } else {
         const errorMessage = response.error || 'Login failed';
@@ -122,6 +142,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         
         setUser(authUser);
         localStorage.setItem("offchat_user", JSON.stringify(authUser));
+        
+        // Store tokens with admin prefix if user is admin
+        if (authUser.role === 'admin' || authUser.is_staff) {
+          localStorage.setItem("admin_access_token", response.data.access);
+          localStorage.setItem("admin_refresh_token", response.data.refresh);
+        } else {
+          localStorage.setItem("chat_access_token", response.data.access);
+          localStorage.setItem("chat_refresh_token", response.data.refresh);
+        }
+        
         return authUser;
       } else {
         const errorMessage = response.error || 'Signup failed';
@@ -150,6 +180,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       localStorage.removeItem("offchat_user");
       localStorage.removeItem("access_token");
       localStorage.removeItem("refresh_token");
+      localStorage.removeItem("chat_access_token");
+      localStorage.removeItem("chat_refresh_token");
+      localStorage.removeItem("admin_access_token");
+      localStorage.removeItem("admin_refresh_token");
     }
   };
 

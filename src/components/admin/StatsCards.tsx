@@ -49,47 +49,43 @@ export const StatsCards = () => {
     setError(null);
     
     try {
-      const usersResponse = await apiService.getUsers();
+      const statsResponse = await apiService.httpRequest('/admin/dashboard/stats/');
       
-      if (usersResponse.success && usersResponse.data) {
-        const users = usersResponse.data;
-        const totalUsers = users.length;
-        const activeUsers = users.filter(u => u.status === 'active').length;
-        const onlineUsers = users.filter(u => u.online_status === 'online').length;
-        const totalMessages = users.reduce((sum, u) => sum + (u.message_count || 0), 0);
+      if (statsResponse.success && statsResponse.data) {
+        const data = statsResponse.data;
         
         setStats([
           {
             title: t('stats.totalUsers'),
-            value: totalUsers,
+            value: data.users?.total || 0,
             change: 15.2,
             icon: Users,
             color: "admin-primary",
           },
           {
             title: t('conversations.activeConversations'),
-            value: Math.floor(activeUsers / 2),
+            value: data.conversations?.active || 0,
             change: 8.5,
             icon: MessageSquare,
             color: "admin-secondary",
           },
           {
             title: t('stats.totalMessages'),
-            value: totalMessages,
-            change: 23.1,
+            value: data.messages?.total || 0,
+            change: data.messages?.change || 0,
             icon: Activity,
             color: "admin-warning",
           },
           {
             title: t('users.onlineUsers'),
-            value: onlineUsers,
+            value: data.users?.online || 0,
             change: -2.4,
             icon: Shield,
             color: "admin-success",
           },
         ]);
       } else {
-        throw new Error('Failed to fetch users data');
+        throw new Error('Failed to fetch dashboard stats');
       }
     } catch (err) {
       console.error('Failed to load dashboard stats:', err);

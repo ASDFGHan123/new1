@@ -1,7 +1,9 @@
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 from users.models import UserActivity
-from users.notification_utils import send_notification
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 ACTIVITY_NOTIFICATION_MAP = {
@@ -78,10 +80,29 @@ def send_activity_notification(sender, instance, created, **kwargs):
     if not activity_config:
         return
     
-    send_notification(
-        user=instance.user,
-        notification_type=activity_config['type'],
-        title=activity_config['title'],
-        message=activity_config['message'],
-        data={'activity_id': str(instance.id), 'action': instance.action}
-    )
+    try:
+        from users.notification_tasks import send_notification_async
+        
+        try:
+            send_notification_async.delay(
+                user_id=instance.user.id,
+                notification_type=activity_config['type'],
+                title=activity_config['title'],
+                message=activity_config['message'],
+                data={'activity_id': str(instance.id), 'action': instance.action}
+            )
+        except Exception as celery_error:
+            logger.warning(f"Celery task failed, falling back to sync: {str(celery_error)}")
+            from users.notification_utils import send_notification
+            try:
+                send_notification(
+                    user=instance.user,
+                    notification_type=activity_config['type'],
+                    title=activity_config['title'],
+                    message=activity_config['message'],
+                    data={'activity_id': str(instance.id), 'action': instance.action}
+                )
+            except Exception as sync_error:
+                logger.error(f"Failed to send notification: {str(sync_error)}")
+    except Exception as e:
+        logger.error(f"Error in send_activity_notification: {str(e)}")

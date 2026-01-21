@@ -50,12 +50,81 @@ interface NotificationContextType {
 
 const NotificationContext = createContext<NotificationContextType | undefined>(undefined);
 
+// Type guard for localStorage data validation
+function isValidNotification(data: any): data is Notification {
+  return (
+    typeof data === 'object' &&
+    data !== null &&
+    typeof data.id === 'string' &&
+    typeof data.type === 'string' &&
+    typeof data.title === 'string' &&
+    typeof data.message === 'string' &&
+    typeof data.read === 'boolean' &&
+    typeof data.priority === 'string'
+  );
+}
+
+// Sanitize notification content to prevent XSS
+function sanitizeText(text: string): string {
+  try {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+  } catch {
+    return '';
+  }
+}
+
 // Notification provider component
 export const NotificationProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const { user, isAuthenticated } = useAuth();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [isEnabled, setIsEnabled] = useState(true);
   const [permission, setPermission] = useState<NotificationPermission>('default');
+  
+  // Define handlers before using in hook
+  const handleNewMessage = useCallback((data: any) => {
+    try {
+      if (!isEnabled || !isAuthenticated) return;
+      
+      const notification: Omit<Notification, 'id' | 'timestamp' | 'read'> = {
+        type: 'message',
+        title: `New message from ${data.sender?.username || 'Unknown'}`,
+        message: data.content || 'You have received a new message',
+        data,
+        priority: 'medium'
+      };
+      
+      addNotification(notification);
+    } catch (error) {
+      console.error('Error handling new message:', error);
+    }
+  }, [isEnabled, isAuthenticated]);
+  
+  const handleUserStatusChange = useCallback((data: any) => {
+    try {
+      if (!isEnabled || !isAuthenticated) return;
+      
+      const isOnline = data.type === 'user_online';
+      const notification: Omit<Notification, 'id' | 'timestamp' | 'read'> = {
+        type: isOnline ? 'success' : 'system',
+        title: isOnline ? 'User Online' : 'User Offline',
+        message: `${data.username || 'A user'} is now ${isOnline ? 'online' : 'offline'}`,
+        data,
+        priority: 'low',
+        persistent: false
+      };
+      
+      addNotification(notification);
+      
+      // Auto-remove status notifications after 3 seconds
+      setTimeout(() => {
+        removeNotification(notification.id || '');
+      }, 3000);
+    } catch (error) {
+      console.error('Error handling user status change:', error);
+    }
+  }, [isEnabled, isAuthenticated]);
   
   const { onMessage, onUserStatus } = useWebSocket({
     onMessage: handleNewMessage,
@@ -64,136 +133,129 @@ export const NotificationProvider: React.FC<{ children: ReactNode }> = ({ childr
   
   // Initialize browser notification permission
   useEffect(() => {
-    if (typeof window !== 'undefined' && 'Notification' in window) {
-      setPermission(Notification.permission);
+    try {
+      if (typeof window !== 'undefined' && 'Notification' in window) {
+        setPermission(Notification.permission);
+      }
+    } catch (error) {
+      console.error('Error initializing notification permission:', error);
     }
   }, []);
   
   // Load persisted notifications on mount
   useEffect(() => {
-    if (isAuthenticated && user) {
-      const saved = localStorage.getItem(`offchat_notifications_${user.id}`);
-      if (saved) {
-        try {
-          const parsed = JSON.parse(saved);
-          const notificationsWithDates = parsed.map((n: any) => ({
-            ...n,
-            timestamp: new Date(n.timestamp)
-          }));
-          setNotifications(notificationsWithDates);
-        } catch (error) {
-          console.error('Failed to load notifications:', error);
+    try {
+      if (isAuthenticated && user) {
+        const saved = localStorage.getItem(`offchat_notifications_${user.id}`);
+        if (saved) {
+          try {
+            const parsed = JSON.parse(saved);
+            const notificationsWithDates = parsed
+              .filter(isValidNotification)
+              .map((n: any) => ({
+                ...n,
+                timestamp: new Date(n.timestamp)
+              }));
+            setNotifications(notificationsWithDates);
+          } catch (parseError) {
+            console.error('Failed to parse notifications:', parseError);
+          }
         }
       }
+    } catch (error) {
+      console.error('Failed to load notifications:', error);
     }
   }, [isAuthenticated, user]);
   
   // Persist notifications when they change
   useEffect(() => {
-    if (isAuthenticated && user && notifications.length > 0) {
-      localStorage.setItem(`offchat_notifications_${user.id}`, JSON.stringify(notifications));
+    try {
+      if (isAuthenticated && user) {
+        localStorage.setItem(`offchat_notifications_${user.id}`, JSON.stringify(notifications));
+      }
+    } catch (error) {
+      console.error('Failed to persist notifications:', error);
     }
   }, [notifications, isAuthenticated, user]);
   
-  // WebSocket event handlers
-  function handleNewMessage(data: any) {
-    if (!isEnabled || !isAuthenticated) return;
-    
-    const notification: Notification = {
-      id: `msg_${data.id}_${Date.now()}`,
-      type: 'message',
-      title: `New message from ${data.sender?.username || 'Unknown'}`,
-      message: data.content || 'You have received a new message',
-      data,
-      timestamp: new Date(),
-      read: false,
-      priority: 'medium'
-    };
-    
-    addNotification(notification);
-  }
-  
-  function handleUserStatusChange(data: any) {
-    if (!isEnabled || !isAuthenticated) return;
-    
-    const isOnline = data.type === 'user_online';
-    const notification: Notification = {
-      id: `status_${data.user_id}_${Date.now()}`,
-      type: isOnline ? 'success' : 'system',
-      title: isOnline ? 'User Online' : 'User Offline',
-      message: `${data.username || 'A user'} is now ${isOnline ? 'online' : 'offline'}`,
-      data,
-      timestamp: new Date(),
-      read: false,
-      priority: 'low',
-      persistent: false
-    };
-    
-    addNotification(notification);
-    
-    // Auto-remove status notifications after 3 seconds
-    setTimeout(() => {
-      removeNotification(notification.id);
-    }, 3000);
-  }
-  
   // Add notification
   const addNotification = useCallback((notificationData: Omit<Notification, 'id' | 'timestamp' | 'read'>): string => {
-    const notification: Notification = {
-      ...notificationData,
-      id: `notification_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-      timestamp: new Date(),
-      read: false
-    };
-    
-    setNotifications(prev => [notification, ...prev]);
-    
-    // Show browser notification if permission granted and enabled
-    if (permission === 'granted' && isEnabled) {
-      showBrowserNotification(notification);
+    try {
+      const notification: Notification = {
+        ...notificationData,
+        id: `notification_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        timestamp: new Date(),
+        read: false
+      };
+      
+      setNotifications(prev => [notification, ...prev]);
+      
+      // Show browser notification if permission granted and enabled
+      if (permission === 'granted' && isEnabled) {
+        showBrowserNotification(notification);
+      }
+      
+      // Auto-remove low priority, non-persistent notifications after 5 seconds
+      if (notification.priority === 'low' && !notification.persistent) {
+        setTimeout(() => {
+          removeNotification(notification.id);
+        }, 5000);
+      }
+      
+      return notification.id;
+    } catch (error) {
+      console.error('Error adding notification:', error);
+      return '';
     }
-    
-    // Auto-remove low priority, non-persistent notifications after 5 seconds
-    if (notification.priority === 'low' && !notification.persistent) {
-      setTimeout(() => {
-        removeNotification(notification.id);
-      }, 5000);
-    }
-    
-    return notification.id;
   }, [permission, isEnabled]);
   
   // Mark notification as read
   const markAsRead = useCallback((id: string) => {
-    setNotifications(prev => 
-      prev.map(n => n.id === id ? { ...n, read: true } : n)
-    );
+    try {
+      setNotifications(prev => 
+        prev.map(n => n.id === id ? { ...n, read: true } : n)
+      );
+    } catch (error) {
+      console.error('Error marking notification as read:', error);
+    }
   }, []);
   
   // Mark all notifications as read
   const markAllAsRead = useCallback(() => {
-    setNotifications(prev => 
-      prev.map(n => ({ ...n, read: true }))
-    );
+    try {
+      setNotifications(prev => 
+        prev.map(n => ({ ...n, read: true }))
+      );
+    } catch (error) {
+      console.error('Error marking all as read:', error);
+    }
   }, []);
   
   // Remove notification
   const removeNotification = useCallback((id: string) => {
-    setNotifications(prev => prev.filter(n => n.id !== id));
+    try {
+      setNotifications(prev => prev.filter(n => n.id !== id));
+    } catch (error) {
+      console.error('Error removing notification:', error);
+    }
   }, []);
   
   // Clear all notifications
   const clearAll = useCallback(() => {
-    setNotifications([]);
+    try {
+      setNotifications([]);
+    } catch (error) {
+      console.error('Error clearing notifications:', error);
+    }
   }, []);
   
   // Request browser notification permission
   const requestPermission = useCallback(async (): Promise<boolean> => {
-    if (typeof window === 'undefined' || !('Notification' in window)) {
-      return false;
-    }
-    
     try {
+      if (typeof window === 'undefined' || !('Notification' in window)) {
+        return false;
+      }
+      
       const result = await Notification.requestPermission();
       setPermission(result);
       return result === 'granted';
@@ -205,9 +267,9 @@ export const NotificationProvider: React.FC<{ children: ReactNode }> = ({ childr
   
   // Show browser notification
   const showBrowserNotification = useCallback((notification: Notification) => {
-    if (permission !== 'granted' || !isEnabled) return;
-    
     try {
+      if (permission !== 'granted' || !isEnabled) return;
+      
       const browserNotification = new Notification(notification.title, {
         body: notification.message,
         icon: '/favicon.ico',
@@ -217,19 +279,27 @@ export const NotificationProvider: React.FC<{ children: ReactNode }> = ({ childr
       });
       
       browserNotification.onclick = () => {
-        if (notification.actionUrl) {
-          window.open(notification.actionUrl, '_blank');
-        } else {
-          window.focus();
+        try {
+          if (notification.actionUrl) {
+            window.open(notification.actionUrl, '_blank');
+          } else {
+            window.focus();
+          }
+          browserNotification.close();
+          markAsRead(notification.id);
+        } catch (error) {
+          console.error('Error handling notification click:', error);
         }
-        browserNotification.close();
-        markAsRead(notification.id);
       };
       
       // Auto-close after 10 seconds for non-urgent notifications
       if (notification.priority !== 'urgent') {
         setTimeout(() => {
-          browserNotification.close();
+          try {
+            browserNotification.close();
+          } catch (error) {
+            console.error('Error closing notification:', error);
+          }
         }, 10000);
       }
     } catch (error) {
@@ -309,11 +379,15 @@ export const NotificationItem: React.FC<{ notification: Notification }> = ({ not
   };
   
   const handleClick = () => {
-    if (!notification.read) {
-      markAsRead(notification.id);
-    }
-    if (notification.actionUrl) {
-      window.open(notification.actionUrl, '_blank');
+    try {
+      if (!notification.read) {
+        markAsRead(notification.id);
+      }
+      if (notification.actionUrl) {
+        window.open(notification.actionUrl, '_blank');
+      }
+    } catch (error) {
+      console.error('Error handling notification click:', error);
     }
   };
   
@@ -334,14 +408,14 @@ export const NotificationItem: React.FC<{ notification: Notification }> = ({ not
               <h4 className={cn(
                 "font-medium text-sm",
                 !notification.read ? "text-gray-900" : "text-gray-600"
-              )}>
-                {notification.title}
+              )} title={notification.title}>
+                {sanitizeText(notification.title)}
               </h4>
               {!notification.read && (
                 <div className="w-2 h-2 bg-blue-500 rounded-full flex-shrink-0" />
               )}
             </div>
-            <p className="text-sm text-gray-600 mt-1">{notification.message}</p>
+            <p className="text-sm text-gray-600 mt-1" title={notification.message}>{sanitizeText(notification.message)}</p>
             <p className="text-xs text-gray-400 mt-2">
               {notification.timestamp.toLocaleTimeString()}
             </p>
@@ -352,8 +426,12 @@ export const NotificationItem: React.FC<{ notification: Notification }> = ({ not
           size="sm"
           className="h-6 w-6 p-0"
           onClick={(e) => {
-            e.stopPropagation();
-            removeNotification(notification.id);
+            try {
+              e.stopPropagation();
+              removeNotification(notification.id);
+            } catch (error) {
+              console.error('Error removing notification:', error);
+            }
           }}
         >
           <X className="h-3 w-3" />
@@ -462,33 +540,40 @@ export const NotificationBell: React.FC = () => {
 
 // Toast notification hook
 export const useToast = () => {
-  const { addNotification } = useNotifications();
+  const { addNotification, removeNotification } = useNotifications();
   
-  const showToast = useCallback((
-    type: Notification['type'],
-    title: string,
-    message: string,
-    priority: Notification['priority'] = 'medium',
-    duration: number = 5000
-  ) => {
-    const notificationId = addNotification({
-      type,
-      title,
-      message,
-      priority,
-      persistent: false
-    });
-    
-    // Auto-remove toast notifications
-    if (duration > 0) {
-      setTimeout(() => {
-        // This would need access to removeNotification, but for simplicity
-        // we'll rely on the auto-removal in addNotification
-      }, duration);
-    }
-    
-    return notificationId;
-  }, [addNotification]);
+  const showToast = useCallback(
+    (
+      type: Notification['type'],
+      title: string,
+      message: string,
+      priority: Notification['priority'] = 'medium',
+      duration: number = 5000
+    ) => {
+      try {
+        const notificationId = addNotification({
+          type,
+          title,
+          message,
+          priority,
+          persistent: false
+        });
+        
+        // Auto-remove toast notifications
+        if (duration > 0) {
+          setTimeout(() => {
+            removeNotification(notificationId);
+          }, duration);
+        }
+        
+        return notificationId;
+      } catch (error) {
+        console.error('Error showing toast:', error);
+        return '';
+      }
+    },
+    [addNotification, removeNotification]
+  );
   
   return {
     success: (title: string, message: string) => showToast('success', title, message, 'medium'),

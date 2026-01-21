@@ -220,6 +220,10 @@ class UserManagementService:
                             raise ValidationError("Email already exists")
                     setattr(user, field, user_data[field])
             
+            # Sync is_staff when role is updated
+            if 'role' in user_data:
+                user.is_staff = (user_data['role'] == 'admin')
+            
             user.save()
             
             return cls._serialize_user(user, include_detailed_stats=True)
@@ -368,6 +372,7 @@ class UserManagementService:
                 raise ValidationError("Invalid role")
             
             user.role = new_role
+            user.is_staff = (new_role == 'admin')
             user.save()
             
             # Log the role change
@@ -376,7 +381,8 @@ class UserManagementService:
             return {
                 'message': 'User role updated successfully',
                 'old_role': old_role,
-                'new_role': new_role
+                'new_role': new_role,
+                'is_staff': user.is_staff
             }
         except User.DoesNotExist:
             raise ValidationError("User not found")
@@ -415,6 +421,7 @@ class UserManagementService:
                         new_role = kwargs.get('new_role')
                         if new_role:
                             user.role = new_role
+                            user.is_staff = (new_role == 'admin')
                             user.save()
                     else:
                         errors.append(f"Unknown action: {action}")

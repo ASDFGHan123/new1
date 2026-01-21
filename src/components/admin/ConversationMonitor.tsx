@@ -1,5 +1,6 @@
 import { Search, Filter, Users, Clock, MessageCircle, ChevronUp, ChevronDown, Eye, MoreHorizontal, Download, Archive, Trash2, VolumeX, AlertTriangle, Printer, Loader2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import i18n from "i18next";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -102,13 +103,15 @@ export const ConversationMonitor = ({ onTrashConversation }: ConversationMonitor
       if (token) {
         headers['Authorization'] = `Bearer ${token}`;
       }
-      const response = await fetch('http://localhost:8000/api/chat/conversations/?is_deleted=false', { headers });
+      const response = await fetch('http://localhost:8000/api/admin/conversations/', { headers });
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       const data = await response.json();
       
       let results = [];
       if (Array.isArray(data)) {
         results = data;
+      } else if (data.conversations && Array.isArray(data.conversations)) {
+        results = data.conversations;
       } else if (data.results && Array.isArray(data.results)) {
         results = data.results;
       } else if (data.data && Array.isArray(data.data)) {
@@ -116,18 +119,17 @@ export const ConversationMonitor = ({ onTrashConversation }: ConversationMonitor
       }
       
       const formattedData = results.map((conv: any, idx: number) => {
-        const lastMsg = conv.last_message;
-        const lastMessageText = typeof lastMsg === 'string' ? lastMsg : (lastMsg?.content || t('messages.noMessages'));
+        const lastMessageText = conv.last_message || t('messages.noMessages');
         
         let title = conv.title;
         if (!title) {
-          if (Array.isArray(conv.participants) && conv.participants.length > 0) {
+          if (conv.participant_names && Array.isArray(conv.participant_names)) {
+            title = conv.participant_names.join(', ');
+          } else if (Array.isArray(conv.participants) && conv.participants.length > 0) {
             const participantNames = conv.participants
               .map((p: any) => typeof p === 'string' ? p : (p.username || p.name || p.id))
               .join(', ');
             title = participantNames;
-          } else if (conv.participant_names) {
-            title = conv.participant_names.join(', ');
           } else {
             title = `${t('conversations.conversation')} ${idx + 1}`;
           }
@@ -136,14 +138,14 @@ export const ConversationMonitor = ({ onTrashConversation }: ConversationMonitor
         const actTime = conv.last_message_at || conv.updated_at || conv.created_at;
         return {
           id: conv.id || idx + 1,
-          type: conv.conversation_type === 'group' ? 'group' : 'private',
+          type: conv.type === 'group' ? 'group' : 'private',
           title,
-          participants: conv.participant_count || (Array.isArray(conv.participants) ? conv.participants.length : 2),
-          participantsList: Array.isArray(conv.participants) ? conv.participants : [],
+          participants: conv.participants || 2,
+          participantsList: conv.participant_list || [],
           lastMessage: lastMessageText,
           lastActivity: actTime ? new Date(actTime).toLocaleString() : t('common.noData'),
           messageCount: conv.message_count || 0,
-          isActive: conv.conversation_status === 'active' || conv.is_active || false,
+          isActive: conv.is_active || false,
           messages: conv.messages || []
         };
       });
@@ -358,10 +360,12 @@ export const ConversationMonitor = ({ onTrashConversation }: ConversationMonitor
   };
 
   const handlePrintConversations = () => {
-    const printData = generateConversationReportHTML(filteredAndSortedConversations);
+    const lang = i18n.language as 'en' | 'ps' | 'da';
+    const printData = generateConversationReportHTML(filteredAndSortedConversations, lang);
     openPrintWindow({
       ...printData,
-      subtitle: `${t('common.filteredResults')}: ${filteredAndSortedConversations.length} ${t('common.of')} ${conversations.length} ${t('conversations.conversations')}`
+      subtitle: `${t('common.filteredResults')}: ${filteredAndSortedConversations.length} ${t('common.of')} ${conversations.length} ${t('conversations.conversations')}`,
+      language: lang
     });
   };
 

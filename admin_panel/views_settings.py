@@ -4,6 +4,7 @@ from rest_framework.permissions import AllowAny
 from .models import SystemSettings, AuditLog
 from .serializers import SystemSettingSerializer, SystemSettingCreateUpdateSerializer
 from .services.audit_logging_service import AuditLoggingService
+from .services.settings_service import SettingsService
 from users.views import IsAdminUser
 
 class SystemSettingsListView(APIView):
@@ -42,7 +43,9 @@ class SystemSettingUpdateView(APIView):
             setting = SystemSettings.objects.get(key=key)
             serializer = SystemSettingCreateUpdateSerializer(setting, data=request.data, context={'request': request})
             if serializer.is_valid():
-                return Response(SystemSettingSerializer(serializer.save()).data)
+                serializer.save()
+                SettingsService.clear_cache(key)
+                return Response(SystemSettingSerializer(setting).data)
             return Response(serializer.errors, status=400)
         except SystemSettings.DoesNotExist:
             return Response({'error': 'Not found'}, status=404)
@@ -69,6 +72,7 @@ class SystemSettingsBulkUpdateView(APIView):
                 if request.user.is_authenticated:
                     setting.updated_by = request.user
                 setting.save()
+                SettingsService.clear_cache(item['key'])
                 updated.append(SystemSettingSerializer(setting).data)
             except SystemSettings.DoesNotExist:
                 pass

@@ -509,7 +509,11 @@ class AdminUserDetailView(APIView):
             serializer = UserSerializer(user, data=request.data, partial=True)
             if serializer.is_valid():
                 serializer.save()
-                return Response(serializer.data, status=status.HTTP_200_OK)
+                # Sync is_staff when role is updated
+                if 'role' in request.data:
+                    user.is_staff = (request.data['role'] == 'admin')
+                    user.save()
+                return Response(UserSerializer(user).data, status=status.HTTP_200_OK)
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
         except User.DoesNotExist:
             return Response({

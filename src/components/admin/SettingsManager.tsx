@@ -75,9 +75,7 @@ export function SettingsManager() {
 
   if (loading) return <div className="flex justify-center p-8"><Loader2 className="animate-spin" /></div>;
 
-  const categories = Object.keys(settings)
-    .filter(cat => !['chat', 'email', 'general'].includes(cat.toLowerCase()))
-    .sort();
+  const categories = Object.keys(settings).sort();
 
   if (categories.length === 0) {
     return <div className="text-center p-8 text-muted-foreground">{t('settings.noSettings')}</div>;
@@ -100,7 +98,7 @@ export function SettingsManager() {
 
         {categories.map(cat => (
           <TabsContent key={cat} value={cat} className="space-y-3">
-            {settings[cat]?.filter((s: Setting) => !['enable_2fa', 'lockout_duration', 'require_email_verification'].includes(s.key)).map(s => (
+            {settings[cat]?.map(s => (
               <Card key={s.key}>
                 <CardHeader className="pb-3">
                   <CardTitle className="text-sm">{s.key.replace(/_/g, ' ').toUpperCase()}</CardTitle>
