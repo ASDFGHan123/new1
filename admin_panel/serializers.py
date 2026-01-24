@@ -5,7 +5,7 @@ from rest_framework import serializers
 from django.contrib.auth import get_user_model
 from users.models import User, UserActivity
 from chat.models import Message, Conversation, Group
-from .models import AuditLog, Trash, Backup, SystemSettings
+from .models import AuditLog, Trash, Backup, SystemSettings, MessageTemplate, AdminOutgoingMessage
 
 User = get_user_model()
 
@@ -105,6 +105,26 @@ class BackupCreateSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         validated_data['created_by'] = self.context['request'].user
         return super().create(validated_data)
+
+
+class MessageTemplateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = MessageTemplate
+        fields = [
+            'id', 'name', 'content', 'category', 'usage_count',
+            'created_by', 'created_at', 'updated_at'
+        ]
+        read_only_fields = ['id', 'usage_count', 'created_by', 'created_at', 'updated_at']
+
+
+class AdminOutgoingMessageSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = AdminOutgoingMessage
+        fields = [
+            'id', 'type', 'content', 'recipients', 'recipient_count',
+            'sent_by', 'sent_at', 'status', 'priority'
+        ]
+        read_only_fields = ['id', 'sent_by', 'sent_at']
 
 
 class SystemSettingSerializer(serializers.ModelSerializer):

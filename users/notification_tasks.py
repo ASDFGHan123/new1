@@ -4,6 +4,7 @@ Celery tasks for notification management.
 from celery import shared_task
 from users.notification_utils import send_notification, send_bulk_notification
 from users.models import User
+from utils.json_utils import prepare_metadata
 import logging
 
 logger = logging.getLogger(__name__)
@@ -19,7 +20,7 @@ def send_notification_async(user_id, notification_type, title, message, data=Non
             notification_type=notification_type,
             title=title,
             message=message,
-            data=data or {}
+            data=prepare_metadata(data or {})
         )
         return f"Notification sent to user {user_id}"
     except User.DoesNotExist:
@@ -49,7 +50,7 @@ def send_bulk_notification_async(user_ids=None, notification_type=None, title=No
             notification_type=notification_type,
             title=title,
             message=message,
-            data=data or {}
+            data=prepare_metadata(data or {})
         )
         return f"Notifications sent to {users.count()} users"
     except Exception as e:

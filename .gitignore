@@ -49,3 +49,7 @@ wheels/
 *.njsproj
 *.sln
 *.sw?
+
+# Allow committing/reading the frontend API service even if a broad lib ignore matches
+!src/lib/api.ts
+!src/lib/api.ts.backup

@@ -61,7 +61,7 @@ export const UserManagement = React.memo(({ users: propUsers = [], approveUser, 
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [editUsername, setEditUsername] = useState("");
   const [editEmail, setEditEmail] = useState("");
-  const [editRole, setEditRole] = useState("user");
+  const [editRole, setEditRole] = useState<User['role']>("user");
   const [editAvatar, setEditAvatar] = useState<string | undefined>(undefined);
   const [editLoading, setEditLoading] = useState(false);
   const [search, setSearch] = useState("");
@@ -433,9 +433,8 @@ export const UserManagement = React.memo(({ users: propUsers = [], approveUser, 
 
   const loadUserDepartments = useCallback(async () => {
     try {
-      const data = await fetch('http://localhost:8000/api/users/department-office-users/', {
-        headers: { 'Authorization': `Bearer ${localStorage.getItem('access_token')}` }
-      }).then(r => r.json());
+      const resp = await apiService.httpRequest<any>('/users/department-office-users/');
+      const data = resp.success ? resp.data : [];
       
       const deptMap: {[key: string]: any} = {};
       const assignments = Array.isArray(data) ? data : data.results || [];
@@ -671,7 +670,7 @@ export const UserManagement = React.memo(({ users: propUsers = [], approveUser, 
                   )}
                   <div>
                     <Label>{t('common.optional')}</Label>
-                    <ImageUpload value={newAvatar} onChange={setNewAvatar} disabled={addLoading} />
+                    <ImageUpload value={newAvatar} onChange={setNewAvatar} />
                   </div>
                   {formError && <div className="text-red-500 text-sm">{formError}</div>}
                   </div>
@@ -722,7 +721,7 @@ export const UserManagement = React.memo(({ users: propUsers = [], approveUser, 
                       id="edit-role" 
                       className="w-full border rounded-md p-2" 
                       value={editRole} 
-                      onChange={e => setEditRole(e.target.value)}
+                      onChange={e => setEditRole(e.target.value as User['role'])}
                       disabled={editLoading}
                     >
                       <option value="user">User</option>
@@ -738,7 +737,7 @@ export const UserManagement = React.memo(({ users: propUsers = [], approveUser, 
                   )}
                   <div>
                     <Label>Profile Image</Label>
-                    <ImageUpload value={editAvatar} onChange={setEditAvatar} disabled={editLoading} />
+                    <ImageUpload value={editAvatar} onChange={setEditAvatar} />
                   </div>
                   {formError && <div className="text-red-500 text-sm">{formError}</div>}
                   <DialogFooter>

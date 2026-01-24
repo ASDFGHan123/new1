@@ -104,33 +104,32 @@ export interface DataExportOptions {
   connections: boolean;
 }
 
+const getApiBaseUrl = (): string => {
+  const envUrl = import.meta.env.VITE_API_URL;
+  if (envUrl) {
+    return envUrl;
+  }
+  
+  const hostname = window.location.hostname;
+  const protocol = window.location.protocol;
+  
+  if (hostname === 'localhost' || hostname === '127.0.0.1') {
+    return `${protocol}//${hostname}:8000/api`;
+  }
+  
+  return `${protocol}//${hostname}:8000/api`;
+};
+
+export const API_BASE_URL = getApiBaseUrl();
+
 class ApiService {
-  private baseURL = this.getApiBaseUrl();
+  private baseURL = API_BASE_URL;
   private isDevelopment = import.meta.env.DEV;
   private authToken: string | null = null;
   private refreshToken: string | null = null;
   private isInitialized = false;
   private lastRequestTime = 0;
   private minRequestInterval = 1000;
-  
-  private getApiBaseUrl(): string {
-    const envUrl = import.meta.env.VITE_API_URL;
-    if (envUrl) {
-      return envUrl;
-    }
-    
-    const hostname = window.location.hostname;
-    const port = window.location.port ? `:${window.location.port}` : '';
-    const protocol = window.location.protocol;
-    
-    // For localhost/127.0.0.1, use port 8000
-    if (hostname === 'localhost' || hostname === '127.0.0.1') {
-      return `${protocol}//${hostname}:8000/api`;
-    }
-    
-    // For other IPs (LAN access), use port 8000
-    return `${protocol}//${hostname}:8000/api`;
-  }
   
   private isRefreshing = false;
   private refreshPromise: Promise<string> | null = null;
@@ -148,6 +147,9 @@ class ApiService {
   }
 
   constructor() {
+    if (this.isDevelopment) {
+      this.minRequestInterval = 0;
+    }
     if (typeof window !== 'undefined' && !this.isInitialized) {
       this.initializeAuth();
       this.isInitialized = true;
@@ -302,35 +304,26 @@ class ApiService {
       ...options.headers,
     };
 
+    // Always initialize auth to load tokens from storage
+    if (!this.authToken && typeof window !== 'undefined') {
+      this.initializeAuth();
+    }
+
     if (typeof window !== 'undefined') {
       // For admin endpoints, use admin token
       if (endpoint.includes('/admin/') || endpoint.includes('/users/admin/')) {
-        let accessToken = sessionStorage.getItem('admin_access_token');
+        let accessToken = sessionStorage.getItem('admin_access_token') || localStorage.getItem('admin_access_token');
         if (!accessToken) {
-          accessToken = localStorage.getItem('admin_access_token');
-        }
-        // Fallback to regular access token
-        if (!accessToken) {
-          accessToken = sessionStorage.getItem('access_token');
-          if (!accessToken) {
-            accessToken = localStorage.getItem('access_token');
-          }
+          accessToken = sessionStorage.getItem('access_token') || localStorage.getItem('access_token');
         }
         if (accessToken) {
           this.authToken = accessToken;
         }
       } else {
         // For chat endpoints, use chat token
-        let accessToken = sessionStorage.getItem('chat_access_token');
+        let accessToken = sessionStorage.getItem('chat_access_token') || localStorage.getItem('chat_access_token');
         if (!accessToken) {
-          accessToken = localStorage.getItem('chat_access_token');
-        }
-        // Fallback to regular access token
-        if (!accessToken) {
-          accessToken = sessionStorage.getItem('access_token');
-          if (!accessToken) {
-            accessToken = localStorage.getItem('access_token');
-          }
+          accessToken = sessionStorage.getItem('access_token') || localStorage.getItem('access_token');
         }
         if (accessToken) {
           this.authToken = accessToken;
@@ -355,7 +348,6 @@ class ApiService {
       if (!response.ok) {
         console.error('[API] Error', response.status, ':', data);
         
-        // For 401 errors, check if there's a specific error message from backend
         if (response.status === 401) {
           const errorMessage = data.error || data.detail || 'Authentication required';
           throw new Error(errorMessage);
@@ -533,6 +525,9 @@ class ApiService {
         sessionStorage.removeItem('access_token');
         sessionStorage.removeItem('refresh_token');
         sessionStorage.removeItem('offchat_user');
+        localStorage.removeItem('access_token');
+        localStorage.removeItem('refresh_token');
+        localStorage.removeItem('offchat_user');
       }
     }
     
@@ -720,7 +715,7 @@ class ApiService {
 
   async getConversations(): Promise<ApiResponse<Conversation[]>> {
     try {
-      const response = await this.request<any>('/chat/conversations/');
+      const response = await this.httpRequest<any>('/chat/conversations/');
       
       if (response.success && response.data) {
         let conversations = [];
@@ -809,7 +804,7 @@ class ApiService {
 
   async getMessages(conversationId: string): Promise<ApiResponse<Message[]>> {
     try {
-      const response = await this.request<any>(`/chat/conversations/${conversationId}/messages/`);
+      const response = await this.httpRequest<any>(`/chat/conversations/${conversationId}/messages/`);
       
       if (response.success && response.data) {
         let messages = [];

@@ -112,6 +112,8 @@ def login_view(request):
         # Generate tokens
         refresh = RefreshToken.for_user(user)
         
+        logger.info(f"User logged in: {username}")
+        
         return Response({
             'user': UserSerializer(user).data,
             'tokens': {
@@ -180,18 +182,21 @@ def signup_view(request):
 def logout_view(request):
     """Logout endpoint - blacklist refresh token and set offline."""
     try:
-        # Set user offline status
-        request.user.online_status = 'offline'
-        request.user.save(update_fields=['online_status'])
-        
+        # Blacklist refresh token with proper expiration
         refresh_token = request.data.get('refresh')
         if refresh_token:
-            BlacklistedToken.blacklist_token(
-                token=refresh_token,
-                user=request.user,
-                token_type='refresh',
-                expires_at=None
-            )
+            try:
+                from rest_framework_simplejwt.tokens import RefreshToken as RT
+                token = RT(refresh_token)
+                expires_at = token.get_exp()
+                BlacklistedToken.blacklist_token(
+                    token=refresh_token,
+                    user=request.user,
+                    token_type='refresh',
+                    expires_at=expires_at
+                )
+            except Exception as e:
+                logger.warning(f"Failed to blacklist token: {str(e)}")
         
         logger.info(f"User logged out: {request.user.username}")
         return Response(

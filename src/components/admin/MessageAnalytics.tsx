@@ -16,16 +16,34 @@ interface AnalyticsData {
   messageData: Array<{ time: string; messages: number }>;
   messageTypeData: Array<{ type: string; count: number; color: string }>;
   dailyStats: Array<{ day: string; sent: number; delivered: number; read: number }>;
-  totalMessages: number;
-  messagesToday: number;
-  activeUsers: number;
-  averageMessages: number;
+  userStats?: {
+    total?: number;
+    active?: number;
+    pending?: number;
+    suspended?: number;
+    banned?: number;
+  };
+  activityStats?: {
+    totalMessages?: number;
+    averageMessages?: number;
+    totalReports?: number;
+    totalActivities?: number;
+  };
+  onlineStats?: {
+    online?: number;
+    away?: number;
+    offline?: number;
+  };
 }
 
 export const MessageAnalytics = ({ detailed = false }: MessageAnalyticsProps) => {
   const [messageData, setMessageData] = useState<Array<{ time: string; messages: number }>>([]);
   const [messageTypeData, setMessageTypeData] = useState<Array<{ type: string; count: number; color: string }>>([]);
   const [dailyStats, setDailyStats] = useState<Array<{ day: string; sent: number; delivered: number; read: number }>>([]);
+  const [summary, setSummary] = useState<{ activeUsers: number; averageMessages: number }>({
+    activeUsers: 0,
+    averageMessages: 0,
+  });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
@@ -34,8 +52,8 @@ export const MessageAnalytics = ({ detailed = false }: MessageAnalyticsProps) =>
     const analytics = {
       totalMessages: dailyStats.reduce((sum, day) => sum + day.sent, 0),
       messagesToday: messageData[messageData.length - 1]?.messages || 0,
-      activeUsers: 2847,
-      averageMessages: Math.round(dailyStats.reduce((sum, day) => sum + day.sent, 0) / dailyStats.length),
+      activeUsers: summary.activeUsers,
+      averageMessages: summary.averageMessages,
       messageTypes: messageTypeData.reduce((acc, type) => ({ ...acc, [type.type]: type.count }), {})
     };
     
@@ -57,8 +75,8 @@ export const MessageAnalytics = ({ detailed = false }: MessageAnalyticsProps) =>
         summary: {
           totalMessages: dailyStats.reduce((sum, day) => sum + day.sent, 0),
           messagesToday: messageData[messageData.length - 1]?.messages || 0,
-          activeUsers: 2847,
-          averageMessages: Math.round(dailyStats.reduce((sum, day) => sum + day.sent, 0) / dailyStats.length),
+          activeUsers: summary.activeUsers,
+          averageMessages: summary.averageMessages,
           messageTypes: messageTypeData.reduce((acc, type) => ({ ...acc, [type.type]: type.count }), {})
         }
       }
@@ -89,12 +107,17 @@ export const MessageAnalytics = ({ detailed = false }: MessageAnalyticsProps) =>
         setMessageData(data.messageData || []);
         setMessageTypeData(data.messageTypeData || []);
         setDailyStats(data.dailyStats || []);
+        setSummary({
+          activeUsers: Number(data.userStats?.active ?? 0),
+          averageMessages: Number(data.activityStats?.averageMessages ?? 0),
+        });
         setLastUpdated(new Date());
         setError(null);
       } else {
         setMessageData([]);
         setMessageTypeData([]);
         setDailyStats([]);
+        setSummary({ activeUsers: 0, averageMessages: 0 });
         setError(`Analytics API unavailable: ${response.error}`);
       }
     } catch (err) {
@@ -103,6 +126,7 @@ export const MessageAnalytics = ({ detailed = false }: MessageAnalyticsProps) =>
       setMessageData([]);
       setMessageTypeData([]);
       setDailyStats([]);
+      setSummary({ activeUsers: 0, averageMessages: 0 });
       setError(`API connection failed: ${errorMessage}`);
     } finally {
       setLoading(false);

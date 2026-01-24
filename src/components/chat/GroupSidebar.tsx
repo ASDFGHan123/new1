@@ -38,6 +38,7 @@ import {
 import { Group, User as UserType, GroupFilters } from "@/types/group";
 import { CreateGroupDialog } from "./CreateGroupDialog";
 import { GroupManagementDialog } from "./GroupManagementDialog";
+import { GroupMembersDialog } from "./GroupMembersDialog";
 
 interface GroupSidebarProps {
   groups: Group[];
@@ -75,6 +76,8 @@ export const GroupSidebar = ({
     showPublic: true
   });
   const [showFilters, setShowFilters] = useState(false);
+  const [showMembersDialog, setShowMembersDialog] = useState(false);
+  const [selectedGroupForMembers, setSelectedGroupForMembers] = useState<Group | null>(null);
 
   const filteredGroups = groups
     .filter(group => {
@@ -329,7 +332,16 @@ export const GroupSidebar = ({
                       </div>
                       
                       <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                        <span>{group.members.length} members</span>
+                        <button
+                          className="hover:text-primary hover:underline cursor-pointer transition-colors"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSelectedGroupForMembers(group);
+                            setShowMembersDialog(true);
+                          }}
+                        >
+                          {group.members.length} members
+                        </button>
                         {group.lastActivity && (
                           <>
                             <span>•</span>
@@ -354,9 +366,15 @@ export const GroupSidebar = ({
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => onSelectGroup(group.id)}>
-                            <MessageSquare className="h-4 w-4 mr-2" />
-                            Open Chat
+                          <DropdownMenuItem
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSelectedGroupForMembers(group);
+                              setShowMembersDialog(true);
+                            }}
+                          >
+                            <Users className="h-4 w-4 mr-2" />
+                            View Members
                           </DropdownMenuItem>
                           
                           {(isAdmin(group) || isModerator(group)) && (
@@ -422,6 +440,12 @@ export const GroupSidebar = ({
           </div>
         </div>
       </div>
-    </div>
-  );
-};
+
+      {/* Members Dialog */}
+      {selectedGroupForMembers && (
+        <GroupMembersDialog
+          group={selectedGroupForMembers}
+          open={showMembersDialog}
+          onOpenChange={setShowMembersDialog}
+        />
+      )}

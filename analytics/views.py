@@ -25,11 +25,31 @@ def dashboard_stats(request):
         total_messages = sum(user.message_count or 0 for user in users)
         messages_today = total_messages // 30  # Estimate daily messages
         
-        # Calculate growth percentages (mock for now)
-        user_growth = 15.2
-        conversation_growth = 8.5
-        message_growth = 23.1
-        online_growth = -2.4
+        # Calculate growth percentages
+        today = timezone.now().date()
+        seven_days_ago = today - timedelta(days=7)
+        fourteen_days_ago = today - timedelta(days=14)
+
+        # User Growth
+        users_today = User.objects.filter(date_joined__date=today).count()
+        users_seven_days_ago = User.objects.filter(date_joined__date=seven_days_ago).count()
+        user_growth = ((users_today - users_seven_days_ago) / max(users_seven_days_ago, 1)) * 100 if users_seven_days_ago else 0
+
+        # Conversation Growth
+        conversations_today = Conversation.objects.filter(created_at__date=today).count()
+        conversations_seven_days_ago = Conversation.objects.filter(created_at__date=seven_days_ago).count()
+        conversation_growth = ((conversations_today - conversations_seven_days_ago) / max(conversations_seven_days_ago, 1)) * 100 if conversations_seven_days_ago else 0
+
+        # Message Growth
+        messages_last_7_days = Message.objects.filter(timestamp__date__gte=seven_days_ago, timestamp__date__lt=today).count()
+        messages_prev_7_days = Message.objects.filter(timestamp__date__gte=fourteen_days_ago, timestamp__date__lt=seven_days_ago).count()
+        message_growth = ((messages_last_7_days - messages_prev_7_days) / max(messages_prev_7_days, 1)) * 100 if messages_prev_7_days else 0
+
+        # Online Growth (this is harder to track historically without a dedicated logging system)
+        # For now, we can calculate growth based on active users, assuming online status is indicative of recent activity
+        online_users_today = users.filter(online_status='online').count()
+        online_users_seven_days_ago = User.objects.filter(last_activity__date=seven_days_ago, online_status='online').count()
+        online_growth = ((online_users_today - online_users_seven_days_ago) / max(online_users_seven_days_ago, 1)) * 100 if online_users_seven_days_ago else 0
         
         return Response({
             'totalUsers': total_users,
@@ -38,10 +58,10 @@ def dashboard_stats(request):
             'totalMessages': total_messages,
             'messagesToday': messages_today,
             'activeConversations': active_users // 2,  # Estimate
-            'userGrowth': user_growth,
-            'conversationGrowth': conversation_growth,
-            'messageGrowth': message_growth,
-            'onlineGrowth': online_growth
+            'userGrowth': round(user_growth, 2),
+            'conversationGrowth': round(conversation_growth, 2),
+            'messageGrowth': round(message_growth, 2),
+            'onlineGrowth': round(online_growth, 2)
         })
     except Exception as e:
         return Response({'error': str(e)}, status=500)
@@ -107,13 +127,36 @@ def analytics_data(request):
                 "messages": count
             })
         
-        # Get message type distribution
-        total_msgs = Message.objects.filter(is_deleted=False).count()
+        # Get message type distribution (real counts)
+        type_colors = {
+            'text': '#3b82f6',
+            'image': '#10b981',
+            'file': '#f59e0b',
+            'audio': '#ef4444',
+            'video': '#8b5cf6',
+            'system': '#6b7280',
+        }
+        type_labels = {
+            'text': 'Text',
+            'image': 'Image',
+            'file': 'File',
+            'audio': 'Audio',
+            'video': 'Video',
+            'system': 'System',
+        }
+        type_counts = (
+            Message.objects.filter(is_deleted=False)
+            .values('message_type')
+            .annotate(count=Count('id'))
+            .order_by('-count')
+        )
         message_type_data = [
-            {"type": "Text", "count": int(total_msgs * 0.7), "color": "#3b82f6"},
-            {"type": "Image", "count": int(total_msgs * 0.2), "color": "#10b981"},
-            {"type": "File", "count": int(total_msgs * 0.08), "color": "#f59e0b"},
-            {"type": "Voice", "count": int(total_msgs * 0.02), "color": "#ef4444"}
+            {
+                'type': type_labels.get(row['message_type'], str(row['message_type'])),
+                'count': int(row['count']),
+                'color': type_colors.get(row['message_type'], '#64748b'),
+            }
+            for row in type_counts
         ]
         
         # Get daily stats for last 7 days

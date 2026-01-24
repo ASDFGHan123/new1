@@ -19,6 +19,7 @@ from .views.debug_heartbeat_view import debug_user_heartbeat_view
 from .trash_views import TrashViewSet
 from .notification_views import NotificationViewSet
 from .organization_views import DepartmentViewSet, OfficeViewSet, DepartmentOfficeUserViewSet
+from . import data_tools_views
 
 class PermissionSerializer(serializers.ModelSerializer):
     class Meta:
@@ -70,6 +71,10 @@ urlpatterns = router.urls + [
     path('refresh-status/', refresh_user_status_view, name='refresh_user_status'),
     path('debug/heartbeat/<str:username>/', debug_user_heartbeat_view, name='debug_user_heartbeat'),
     path('all-users/', get_all_users_with_status, name='get_all_users_with_status'),
+
+    # Data tools endpoints (Admin)
+    path('data/export/', data_tools_views.export_user_data_view, name='export_user_data'),
+    path('data/delete/', data_tools_views.delete_user_data_view, name='delete_user_data'),
     
     # Comprehensive user management endpoints (Admin) - Temporarily disabled for migration
     # path('management/list/', user_management_views.users_list_view, name='users_list'),

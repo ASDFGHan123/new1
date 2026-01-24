@@ -54,8 +54,10 @@ export function PermissionsManager() {
 
   const fetchData = async () => {
     try {
-      const permResponse = await apiService.httpRequest<any>('/users/permissions/');
-      const rolesResponse = await apiService.httpRequest<any>('/users/groups/');
+      const [permResponse, rolesResponse] = await Promise.all([
+        apiService.httpRequest<any>('/users/permissions/'),
+        apiService.httpRequest<any>('/users/groups/'),
+      ]);
       
       if (permResponse.success && rolesResponse.success) {
         const permsData = permResponse.data;

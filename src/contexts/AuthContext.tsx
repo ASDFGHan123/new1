@@ -100,6 +100,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           localStorage.setItem("chat_refresh_token", response.data.refresh);
         }
         
+        // Set token in apiService
+        apiService.setAuthToken(response.data.access);
+        
         return authUser;
       } else {
         const errorMessage = response.error || 'Login failed';
@@ -151,6 +154,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           localStorage.setItem("chat_access_token", response.data.access);
           localStorage.setItem("chat_refresh_token", response.data.refresh);
         }
+        
+        // Set token in apiService
+        apiService.setAuthToken(response.data.access);
         
         return authUser;
       } else {

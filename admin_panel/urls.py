@@ -8,10 +8,16 @@ from admin_panel import moderation_views
 from admin_panel import views_audit
 from admin_panel import views_dashboard
 from admin_panel import views_conversations
+from admin_panel import views_message_templates
+from admin_panel import views_message_history
+from admin_panel import views_backups
 
 router = DefaultRouter()
 router.register(r'pending-users', moderation_views.PendingUsersViewSet, basename='pending-users')
 router.register(r'audit-logs', views_audit.AuditLogViewSet, basename='audit-logs')
+router.register(r'message-templates', views_message_templates.MessageTemplateViewSet, basename='message-templates')
+router.register(r'message-history', views_message_history.MessageHistoryViewSet, basename='message-history')
+router.register(r'backups', views_backups.BackupViewSet, basename='backups')
 
 urlpatterns = [
     # Dashboard endpoints

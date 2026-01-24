@@ -35,5 +35,6 @@ email-validator==2.1.0
 requests==2.31.0
 pytz==2023.3
 asgiref==3.7.2
+django-redis==5.4.0
 
 # Development Dependencies (install with: pip install -r requirements-dev.txt)

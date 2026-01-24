@@ -20,6 +20,7 @@ import { Label } from "@/components/ui/label";
 import { User, Group, GroupMessage, Attachment, GroupMember } from "@/types/group";
 import { GroupSidebar } from "./GroupSidebar";
 import { GroupManagementDialog } from "./GroupManagementDialog";
+import { GroupMembersDialog } from "./GroupMembersDialog";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { apiService } from "@/lib/api";
 
@@ -68,6 +69,7 @@ export const GroupChatInterface = ({
   const [attachments, setAttachments] = useState<File[]>([]);
   const [isDragging, setIsDragging] = useState(false);
   const [showGroupInfo, setShowGroupInfo] = useState(false);
+  const [showMembersDialog, setShowMembersDialog] = useState(false);
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
   const [editMessageContent, setEditMessageContent] = useState("");
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
@@ -587,8 +589,13 @@ export const GroupChatInterface = ({
                   )}
                 </div>
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <Users className="h-4 w-4" />
-                  <span>{currentGroup.members.length} members</span>
+                  <button
+                    onClick={() => setShowMembersDialog(true)}
+                    className="flex items-center gap-2 hover:text-primary hover:underline cursor-pointer"
+                  >
+                    <Users className="h-4 w-4" />
+                    <span>{currentGroup.members.length} members</span>
+                  </button>
                   {currentGroup.description && (
                     <>
                       <span>•</span>
@@ -1060,3 +1067,10 @@ export const GroupChatInterface = ({
     </div>
   );
 };
+
+      {/* Members Dialog */}
+      <GroupMembersDialog
+        group={currentGroup}
+        open={showMembersDialog}
+        onOpenChange={setShowMembersDialog}
+      />

@@ -8,6 +8,11 @@ import sys
 import django
 from django.contrib.auth.hashers import make_password
 
+if os.environ.get('OFFCHAT_ALLOW_SEED_SCRIPTS') != '1':
+    raise SystemExit(
+        'Refusing to run seed/demo data script. Set OFFCHAT_ALLOW_SEED_SCRIPTS=1 to explicitly allow.'
+    )
+
 # Add the project root to Python path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 

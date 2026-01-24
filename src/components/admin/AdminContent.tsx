@@ -1,4 +1,4 @@
-import React, { Suspense, useState, useRef } from 'react';
+import React, { Suspense, useState, useRef, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useAdmin } from '@/contexts/AdminContext';
 import { StatsCards } from './StatsCards';
@@ -17,6 +17,7 @@ import { UserAssignmentPanel } from './UserAssignmentPanel';
 import { Button } from '@/components/ui/button';
 import { Loading } from '@/components/ui/loading';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
+import { apiService } from '@/lib/api';
 
 // Lazy load heavy components
 const ConversationMonitor = React.lazy(() => import('./ConversationMonitor').then(m => ({ default: m.ConversationMonitor })));
@@ -32,11 +33,36 @@ interface AdminContentProps {
   };
 }
 
+interface ProfileUser {
+  id: string;
+  username: string;
+  avatar?: string;
+  role?: string;
+  online_status?: string;
+  last_seen?: string;
+}
+
 export function AdminContent({ user }: AdminContentProps = {}) {
   const { t } = useTranslation();
   const { state } = useAdmin();
   const [showEditProfile, setShowEditProfile] = useState(false);
   const trashManagerRef = useRef<{ refresh: () => Promise<void> }>(null);
+  const [profileUser, setProfileUser] = useState<ProfileUser | null>(null);
+  const [profileLoading, setProfileLoading] = useState(false);
+
+  const exportUserData = async (userId: string, options: any) => {
+    await apiService.httpRequest('/users/data/export/', {
+      method: 'POST',
+      body: JSON.stringify({ user_id: userId, options }),
+    });
+  };
+
+  const deleteUserData = async (userId: string, options: any) => {
+    await apiService.httpRequest('/users/data/delete/', {
+      method: 'POST',
+      body: JSON.stringify({ user_id: userId, options }),
+    });
+  };
 
   const handleUserDeleted = async () => {
     if (trashManagerRef.current) {
@@ -44,12 +70,45 @@ export function AdminContent({ user }: AdminContentProps = {}) {
     }
   };
 
+  useEffect(() => {
+    if (state.activeTab !== 'profile') {
+      return;
+    }
+
+    let intervalId: number | undefined;
+    let cancelled = false;
+
+    const loadProfile = async () => {
+      setProfileLoading(true);
+      try {
+        const resp = await apiService.httpRequest<ProfileUser>('/users/profile/');
+        if (!cancelled && resp.success && resp.data) {
+          setProfileUser(resp.data);
+        }
+      } finally {
+        if (!cancelled) {
+          setProfileLoading(false);
+        }
+      }
+    };
+
+    loadProfile();
+    intervalId = window.setInterval(loadProfile, 30000);
+
+    return () => {
+      cancelled = true;
+      if (intervalId) {
+        window.clearInterval(intervalId);
+      }
+    };
+  }, [state.activeTab]);
+
   const renderContent = () => {
     switch (state.activeTab) {
       case 'overview':
         return (
           <div className="space-y-6">
-            <StatsCards users={state.users} />
+            <StatsCards />
             <MessageAnalytics />
           </div>
         );
@@ -70,10 +129,20 @@ export function AdminContent({ user }: AdminContentProps = {}) {
           </ErrorBoundary>
         );
       case 'data':
+        const dataUser = profileUser || (user as any);
+        const dataUserId = String(dataUser?.id || '');
+        const dataUsername = String(dataUser?.username || '');
         return (
           <ErrorBoundary>
             <Suspense fallback={<Loading />}>
-              <DataTools />
+              <DataTools
+                userId={dataUserId}
+                username={dataUsername}
+                isOpen={true}
+                onClose={() => null}
+                onExportData={exportUserData}
+                onDeleteData={deleteUserData}
+              />
             </Suspense>
           </ErrorBoundary>
         );
@@ -87,7 +156,7 @@ export function AdminContent({ user }: AdminContentProps = {}) {
         return (
           <ErrorBoundary>
             <Suspense fallback={<Loading />}>
-              <ConversationMonitor conversations={state.conversations} />
+              <ConversationMonitor />
             </Suspense>
           </ErrorBoundary>
         );
@@ -100,6 +169,25 @@ export function AdminContent({ user }: AdminContentProps = {}) {
       case 'trash':
         return <TrashManager ref={trashManagerRef} />;
       case 'profile':
+        const effectiveUser = profileUser || (user as any);
+        const onlineStatus = (effectiveUser?.online_status || effectiveUser?.status || 'offline') as string;
+        const statusText =
+          onlineStatus === 'online'
+            ? t('users.online')
+            : onlineStatus === 'away'
+              ? t('users.away')
+              : t('users.offline');
+        const statusClass =
+          onlineStatus === 'online'
+            ? 'text-green-600'
+            : onlineStatus === 'away'
+              ? 'text-yellow-600'
+              : 'text-muted-foreground';
+
+        const lastSeenText = effectiveUser?.last_seen
+          ? new Date(effectiveUser.last_seen).toLocaleString()
+          : t('common.noData');
+
         return (
           <div className="max-w-2xl mx-auto space-y-6">
             <div className="bg-gradient-card border border-border/50 rounded-lg p-6">
@@ -107,27 +195,27 @@ export function AdminContent({ user }: AdminContentProps = {}) {
               <div className="flex items-start space-x-6">
                 <div className="flex-shrink-0">
                   <ProfileImageUpload 
-                    currentImage={user?.avatar}
-                    username={user?.username || t('users.admin')}
-                    key={user?.avatar}
+                    currentImage={effectiveUser?.avatar}
+                    username={effectiveUser?.username || t('users.admin')}
+                    key={effectiveUser?.avatar}
                   />
                 </div>
                 <div className="flex-1 space-y-4">
                   <div>
                     <label className="text-sm font-medium text-muted-foreground">{t('common.username')}</label>
-                    <p className="text-lg">{user?.username || t('users.admin')}</p>
+                    <p className="text-lg">{effectiveUser?.username || t('users.admin')}</p>
                   </div>
                   <div>
                     <label className="text-sm font-medium text-muted-foreground">{t('users.role')}</label>
-                    <p className="text-lg capitalize">{user?.role || t('users.administrator')}</p>
+                    <p className="text-lg capitalize">{effectiveUser?.role || t('users.administrator')}</p>
                   </div>
                   <div>
                     <label className="text-sm font-medium text-muted-foreground">{t('common.status')}</label>
-                    <p className="text-lg text-green-600">{t('users.online')}</p>
+                    <p className={`text-lg ${statusClass}`}>{statusText}</p>
                   </div>
                   <div>
                     <label className="text-sm font-medium text-muted-foreground">{t('users.lastActive')}</label>
-                    <p className="text-lg">{new Date().toLocaleDateString()}</p>
+                    <p className="text-lg">{profileLoading ? t('common.loading') : lastSeenText}</p>
                   </div>
                   <Button onClick={() => setShowEditProfile(true)} className="mt-4">
                     {t('common.edit')}
@@ -138,7 +226,7 @@ export function AdminContent({ user }: AdminContentProps = {}) {
             <EditProfileDialog
               isOpen={showEditProfile}
               onClose={() => setShowEditProfile(false)}
-              user={user}
+              user={effectiveUser}
             />
           </div>
         );

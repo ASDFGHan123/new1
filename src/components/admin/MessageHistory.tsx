@@ -86,13 +86,25 @@ export const MessageHistory = ({ initialMessages = [] }: MessageHistoryProps) =>
     setError(null);
     
     try {
-      // Note: This would need to be implemented in the backend API
-      // For now, we'll use mock data with error handling
-      await new Promise(resolve => setTimeout(resolve, 500)); // Simulate API call
-      
-      // In a real implementation, this would be:
-      // const response = await apiService.getMessageHistory();
-      
+      const response = await apiService.httpRequest<any>('/admin/message-history/');
+      if (!response.success) {
+        throw new Error(response.error || 'Failed to load message history');
+      }
+
+      const raw = (response.data?.results || response.data || []) as any[];
+      const mapped: SentMessage[] = raw.map((m: any) => ({
+        id: String(m.id),
+        type: m.type,
+        content: m.content,
+        recipients: Array.isArray(m.recipients) ? m.recipients.map((r: any) => String(r)) : [],
+        recipientCount: Number(m.recipient_count || 0),
+        sentBy: m.sent_by ? String(m.sent_by) : 'admin',
+        sentAt: m.sent_at || new Date().toISOString(),
+        status: m.status || 'sent',
+        priority: m.priority || 'normal',
+      }));
+
+      setMessages(mapped);
       setRetryCount(0); // Reset retry count on success
     } catch (err) {
       console.error('Failed to load message history:', err);
@@ -239,25 +251,38 @@ export const MessageHistory = ({ initialMessages = [] }: MessageHistoryProps) =>
 
   // Function to add a new sent message to history
   const addSentMessage = async (content: string, type: "system" | "broadcast" | "targeted", priority: string, recipients: string[] = [], recipientCount: number = 0) => {
-    const newMessage: SentMessage = {
-      id: Date.now().toString(),
-      type,
-      content,
-      recipients,
-      recipientCount: type === "broadcast" ? recipientCount : recipients.length,
-      sentBy: "admin", // In a real app, this would come from auth context
-      sentAt: new Date().toISOString(),
-      status: "sent",
-      priority: priority as "low" | "normal" | "high" | "urgent",
-    };
+    try {
+      const payload = {
+        type,
+        content,
+        recipients,
+        recipient_count: type === 'broadcast' ? recipientCount : recipients.length,
+        status: 'sent',
+        priority,
+      };
 
-    setMessages(prev => [newMessage, ...prev]);
-    
-    // Note: In a real implementation, this would send the message via API
-    toast({
-      title: t('messages.sendMessage'),
-      description: t('system.messageSent'),
-    });
+      const resp = await apiService.httpRequest<any>('/admin/message-history/', {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      });
+
+      if (!resp.success) {
+        throw new Error(resp.error || 'Failed to send message');
+      }
+
+      await loadMessageHistory();
+      toast({
+        title: t('messages.sendMessage'),
+        description: t('system.messageSent'),
+      });
+    } catch (error) {
+      console.error('Failed to send message:', error);
+      toast({
+        title: t('common.error'),
+        description: t('errors.failedToSend'),
+        variant: "destructive"
+      });
+    }
   };
 
   // Function to view message details
@@ -271,19 +296,19 @@ export const MessageHistory = ({ initialMessages = [] }: MessageHistoryProps) =>
     setActionLoading(prev => ({ ...prev, [messageId]: true }));
     
     try {
-      const messageToTrash = messages.find(msg => msg.id === messageId);
-      if (messageToTrash) {
-        // Remove from local state
-        setMessages(prev => prev.filter(msg => msg.id !== messageId));
-        
-        // Note: In a real implementation, this would call an API to move to trash
-        // const response = await apiService.moveMessageToTrash(messageId);
-        
-        toast({
-          title: t('trash.deletedItems'),
-          description: t('trash.restoreItem'),
-        });
+      const resp = await apiService.httpRequest<any>(`/admin/message-history/${messageId}/`, {
+        method: 'DELETE',
+      });
+
+      if (!resp.success) {
+        throw new Error(resp.error || 'Failed to delete message');
       }
+
+      await loadMessageHistory();
+      toast({
+        title: t('trash.deletedItems'),
+        description: t('trash.restoreItem'),
+      });
     } catch (error) {
       console.error('Failed to delete message:', error);
       toast({
@@ -294,25 +319,6 @@ export const MessageHistory = ({ initialMessages = [] }: MessageHistoryProps) =>
     } finally {
       setActionLoading(prev => ({ ...prev, [messageId]: false }));
     }
-  };
-
-  // Function to add a test message for demo purposes
-  const addTestMessage = () => {
-    const testMessages = [
-      "System maintenance completed successfully. All services are now operational.",
-      "Welcome to our updated platform! Check out the new features in your dashboard.",
-      "Security update: Two-factor authentication is now available for all accounts.",
-      "Important: Please update your password for enhanced security.",
-    ];
-
-    const randomContent = testMessages[Math.floor(Math.random() * testMessages.length)];
-    const types: ("system" | "broadcast" | "targeted")[] = ["system", "broadcast", "targeted"];
-    const priorities: ("low" | "normal" | "high" | "urgent")[] = ["low", "normal", "high", "urgent"];
-
-    const randomType = types[Math.floor(Math.random() * types.length)];
-    const randomPriority = priorities[Math.floor(Math.random() * priorities.length)];
-
-    addSentMessage(randomContent, randomType, randomPriority, ["all"], 1250);
   };
 
   const handlePrintMessageHistory = () => {
@@ -795,25 +801,16 @@ export const MessageHistory = ({ initialMessages = [] }: MessageHistoryProps) =>
               {t('common.print')}
             </Button>
 
-            {/* Add Test Message Button */}
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={addTestMessage}
-              className="bg-blue-50 hover:bg-blue-100 border-blue-200 text-blue-700"
-            >
-              <Plus className="w-4 h-4 mr-1" />
-              Test
-            </Button>
-
             <Badge variant="secondary" className="text-xs">
               {filteredMessages.length} message{filteredMessages.length !== 1 ? 's' : ''}
             </Badge>
+
           </div>
         </div>
       </CardHeader>
       <CardContent>
         <div className="space-y-4">
+// ... (rest of the code remains the same)
           {/* Message Statistics */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-4 bg-muted/50 rounded-lg">
             <div className="text-center">

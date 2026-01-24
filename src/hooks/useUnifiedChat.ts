@@ -32,6 +32,9 @@ export const useUnifiedChat = (): UnifiedChatData => {
       setError(null);
 
       try {
+        // Initialize auth to load tokens from storage
+        apiService.initializeAuth();
+        
         // Only load all users if user has admin access
         const authToken = apiService.getAuthToken();
         if (authToken) {
@@ -69,30 +72,26 @@ export const useUnifiedChat = (): UnifiedChatData => {
             let participants: any[] = [];
             let otherUserId: string | undefined;
 
-            if (isGroup && conv.group) {
-              participants = (conv.group.members || []).map((m: any) => {
-                const username = (m.user?.username && m.user.username.trim()) || m.user?.first_name || m.username || 'Unknown';
+            if (isGroup) {
+              // For groups, participants are returned flattened by the serializer
+              participants = (conv.participants || []).map((p: any) => ({
+                id: String(p.id),
+                username: (p.username && p.username.trim()) || p.first_name || p.email?.split('@')[0] || 'Unknown',
+                avatar: p.avatar || '',
+                status: 'offline' as const
+              }));
+            } else if (conv.participants && Array.isArray(conv.participants)) {
+              participants = conv.participants.map((p: any) => {
+                const username = (p.username && p.username.trim()) || p.first_name || p.email?.split('@')[0] || 'Unknown';
                 return {
-                  id: String(m.user?.id || m.id),
+                  id: String(p.id),
                   username,
-                  avatar: m.user?.avatar || m.avatar || '',
+                  avatar: p.avatar || '',
                   status: 'offline' as const
                 };
               });
-            } else {
-              if (conv.participants && Array.isArray(conv.participants) && conv.participants.length > 0) {
-                participants = conv.participants.map((p: any) => {
-                  const username = (p.username && p.username.trim()) || p.first_name || p.email?.split('@')[0] || 'Unknown';
-                  return {
-                    id: String(p.id),
-                    username,
-                    avatar: p.avatar || '',
-                    status: 'offline' as const
-                  };
-                });
-                if (participants.length > 0) {
-                  otherUserId = participants[0].id;
-                }
+              if (participants.length > 0) {
+                otherUserId = participants[0].id;
               }
             }
 

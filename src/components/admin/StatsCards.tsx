@@ -7,6 +7,26 @@ import { useState, useEffect, useCallback } from "react";
 import { openPrintWindow, generateStatsCardsHTML } from "@/lib/printUtils";
 import { apiService } from "@/lib/api";
 
+interface DashboardStatsResponse {
+  users?: {
+    total?: number;
+    active?: number;
+    online?: number;
+    change?: number;
+    online_change?: number;
+  };
+  conversations?: {
+    total?: number;
+    active?: number;
+    change?: number;
+  };
+  messages?: {
+    total?: number;
+    change?: number;
+    today_ratio?: number;
+  };
+}
+
 const getInitialStats = (t: (key: string) => string) => [
   {
     title: t('stats.totalUsers'),
@@ -49,7 +69,7 @@ export const StatsCards = () => {
     setError(null);
     
     try {
-      const statsResponse = await apiService.httpRequest('/admin/dashboard/stats/');
+      const statsResponse = await apiService.httpRequest<DashboardStatsResponse>('/admin/dashboard/stats/');
       
       if (statsResponse.success && statsResponse.data) {
         const data = statsResponse.data;
@@ -58,28 +78,28 @@ export const StatsCards = () => {
           {
             title: t('stats.totalUsers'),
             value: data.users?.total || 0,
-            change: 15.2,
+            change: data.users?.change ?? 0,
             icon: Users,
             color: "admin-primary",
           },
           {
             title: t('conversations.activeConversations'),
             value: data.conversations?.active || 0,
-            change: 8.5,
+            change: data.conversations?.change ?? 0,
             icon: MessageSquare,
             color: "admin-secondary",
           },
           {
             title: t('stats.totalMessages'),
             value: data.messages?.total || 0,
-            change: data.messages?.change || 0,
+            change: data.messages?.change ?? 0,
             icon: Activity,
             color: "admin-warning",
           },
           {
             title: t('users.onlineUsers'),
             value: data.users?.online || 0,
-            change: -2.4,
+            change: data.users?.online_change ?? 0,
             icon: Shield,
             color: "admin-success",
           },

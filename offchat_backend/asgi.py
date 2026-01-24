@@ -13,7 +13,7 @@ from channels.routing import ProtocolTypeRouter, URLRouter
 from channels.auth import AuthMiddlewareStack
 from channels.security.websocket import AllowedHostsOriginValidator
 
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'offchat_backend.settings')
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'offchat_backend.settings.development')
 
 # Initialize Django ASGI application early to ensure the AppRegistry
 # is populated before importing code that may need it.

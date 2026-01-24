@@ -16,21 +16,6 @@ import { apiService, User, Conversation, MessageTemplate, Role } from "@/lib/api
 // Initialize auth tokens from localStorage on app start
 apiService.initializeAuth();
 
-// Type definitions to match AdminDashboard interfaces
-interface AppUser {
-  id: string;
-  username: string;
-  email: string;
-  password?: string;
-  status: "active" | "suspended" | "banned";
-  role: string;
-  joinDate: string;
-  lastActive: string;
-  messageCount: number;
-  reportCount: number;
-  avatar?: string;
-}
-
 interface AppConversation {
   id: string;
   type: "private" | "group";
@@ -66,7 +51,6 @@ interface AppRole {
 // Lazy load components for better performance
 const Index = lazy(() => import("./pages/Index"));
 const AdminDashboard = lazy(() => import("./pages/AdminDashboard"));
-const AdminDemo = lazy(() => import("./pages/AdminDemo"));
 const AdminLogin = lazy(() => import("./pages/AdminLogin"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 const UnifiedChatPage = lazy(() => import("./pages/UnifiedChatPage").then(module => ({ default: module.UnifiedChatPage })));
@@ -83,35 +67,38 @@ const queryClient = new QueryClient();
     const refreshIntervalRef = useRef<NodeJS.Timeout | null>(null);
     
   // Admin force logout user
-  const handleForceLogoutUser = (id: string) => {
+  const handleForceLogoutUser = async (id: string) => {
     let username = id;
     const userObj = users.find(u => u.id === id);
     if (userObj) username = userObj.username;
-    
-    // If the user is currently logged in, log them out
-    if (user && user.id === id) {
-      setUser(null);
-      alert(t('auth.loggedOutByAdmin'));
+
+    const resp = await apiService.forceLogoutUser(id);
+    if (!resp.success) {
+      alert(resp.error || t('errors.failedToUpdate'));
+      return;
     }
-    
-    // Show message to admin
+
+    await loadUsers();
     alert(t('users.userForcefullyLoggedOut', { username }));
   };
 
   // Admin delete user
-  const handleDeleteUser = (id: string) => {
+  const handleDeleteUser = async (id: string) => {
     if (id === "admin") {
       alert(t('users.cannotDeleteAdmin'));
       return;
     }
+
     const userObj = users.find(u => u.id === id);
     const username = userObj ? userObj.username : id;
-    setUsers(prev => prev.filter(u => u.id !== id));
-    
-    // If the deleted user is currently logged in, log them out
-    if (user && user.id === id) {
-      setUser(null);
+
+    const resp = await apiService.deleteUser(id);
+    if (!resp.success) {
+      alert(resp.error || t('errors.failedToDelete'));
+      return;
     }
+
+    await loadUsers();
     alert(t('users.userDeleted', { username }));
   };
 
@@ -130,78 +117,14 @@ const queryClient = new QueryClient();
   });
   
   // Messages and conversations
-  const [conversations, setConversations] = useState<AppConversation[]>([
-    {
-      id: "general",
-      type: "group" as const,
-      title: "General Chat",
-      participants: ["admin", "user1", "user2"],
-      messages: [
-        {
-          id: "1",
-          content: "Welcome to OffChat!",
-          sender: "system",
-          timestamp: new Date().toISOString(),
-          type: "system"
-        }
-      ],
-      createdAt: new Date().toISOString(),
-      isActive: true
-    }
-  ]);
+  const [conversations, setConversations] = useState<AppConversation[]>([]);
+  const [messageTemplates, setMessageTemplates] = useState<AppMessageTemplate[]>([]);
 
-  const [messageTemplates, setMessageTemplates] = useState<AppMessageTemplate[]>([
-    {
-      id: "welcome",
-      name: "Welcome Message",
-      content: "Welcome to OffChat! We're excited to have you here.",
-      category: "system"
-    },
-    {
-      id: "maintenance",
-      name: "Maintenance Notice",
-      content: "The system will be undergoing maintenance from {start_time} to {end_time}.",
-      category: "announcement"
-    }
-  ]);
-
-  // Roles and permissions
-  const [roles, setRoles] = useState<AppRole[]>([
-    {
-      id: "admin",
-      name: "Administrator",
-      description: "Full system access",
-      permissions: [
-        "user_management", "role_management", "system_settings",
-        "message_monitoring", "audit_logs", "backup_management",
-        "send_messages", "manage_conversations", "view_analytics"
-      ],
-      isDefault: true,
-      createdAt: "2026-01-01"
-    },
-    {
-      id: "moderator",
-      name: "Moderator",
-      description: "Content moderation and user management",
-      permissions: [
-        "user_management", "message_monitoring", "manage_conversations",
-        "send_messages", "view_analytics"
-      ],
-      isDefault: true,
-      createdAt: "2026-01-01"
-    },
-    {
-      id: "user",
-      name: "User",
-      description: "Basic user access",
-      permissions: ["send_messages", "manage_conversations"],
-      isDefault: true,
-      createdAt: "2026-01-01"
-    }
-  ]);
+  // Roles and permissions (backed by Django auth groups)
+  const [roles, setRoles] = useState<AppRole[]>([]);
 
   // Real data from API
-  const [users, setUsers] = useState<AppUser[]>([]);
+  const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -212,16 +135,7 @@ const queryClient = new QueryClient();
 
     const sendHeartbeat = async () => {
       try {
-        const response = await fetch('http://localhost:8000/api/users/heartbeat/', {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          },
-        });
-        if (!response.ok) {
-          console.error('Heartbeat failed:', response.status);
-        }
+        await apiService.httpRequest('/users/heartbeat/', { method: 'POST' });
       } catch (error) {
         console.error('Heartbeat error:', error);
       }
@@ -250,7 +164,7 @@ const queryClient = new QueryClient();
 
       const response = await apiService.getUsers();
       if (response.success && response.data) {
-        setUsers(response.data as AppUser[]);
+        setUsers(response.data);
       } else if (response.error === 'Authentication failed. Please log in again.') {
         apiService.logout();
         setUsers([]);
@@ -291,26 +205,25 @@ const queryClient = new QueryClient();
   };
 
   // Admin add user (approved by default)
-  const handleAddUser = (username: string, password: string, role: string, avatar?: string) => {
-    if (users.some(u => u.username === username)) {
-      alert(t('users.usernameExists'));
-      return;
+  const handleAddUser = async (username: string, password: string, role: string, avatar?: string) => {
+    try {
+      const response = await apiService.createUser({
+        username,
+        email: `${username}@offchat.local`,
+        password,
+        role,
+        status: 'active',
+      });
+
+      if (response.success) {
+        await loadUsers();
+        alert(t('users.userAddedApproved'));
+      } else {
+        alert(response.error || t('errors.failedToCreate'));
+      }
+    } catch (e) {
+      alert(e instanceof Error ? e.message : t('errors.failedToCreate'));
     }
-    const newUser = {
-      id: String(Date.now()),
-      username,
-      email: `${username}@example.com`,
-      password,
-      status: "active" as const,
-      role,
-      joinDate: new Date().toISOString().split('T')[0],
-      lastActive: "Just now",
-      messageCount: 0,
-      reportCount: 0,
-      avatar: avatar || undefined
-    };
-    setUsers(prev => [...prev, newUser]);
-    alert(t('users.userAddedApproved'));
   };
 
   // Only allow login for approved users, with specific error messages
@@ -398,7 +311,7 @@ const queryClient = new QueryClient();
         
         const usersResponse = await apiService.getUsers();
         if (usersResponse.success && usersResponse.data) {
-          setUsers(usersResponse.data as AppUser[]);
+          setUsers(usersResponse.data);
         }
         
         return true;
@@ -412,43 +325,85 @@ const queryClient = new QueryClient();
   };
 
   // Admin actions
-  const approveUser = (id: string) => {
-    setUsers(prev => prev.map(u => u.id === id ? { ...u, status: "active" } : u));
+  const approveUser = async (id: string) => {
+    const resp = await apiService.approveUser(id);
+    if (!resp.success) {
+      alert(resp.error || t('errors.failedToUpdate'));
+      return;
+    }
+    await loadUsers();
   };
-  const rejectUser = (id: string) => {
-    setUsers(prev => prev.map(u => u.id === id ? { ...u, status: "banned" } : u));
+  const rejectUser = async (id: string) => {
+    const resp = await apiService.banUser(id);
+    if (!resp.success) {
+      alert(resp.error || t('errors.failedToUpdate'));
+      return;
+    }
+    await loadUsers();
   };
-  const updateUser = (id: string, updates: Partial<typeof users[0]>) => {
-    setUsers(prev => prev.map(u => u.id === id ? { ...u, ...updates } : u));
+  const updateUser = async (id: string, updates: Partial<typeof users[0]>) => {
+    const resp = await apiService.updateUser(id, updates as any);
+    if (!resp.success) {
+      alert(resp.error || t('errors.failedToUpdate'));
+      return;
+    }
+    await loadUsers();
   };
 
   // Role management functions
-  const addRole = (name: string, description: string, permissions: string[]) => {
-    const newRole = {
-      id: name.toLowerCase().replace(/\s+/g, '_'),
-      name,
-      description,
-      permissions,
-      isDefault: false,
-      createdAt: new Date().toISOString().split('T')[0]
-    };
-    setRoles(prev => [...prev, newRole]);
+  const reloadRoles = async () => {
+    const rolesResponse = await apiService.httpRequest<any>('/users/groups/');
+    if (rolesResponse.success && rolesResponse.data) {
+      const rawRoles = (rolesResponse.data.results || rolesResponse.data) as any[];
+      const mapped: AppRole[] = rawRoles.map((r: any) => ({
+        id: String(r.id),
+        name: r.name,
+        description: '',
+        permissions: (r.permissions || []).map((p: any) => String(p)),
+        isDefault: false,
+        createdAt: new Date().toISOString().split('T')[0],
+      }));
+      setRoles(mapped);
+    }
   };
 
-  const updateRole = (id: string, updates: Partial<typeof roles[0]>) => {
-    setRoles(prev => prev.map(r => r.id === id ? { ...r, ...updates } : r));
-  };
-
-  const deleteRole = (id: string) => {
-    // Don't allow deleting default roles
-    const role = roles.find(r => r.id === id);
-    if (role?.isDefault) {
-      alert(t('roles.cannotDeleteDefault'));
+  const addRole = async (name: string, description: string, permissions: string[]) => {
+    const resp = await apiService.httpRequest<any>('/users/groups/', {
+      method: 'POST',
+      body: JSON.stringify({ name, permissions }),
+    });
+    if (!resp.success) {
+      alert(resp.error || t('errors.failedToCreate'));
       return;
     }
-    setRoles(prev => prev.filter(r => r.id !== id));
-    // Update users with this role to default user role
-    setUsers(prev => prev.map(u => u.role === id ? { ...u, role: "user" } : u));
+    await reloadRoles();
+  };
+
+  const updateRole = async (id: string, updates: Partial<typeof roles[0]>) => {
+    const resp = await apiService.httpRequest<any>(`/users/groups/${id}/`, {
+      method: 'PUT',
+      body: JSON.stringify({
+        name: (updates as any).name,
+        permissions: (updates as any).permissions,
+      }),
+    });
+    if (!resp.success) {
+      alert(resp.error || t('errors.failedToUpdate'));
+      return;
+    }
+    await reloadRoles();
+  };
+
+  const deleteRole = async (id: string) => {
+    const resp = await apiService.httpRequest<any>(`/users/groups/${id}/`, {
+      method: 'DELETE',
+    });
+    if (!resp.success) {
+      alert(resp.error || t('errors.failedToDelete'));
+      return;
+    }
+    await reloadRoles();
+    await loadUsers();
   };
 
   // Check if user has permission
@@ -519,32 +474,14 @@ const queryClient = new QueryClient();
   };
 
   return (
-    <Suspense fallback={<LoadingPage message="Loading page..." />}>
+    <Suspense fallback={<LoadingPage text="Loading page..." />}>
       <Routes>
         <Route path="/" element={<UnifiedChatPage />} />
         <Route path="/admin-login" element={<AdminLogin onLogin={handleAdminLogin} />} />
         <Route path="/admin" element={
           user && user.role === "admin" ? (
             <AdminDashboard
-              users={users}
-              roles={roles}
-              conversations={conversations}
-              messageTemplates={messageTemplates}
               user={user}
-              approveUser={approveUser}
-              rejectUser={rejectUser}
-              addUser={handleAddUser}
-              updateUser={updateUser}
-              addRole={addRole}
-              updateRole={updateRole}
-              deleteRole={deleteRole}
-              hasPermission={hasPermission}
-              sendSystemMessage={sendSystemMessage}
-              sendBulkMessage={sendBulkMessage}
-              addMessageTemplate={addMessageTemplate}
-              deleteMessageTemplate={deleteMessageTemplate}
-              forceLogoutUser={handleForceLogoutUser}
-              deleteUser={handleDeleteUser}
               onLogout={handleLogout}
             />
           ) : (

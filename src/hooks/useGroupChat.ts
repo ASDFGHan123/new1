@@ -149,7 +149,27 @@ export const useGroupChat = (currentUserId: string = "1") => {
       });
       
       if (response.success && response.data) {
-        await loadConversations();
+        const newGroup: Group = {
+          id: response.data.id,
+          name: response.data.name,
+          description: response.data.description || '',
+          avatar: response.data.avatar,
+          createdBy: response.data.created_by,
+          createdAt: new Date(response.data.created_at),
+          updatedAt: new Date(response.data.updated_at),
+          isPrivate: response.data.group_type === 'private',
+          members: response.data.members || [],
+          lastActivity: new Date(),
+          unreadCount: 0
+        };
+        
+        setGroups(prev => [newGroup, ...prev]);
+        setCurrentGroupId(response.data.id);
+        setMessages(prev => ({
+          ...prev,
+          [response.data.id]: []
+        }));
+        
         return response.data;
       } else {
         throw new Error(response.error || 'Failed to create group');
@@ -161,7 +181,7 @@ export const useGroupChat = (currentUserId: string = "1") => {
     } finally {
       setLoading(false);
     }
-  }, [currentUserId, loadConversations]);
+  }, [currentUserId]);
 
   const updateGroup = useCallback(async (groupId: string, updateData: UpdateGroupData) => {
     setLoading(true);
@@ -238,7 +258,7 @@ export const useGroupChat = (currentUserId: string = "1") => {
       console.error('Failed to remove member:', err);
       setError(err instanceof Error ? err.message : 'Failed to remove member');
     } finally {
-      setLoading(false);
+      setLoading(false)
     }
   }, []);
 

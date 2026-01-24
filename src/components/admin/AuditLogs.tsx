@@ -36,6 +36,7 @@ import {
 import { Label } from "@/components/ui/label";
 import { useState, useEffect } from "react";
 import { Loader2 } from "lucide-react";
+import { apiService } from "@/lib/api";
 
 const getSeverityColor = (severity: string) => {
   switch (severity) {
@@ -77,19 +78,11 @@ export const AuditLogs = () => {
   const fetchAuditLogs = async () => {
     setLoading(true);
     try {
-      let token = localStorage.getItem('admin_access_token');
-      if (!token) {
-        token = localStorage.getItem('chat_access_token');
-      }
-      if (!token) {
-        token = localStorage.getItem('access_token');
-      }
-      const response = await fetch('http://localhost:8000/api/admin/audit-logs/', {
-        headers: token ? { 'Authorization': `Bearer ${token}` } : {}
-      });
-      if (!response.ok) throw new Error('Failed to fetch');
-      const data = await response.json();
-      setAuditLogs(Array.isArray(data) ? data : data.results || []);
+      const resp = await apiService.getAuditLogs();
+      if (!resp.success) throw new Error(resp.error || 'Failed to fetch');
+
+      const data = resp.data || [];
+      setAuditLogs(Array.isArray(data) ? data : (data as any).results || []);
       setCurrentPage(1);
     } catch (error) {
       console.error('Failed to load audit logs:', error);

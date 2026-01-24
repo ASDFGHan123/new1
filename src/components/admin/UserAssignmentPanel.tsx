@@ -3,6 +3,7 @@ import { Plus, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { organizationApi } from '@/lib/organization-api';
+import { apiService } from '@/lib/api';
 
 interface Assignment {
   id: string;
@@ -38,9 +39,7 @@ export function UserAssignmentPanel() {
     try {
       const [depts, assigns] = await Promise.all([
         organizationApi.getDepartments(),
-        fetch('http://localhost:8000/api/users/department-office-users/', {
-          headers: { 'Authorization': `Bearer ${localStorage.getItem('access_token')}` }
-        }).then(r => r.json())
+        apiService.httpRequest<any>('/users/department-office-users/').then(r => (r.success ? r.data : []))
       ]);
       setDepartments(Array.isArray(depts) ? depts : depts.results || []);
       setAssignments(Array.isArray(assigns) ? assigns : assigns.results || []);

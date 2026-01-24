@@ -12,6 +12,7 @@ from django.core.paginator import Paginator
 from django.db.models import Q, Count, Avg
 
 from admin_panel.models import AuditLog
+from utils.json_utils import prepare_metadata
 
 User = get_user_model()
 logger = logging.getLogger(__name__)
@@ -89,7 +90,7 @@ class AuditLoggingService:
                 ip_address=ip_address,
                 user_agent=user_agent,
                 session_id=session_id,
-                metadata=metadata
+                metadata=prepare_metadata(metadata)
             )
             
             logger.info(f"Audit log created: {action_type} by {admin_user}")
@@ -386,7 +387,7 @@ class AuditLoggingService:
             category='security',
             ip_address=ip_address,
             user_agent=user_agent,
-            metadata=metadata
+            metadata=prepare_metadata(metadata)
         )
     
     @classmethod

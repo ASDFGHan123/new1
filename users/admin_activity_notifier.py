@@ -2,9 +2,9 @@
 Admin Activity Notification Service
 Sends notifications to admins for all system activities
 """
-from users.notification_utils import send_notification, send_bulk_notification
+from users.notification_utils import send_notification
 from users.models import User
-from admin_panel.models import AuditLog
+from utils.json_utils import prepare_metadata
 import logging
 
 logger = logging.getLogger(__name__)
@@ -157,11 +157,15 @@ class AdminActivityNotifier:
             if actor:
                 message_data['username'] = actor.username
             
-            title = config['title']
-            message = config['message'].format(**message_data)
+            try:
+                title = config['title']
+                message = config['message'].format(**message_data)
+            except (KeyError, ValueError) as e:
+                logger.warning(f"Failed to format notification message for {activity_type}: {str(e)}")
+                return
             
             # Get all admin users
-            admins = User.objects.filter(role='admin', is_active=True)
+            admins = User.objects.filter(role='admin', is_active=True).only('id', 'username')
             
             if not admins.exists():
                 return
@@ -174,24 +178,26 @@ class AdminActivityNotifier:
                         notification_type=config['type'],
                         title=title,
                         message=message,
-                        data={
+                        data=prepare_metadata({
                             'activity_type': activity_type,
                             'actor_id': actor.id if actor else None,
                             'target_type': target_type,
                             'target_id': target_id,
                             'severity': severity,
                             'metadata': metadata or {}
-                        }
+                        })
                     )
                 except Exception as e:
-                    logger.error(f"Failed to notify admin {admin.id}: {str(e)}")
+                    logger.error(f"Failed to notify admin {admin.id}: {str(e)}", exc_info=False)
         
         except Exception as e:
-            logger.error(f"Error in notify_admins: {str(e)}")
+            logger.error(f"Error in notify_admins: {str(e)}", exc_info=False)
     
     @classmethod
     def notify_on_user_activity(cls, user, activity_type, metadata=None):
         """Notify admins about user activities"""
+        if not user:
+            return
         cls.notify_admins(
             activity_type=activity_type,
             actor=user,
@@ -203,33 +209,50 @@ class AdminActivityNotifier:
     @classmethod
     def notify_on_message_activity(cls, message, activity_type, actor=None):
         """Notify admins about message activities"""
-        conversation_name = str(message.conversation)
-        cls.notify_admins(
-            activity_type=activity_type,
-            actor=actor or message.sender,
-            target_type='MESSAGE',
-            target_id=message.id,
-            metadata={
-                'username': (actor or message.sender).username,
-                'conversation': conversation_name
-            }
-        )
+        if not message or not hasattr(message, 'conversation'):
+            return
+        try:
+            conversation_name = str(message.conversation)
+            sender = actor or message.sender
+            if not sender:
+                return
+            cls.notify_admins(
+                activity_type=activity_type,
+                actor=sender,
+                target_type='MESSAGE',
+                target_id=message.id,
+                metadata={
+                    'username': sender.username,
+                    'conversation': conversation_name
+                }
+            )
+        except AttributeError as e:
+            logger.warning(f"Missing required message attributes: {str(e)}")
     
     @classmethod
     def notify_on_group_activity(cls, group, activity_type, actor=None, metadata=None):
         """Notify admins about group activities"""
-        data = metadata or {}
-        data['group_name'] = group.name
-        if actor:
-            data['username'] = actor.username
-        
-        cls.notify_admins(
-            activity_type=activity_type,
-            actor=actor or group.created_by,
-            target_type='GROUP',
-            target_id=group.id,
-            metadata=data
-        )
+        if not group or not hasattr(group, 'name'):
+            return
+        try:
+            data = metadata or {}
+            data['group_name'] = group.name
+            if actor:
+                data['username'] = actor.username
+            
+            creator = actor or getattr(group, 'created_by', None)
+            if not creator:
+                return
+            
+            cls.notify_admins(
+                activity_type=activity_type,
+                actor=creator,
+                target_type='GROUP',
+                target_id=group.id,
+                metadata=data
+            )
+        except AttributeError as e:
+            logger.warning(f"Missing required group attributes: {str(e)}")
     
     @classmethod
     def notify_on_security_event(cls, activity_type, ip_address=None, 
@@ -237,7 +260,7 @@ class AdminActivityNotifier:
         """Notify admins about security events"""
         data = metadata or {}
         if ip_address:
-            data['ip_address'] = ip_address
+            data['ip_address'] = str(ip_address)
         
         cls.notify_admins(
             activity_type=activity_type,

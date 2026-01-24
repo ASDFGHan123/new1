@@ -3,6 +3,11 @@ import os
 import django
 from django.conf import settings
 
+if os.environ.get('OFFCHAT_ALLOW_SEED_SCRIPTS') != '1':
+    raise SystemExit(
+        'Refusing to run seed/demo data script. Set OFFCHAT_ALLOW_SEED_SCRIPTS=1 to explicitly allow.'
+    )
+
 # Setup Django
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'offchat_backend.settings.development')
 django.setup()

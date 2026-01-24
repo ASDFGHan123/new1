@@ -29,66 +29,40 @@ function AdminDashboardContent({ user, onLogout }: AdminDashboardProps) {
         if (usersResponse.success && usersResponse.data) {
           dispatch({ type: 'SET_USERS', payload: usersResponse.data });
         }
-        
-        const defaultRoles: Role[] = [
-          {
-            id: "1",
-            name: "User",
-            description: "Standard user with basic permissions",
-            permissions: ["send_messages", "manage_conversations"],
-            isDefault: true,
-            createdAt: "2026-01-01"
-          },
-          {
-            id: "2",
-            name: "Moderator",
-            description: "User with moderation capabilities",
-            permissions: ["send_messages", "manage_conversations", "moderate_content", "view_analytics"],
+
+        const rolesResponse = await apiService.httpRequest<any>('/users/groups/');
+        if (rolesResponse.success && rolesResponse.data) {
+          const rawRoles = (rolesResponse.data.results || rolesResponse.data) as any[];
+          const roles: Role[] = rawRoles.map((r: any) => ({
+            id: String(r.id),
+            name: r.name,
+            description: '',
+            permissions: (r.permissions || []).map((p: any) => String(p)),
             isDefault: false,
-            createdAt: "2026-01-01"
-          },
-          {
-            id: "3",
-            name: "Admin",
-            description: "Full administrative access",
-            permissions: ["user_management", "role_management", "send_messages", "manage_conversations", "message_monitoring", "system_settings", "audit_logs", "backup_management", "view_analytics", "moderate_content", "manage_templates"],
-            isDefault: false,
-            createdAt: "2026-01-01"
-          }
-        ];
-        
-        const defaultConversations: Conversation[] = [
-          {
-            id: "1",
-            type: "group",
-            title: "General Chat",
-            participants: usersResponse.data?.slice(0, 3).map(u => u.id) || [],
-            messages: [
-              { id: "1", content: "Welcome to OffChat!", sender: "system", timestamp: new Date().toISOString(), type: "system" }
-            ],
             createdAt: new Date().toISOString(),
-            isActive: true
-          }
-        ];
-        
-        const defaultTemplates: MessageTemplate[] = [
-          {
-            id: "1",
-            name: "Welcome Message",
-            content: "Welcome to OffChat! We're glad to have you here.",
-            category: "General"
-          },
-          {
-            id: "2",
-            name: "Maintenance Notice",
-            content: "Scheduled maintenance will begin soon. Please save your work.",
-            category: "System"
-          }
-        ];
-        
-        dispatch({ type: 'SET_ROLES', payload: defaultRoles });
-        dispatch({ type: 'SET_CONVERSATIONS', payload: defaultConversations });
-        dispatch({ type: 'SET_MESSAGE_TEMPLATES', payload: defaultTemplates });
+          }));
+          dispatch({ type: 'SET_ROLES', payload: roles });
+        }
+
+        const conversationsResponse = await apiService.httpRequest<any>('/admin/conversations/');
+        if (conversationsResponse.success && conversationsResponse.data) {
+          const rawConversations = (conversationsResponse.data.conversations || []) as any[];
+          const conversations: Conversation[] = rawConversations.map((c: any) => ({
+            id: String(c.id),
+            type: (c.type === 'group' ? 'group' : 'private'),
+            title: c.title || 'Conversation',
+            participants: (c.participant_list || []).map((p: any) => String(p.id)),
+            messages: [],
+            createdAt: c.created_at || new Date().toISOString(),
+            isActive: Boolean(c.is_active),
+          }));
+          dispatch({ type: 'SET_CONVERSATIONS', payload: conversations });
+        }
+
+        const templatesResponse = await apiService.getMessageTemplates();
+        if (templatesResponse.success && templatesResponse.data) {
+          dispatch({ type: 'SET_MESSAGE_TEMPLATES', payload: templatesResponse.data as any });
+        }
       } catch (error) {
         console.error('Failed to fetch dashboard data:', error);
       }

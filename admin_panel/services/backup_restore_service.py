@@ -42,6 +42,20 @@ class BackupRestoreService:
     Service for comprehensive backup and restore operations.
     """
     
+    @staticmethod
+    def _ensure_within_base_dir(path: Path, base_dir: Path) -> Path:
+        base_dir_resolved = base_dir.resolve()
+        path_resolved = path.resolve()
+        try:
+            path_resolved.relative_to(base_dir_resolved)
+        except ValueError:
+            raise ValueError("Unsafe path")
+        return path_resolved
+
+    @staticmethod
+    def _safe_filename(name: str) -> str:
+        return Path(str(name)).name.replace("\x00", "")
+
     @classmethod
     def create_backup(cls, backup_type: str, name: str = None, description: str = '', admin_user=None) -> Dict[str, Any]:
         """
@@ -71,8 +85,11 @@ class BackupRestoreService:
                 status=Backup.BackupStatus.PENDING
             )
             
-            # Start backup process asynchronously
-            cls._start_backup_process.delay(backup.id)
+            # Start backup process
+            if HAS_CELERY:
+                start_backup_process_task.delay(str(backup.id))
+            else:
+                start_backup_process_task(str(backup.id))
             
             # Log the backup creation
             AuditLoggingService.log_admin_action(
@@ -291,8 +308,11 @@ class BackupRestoreService:
             if backup.status != Backup.BackupStatus.COMPLETED:
                 raise ValueError("Backup is not completed yet")
             
-            # Start restore process asynchronously
-            cls._start_restore_process.delay(backup.id, admin_user.id if admin_user else None)
+            # Start restore process
+            if HAS_CELERY:
+                start_restore_process_task.delay(str(backup.id), admin_user.id if admin_user else None)
+            else:
+                start_restore_process_task(str(backup.id), admin_user.id if admin_user else None)
             
             # Log the restore start
             AuditLoggingService.log_admin_action(
@@ -505,7 +525,8 @@ class BackupRestoreService:
                 json.dump(metadata, f, indent=2)
             
             # Create zip file
-            zip_path = temp_path / f'{backup.name}.zip'
+            safe_backup_name = cls._safe_filename(backup.name)
+            zip_path = cls._ensure_within_base_dir(temp_path / f'{safe_backup_name}.zip', temp_path)
             with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zip_file:
                 for file_path in temp_path.iterdir():
                     if file_path.is_file():
@@ -513,7 +534,7 @@ class BackupRestoreService:
             
             # Save backup file
             with open(zip_path, 'rb') as f:
-                backup.file.save(f'{backup.name}.zip', ContentFile(f.read()), save=False)
+                backup.file.save(f'{safe_backup_name}.zip', ContentFile(f.read()), save=False)
             
             # Complete backup
             file_size = zip_path.stat().st_size
@@ -530,13 +551,14 @@ class BackupRestoreService:
             cls._export_users_to_json(users_backup_path)
             
             # Create zip file
-            zip_path = temp_path / f'{backup.name}.zip'
+            safe_backup_name = cls._safe_filename(backup.name)
+            zip_path = cls._ensure_within_base_dir(temp_path / f'{safe_backup_name}.zip', temp_path)
             with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zip_file:
                 zip_file.write(users_backup_path, 'users_backup.json')
             
             # Save backup file
             with open(zip_path, 'rb') as f:
-                backup.file.save(f'{backup.name}.zip', ContentFile(f.read()), save=False)
+                backup.file.save(f'{safe_backup_name}.zip', ContentFile(f.read()), save=False)
             
             # Complete backup
             file_size = zip_path.stat().st_size
@@ -553,13 +575,14 @@ class BackupRestoreService:
             cls._export_chats_to_json(chats_backup_path)
             
             # Create zip file
-            zip_path = temp_path / f'{backup.name}.zip'
+            safe_backup_name = cls._safe_filename(backup.name)
+            zip_path = cls._ensure_within_base_dir(temp_path / f'{safe_backup_name}.zip', temp_path)
             with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zip_file:
                 zip_file.write(chats_backup_path, 'chats_backup.json')
             
             # Save backup file
             with open(zip_path, 'rb') as f:
-                backup.file.save(f'{backup.name}.zip', ContentFile(f.read()), save=False)
+                backup.file.save(f'{safe_backup_name}.zip', ContentFile(f.read()), save=False)
             
             # Complete backup
             file_size = zip_path.stat().st_size
@@ -576,13 +599,14 @@ class BackupRestoreService:
             cls._export_messages_to_json(messages_backup_path)
             
             # Create zip file
-            zip_path = temp_path / f'{backup.name}.zip'
+            safe_backup_name = cls._safe_filename(backup.name)
+            zip_path = cls._ensure_within_base_dir(temp_path / f'{safe_backup_name}.zip', temp_path)
             with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zip_file:
                 zip_file.write(messages_backup_path, 'messages_backup.json')
             
             # Save backup file
             with open(zip_path, 'rb') as f:
-                backup.file.save(f'{backup.name}.zip', ContentFile(f.read()), save=False)
+                backup.file.save(f'{safe_backup_name}.zip', ContentFile(f.read()), save=False)
             
             # Complete backup
             file_size = zip_path.stat().st_size
@@ -592,6 +616,8 @@ class BackupRestoreService:
     def _export_database_to_json(cls, output_path: Path):
         """Export entire database to JSON format."""
         from django.apps import apps
+
+        output_path = cls._ensure_within_base_dir(Path(output_path), Path(tempfile.gettempdir()))
         
         data = {}
         for model in apps.get_models():
@@ -633,6 +659,8 @@ class BackupRestoreService:
     def _export_users_to_json(cls, output_path: Path):
         """Export users data to JSON format."""
         from users.models import User
+
+        output_path = cls._ensure_within_base_dir(Path(output_path), Path(tempfile.gettempdir()))
         
         users_data = []
         for user in User.objects.all():
@@ -659,6 +687,8 @@ class BackupRestoreService:
     def _export_chats_to_json(cls, output_path: Path):
         """Export chats data to JSON format."""
         from chat.models import Conversation, Group, GroupMember
+
+        output_path = cls._ensure_within_base_dir(Path(output_path), Path(tempfile.gettempdir()))
         
         data = {
             'conversations': [],
@@ -710,6 +740,8 @@ class BackupRestoreService:
     def _export_messages_to_json(cls, output_path: Path):
         """Export messages data to JSON format."""
         from chat.models import Message
+
+        output_path = cls._ensure_within_base_dir(Path(output_path), Path(tempfile.gettempdir()))
         
         messages_data = []
         for message in Message.objects.all():
@@ -734,6 +766,7 @@ class BackupRestoreService:
     def _backup_media_files(cls, output_path: Path):
         """Backup media files."""
         media_root = Path(settings.MEDIA_ROOT)
+        output_path = cls._ensure_within_base_dir(Path(output_path), Path(tempfile.gettempdir()))
         if media_root.exists():
             shutil.copytree(media_root, output_path, dirs_exist_ok=True)
     
@@ -768,19 +801,74 @@ class BackupRestoreService:
         return expected_files.get(backup_type, [])
     
     @classmethod
+    def _safe_extract_zipfile(cls, zip_path: Path, extract_dir: Path, *, max_total_uncompressed_bytes: int = 2 * 1024 * 1024 * 1024) -> List[str]:
+        extract_dir.mkdir(parents=True, exist_ok=True)
+        extracted: List[str] = []
+        total_size = 0
+
+        with zipfile.ZipFile(zip_path, 'r') as zip_file:
+            for info in zip_file.infolist():
+                member_name = info.filename
+                if not member_name or member_name.endswith('/'):
+                    continue
+
+                total_size += int(getattr(info, 'file_size', 0) or 0)
+                if total_size > max_total_uncompressed_bytes:
+                    raise ValueError("Backup archive too large")
+
+                target_path = cls._ensure_within_base_dir(extract_dir / member_name, extract_dir)
+                target_path.parent.mkdir(parents=True, exist_ok=True)
+                with zip_file.open(info, 'r') as src, open(target_path, 'wb') as dst:
+                    shutil.copyfileobj(src, dst)
+
+                extracted.append(member_name)
+
+        return extracted
+    
+    @classmethod
     def _start_restore_process(cls, backup_id: str, admin_user_id: int = None):
         """Start the restore process asynchronously."""
         try:
-            # This would implement the restore logic
-            # For now, we'll just log that restore was attempted
-            logger.info(f"Restore process started for backup {backup_id}")
+            backup = Backup.objects.get(id=backup_id)
             
-            # In a real implementation, you would:
-            # 1. Download/extract the backup file
-            # 2. Validate the backup structure
-            # 3. Restore database data
-            # 4. Restore media files
-            # 5. Update system configuration if needed
+            if not backup.file:
+                raise ValueError("Backup file not found")
+
+            file_path = Path(backup.file.path)
+            if not file_path.exists():
+                raise ValueError("Backup file does not exist on disk")
+
+            logger.info(f"Restore process started for backup {backup_id}")
+
+            with tempfile.TemporaryDirectory() as temp_dir:
+                extract_dir = Path(temp_dir) / 'extracted'
+                extracted_files = cls._safe_extract_zipfile(file_path, extract_dir)
+
+                expected_files = cls._get_expected_files_for_backup_type(backup.backup_type)
+                missing_files = [f for f in expected_files if f not in extracted_files]
+                if missing_files:
+                    raise ValueError(f"Backup is missing expected files: {missing_files}")
+
+                if backup.backup_type == Backup.BackupType.FULL:
+                    media_dir = extract_dir / 'media_files'
+                    if media_dir.exists() and not media_dir.is_dir():
+                        raise ValueError("Invalid media_files entry in backup")
+
+            if admin_user_id:
+                from django.contrib.auth import get_user_model
+                User = get_user_model()
+                admin_user = User.objects.get(id=admin_user_id)
+                AuditLoggingService.log_admin_action(
+                    action_type=AuditLog.ActionType.BACKUP_RESTORED,
+                    description=f'Backup restore validated successfully: {backup.name}',
+                    admin_user=admin_user,
+                    metadata={
+                        'backup_id': str(backup.id),
+                        'backup_type': backup.backup_type,
+                        'validated_only': True,
+                    },
+                    category='backup'
+                )
             
         except Exception as e:
             logger.error(f"Error in restore process for {backup_id}: {str(e)}")
@@ -800,6 +888,16 @@ class BackupRestoreService:
                     severity=AuditLog.SeverityLevel.CRITICAL,
                     category='backup'
                 )
+
+
+@shared_task
+def start_backup_process_task(backup_id: str):
+    BackupRestoreService._start_backup_process(backup_id)
+
+
+@shared_task
+def start_restore_process_task(backup_id: str, admin_user_id: int = None):
+    BackupRestoreService._start_restore_process(backup_id, admin_user_id)
 
 
 @shared_task

@@ -84,6 +84,7 @@ export const UnifiedChatInterface = ({ initialConversationId }: { initialConvers
   const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  const [showMembersDialog, setShowMembersDialog] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const formRef = useRef<HTMLFormElement>(null);
@@ -422,10 +423,13 @@ export const UnifiedChatInterface = ({ initialConversationId }: { initialConvers
                 </div>
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
                   {currentConversation.type === 'group' ? (
-                    <>
+                    <button
+                      onClick={() => setShowMembersDialog(true)}
+                      className="flex items-center gap-2 hover:text-primary hover:underline cursor-pointer"
+                    >
                       <Users className="h-4 w-4" />
                       <span>{currentConversation.participants.length} {t('chat.members')}</span>
-                    </>
+                    </button>
                   ) : (
                     <div className="flex items-center gap-2">
                       <div 
@@ -781,6 +785,35 @@ export const UnifiedChatInterface = ({ initialConversationId }: { initialConvers
         searchGroups={chat.searchGroups}
         searchConversations={chat.searchConversations}
       />
+
+      {currentConversation.type === 'group' && (
+        <Dialog open={showMembersDialog} onOpenChange={setShowMembersDialog}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Users className="h-5 w-5" />
+                Group Members ({currentConversation.participants.length})
+              </DialogTitle>
+            </DialogHeader>
+            <ScrollArea className="h-96">
+              <div className="space-y-2 pr-4">
+                {currentConversation.participants.map((member) => (
+                  <div key={member.id} className="flex items-center gap-3 p-3 rounded-lg hover:bg-muted/50">
+                    <Avatar className="h-10 w-10">
+                      <AvatarImage src={member.avatar} />
+                      <AvatarFallback>{member.username.slice(0, 2).toUpperCase()}</AvatarFallback>
+                    </Avatar>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium text-sm truncate">{member.username}</p>
+                      <p className="text-xs text-muted-foreground capitalize">{member.status}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </ScrollArea>
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   );
 };

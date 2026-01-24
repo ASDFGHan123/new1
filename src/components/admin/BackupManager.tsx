@@ -30,9 +30,7 @@ export const BackupManager = ({ detailed = false }: BackupManagerProps) => {
   });
   const [isBackingUp, setIsBackingUp] = React.useState(false);
   const [progress, setProgress] = React.useState(0);
-  const [recentBackups, setRecentBackups] = React.useState([
-    { date: new Date().toISOString().split('T')[0], size: "0 MB", status: "pending" }
-  ]);
+  const [recentBackups, setRecentBackups] = React.useState<any[]>([]);
 
   useEffect(() => {
     checkBackupSetting();
@@ -61,6 +59,24 @@ export const BackupManager = ({ detailed = false }: BackupManagerProps) => {
       }
     } catch (error) {
       console.error('Failed to check backup setting:', error);
+    }
+  };
+
+  const loadRecentBackups = async () => {
+    try {
+      const resp = await apiService.httpRequest<any>('/admin/backups/');
+      if (resp.success && resp.data) {
+        const raw = (resp.data.results || resp.data) as any[];
+        const mapped = raw.slice(0, 5).map((b: any) => ({
+          date: (b.created_at ? String(b.created_at).split('T')[0] : new Date().toISOString().split('T')[0]),
+          size: b.size_mb != null ? `${b.size_mb} MB` : (b.file_size ? `${(Number(b.file_size) / (1024 * 1024)).toFixed(1)} MB` : '0 MB'),
+          status: b.status || '',
+          id: b.id,
+        }));
+        setRecentBackups(mapped as any);
+      }
+    } catch (e) {
+      console.error('Failed to load backups:', e);
     }
   };
 
@@ -189,9 +205,15 @@ export const BackupManager = ({ detailed = false }: BackupManagerProps) => {
     }
 
     try {
-      const logsResponse = await apiService.httpRequest('/admin/audit-logs/');
+      const logsResponse = await apiService.httpRequest<any>('/admin/audit-logs/');
       health.auditLogs.status = logsResponse.success ? 'healthy' : 'error';
-      health.auditLogs.count = logsResponse.success ? logsResponse.data?.length || 0 : 0;
+      const logsData = logsResponse.data;
+      const logsCount = Array.isArray(logsData)
+        ? logsData.length
+        : Array.isArray(logsData?.results)
+          ? logsData.results.length
+          : 0;
+      health.auditLogs.count = logsResponse.success ? logsCount : 0;
     } catch (error) {
       health.auditLogs.status = 'error';
     }
@@ -205,95 +227,40 @@ export const BackupManager = ({ detailed = false }: BackupManagerProps) => {
     setIsBackingUp(true);
     setProgress(0);
     setShowFormatDialog(false);
-    
-    const backupData = {
-      timestamp: new Date().toISOString(),
-      month: selectedMonth,
-      types: backupTypes,
-      systemHealth: {},
-      data: {}
-    };
-
     try {
-      // Step 1: Check system health (20%)
-      setProgress(5);
-      backupData.systemHealth = await checkSystemHealth();
-      setProgress(20);
+      setProgress(10);
 
-      // Step 2: Backup users (35%)
-      if (backupTypes.users) {
-        const usersResponse = await apiService.getUsers();
-        backupData.data.users = usersResponse.success ? usersResponse.data : [];
+      const anySettingsOrLogs = backupTypes.settings || backupTypes.logs;
+      let backupType: string = 'full';
+      if (!anySettingsOrLogs) {
+        if (backupTypes.users && !backupTypes.messages) backupType = 'users';
+        else if (!backupTypes.users && backupTypes.messages) backupType = 'messages';
+        else backupType = 'full';
       }
-      setProgress(35);
 
-      // Step 3: Backup conversations (50%)
-      backupData.data.conversations = [];
-      setProgress(50);
+      const createResp = await apiService.httpRequest<any>('/admin/backups/', {
+        method: 'POST',
+        body: JSON.stringify({
+          name: `Backup_${selectedMonth}_${new Date().toISOString().split('T')[0]}`,
+          description: `Backup (${selectedMonth})`,
+          backup_type: backupType,
+        })
+      });
 
-      // Step 4: Backup settings (65%)
-      if (backupTypes.settings) {
-        const settingsResponse = await apiService.httpRequest('/admin/settings/');
-        backupData.data.settings = settingsResponse.success ? settingsResponse.data : [];
+      if (!createResp.success) {
+        throw new Error(createResp.error || 'Failed to create backup');
       }
-      setProgress(65);
 
-      // Step 5: Backup audit logs (80%)
-      if (backupTypes.logs) {
-        const logsResponse = await apiService.httpRequest('/admin/audit-logs/');
-        backupData.data.auditLogs = logsResponse.success ? logsResponse.data : [];
-      }
-      setProgress(80);
-
-      // Step 6: Backup messages (95%)
-      if (backupTypes.messages) {
-        backupData.data.messages = [];
-      }
-      setProgress(95);
+      setProgress(90);
+      await loadRecentBackups();
+      setProgress(100);
     } catch (error) {
-      console.error('Error fetching backup data:', error);
-      backupData.data.error = 'Failed to fetch some data';
+      console.error('Backup failed:', error);
+    } finally {
+      await new Promise(resolve => setTimeout(resolve, 300));
+      setIsBackingUp(false);
+      setProgress(0);
     }
-    
-    setProgress(100);
-    
-    let fileContent: any;
-    let mimeType: string;
-    let fileExtension: string;
-
-    if (format === 'json') {
-      fileContent = JSON.stringify(backupData, null, 2);
-      mimeType = 'application/json';
-      fileExtension = 'json';
-    } else if (format === 'csv') {
-      fileContent = convertToCSV(backupData);
-      mimeType = 'text/csv';
-      fileExtension = 'csv';
-    } else if (format === 'xml') {
-      fileContent = convertToXML(backupData);
-      mimeType = 'application/xml';
-      fileExtension = 'xml';
-    } else if (format === 'pdf') {
-      fileContent = convertToPDF(backupData);
-      mimeType = 'application/pdf';
-      fileExtension = 'pdf';
-    } else {
-      fileContent = JSON.stringify(backupData, null, 2);
-      mimeType = 'application/json';
-      fileExtension = 'json';
-    }
-    
-    const blob = new Blob([fileContent], { type: mimeType });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `offchat-backup-${selectedMonth}-${new Date().toISOString().split('T')[0]}.${fileExtension}`;
-    a.click();
-    URL.revokeObjectURL(url);
-    
-    await new Promise(resolve => setTimeout(resolve, 500));
-    setIsBackingUp(false);
-    setProgress(0);
   };
 
   const updateBackupType = (key: keyof typeof backupTypes, value: boolean) => {
@@ -301,29 +268,7 @@ export const BackupManager = ({ detailed = false }: BackupManagerProps) => {
   };
 
   React.useEffect(() => {
-    const generateBackupHistory = async () => {
-      try {
-        const usersResponse = await apiService.getUsers();
-        const userCount = usersResponse.success ? usersResponse.data?.length || 0 : 0;
-        const estimatedSize = Math.max(0.1, userCount * 0.2);
-        
-        const backups = [];
-        for (let i = 0; i < 5; i++) {
-          const date = new Date();
-          date.setDate(date.getDate() - (i * 5));
-          backups.push({
-            date: date.toISOString().split('T')[0],
-            size: `${(estimatedSize + Math.random() * 0.5).toFixed(1)} MB`,
-            status: i === 0 ? "completed" : "completed"
-          });
-        }
-        setRecentBackups(backups);
-      } catch (error) {
-        console.error('Failed to generate backup history:', error);
-      }
-    };
-    
-    generateBackupHistory();
+    loadRecentBackups();
   }, []);
 
   const handlePrintBackup = () => {
@@ -332,7 +277,7 @@ export const BackupManager = ({ detailed = false }: BackupManagerProps) => {
       lastBackup: lastBackup?.date || new Date().toISOString().split('T')[0],
       nextScheduled: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
       size: lastBackup?.size || "0 MB",
-      status: lastBackup?.status || "pending",
+      status: lastBackup?.status || "",
       dataTypes: {
         users: backupTypes.users,
         messages: backupTypes.messages,

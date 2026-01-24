@@ -1,4 +1,5 @@
-from django.core.management.base import BaseCommand
+import os
+from django.core.management.base import BaseCommand, CommandError
 from django.utils import timezone
 from users.models import User, SuspiciousActivity
 from datetime import timedelta
@@ -8,6 +9,9 @@ class Command(BaseCommand):
     help = 'Insert test data for moderation panel'
 
     def handle(self, *args, **options):
+        if os.environ.get('OFFCHAT_ALLOW_SEED_SCRIPTS') != '1':
+            raise CommandError('Refusing to insert test/demo data. Set OFFCHAT_ALLOW_SEED_SCRIPTS=1 to explicitly allow.')
+
         # Create test users with report_count > 0
         test_users = [
             {

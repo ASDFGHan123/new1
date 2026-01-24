@@ -2,7 +2,7 @@ import React, { useState, useRef } from 'react';
 import { Upload, Camera, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
-import { apiService } from '@/lib/api';
+import { apiService, API_BASE_URL } from '@/lib/api';
 
 interface ProfileImageUploadProps {
   currentImage?: string;
@@ -22,11 +22,12 @@ export const ProfileImageUpload: React.FC<ProfileImageUploadProps> = ({
   onClose
 }) => {
   const displayUsername = username || user?.username || 'Admin';
+  const serverBaseUrl = API_BASE_URL.replace(/\/?api\/?$/, '');
   const [isDragging, setIsDragging] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [imageUrl, setImageUrl] = useState<string | undefined>(
     currentImage?.startsWith('http') ? currentImage : 
-    currentImage ? `http://localhost:8000${currentImage}` : undefined
+    currentImage ? `${serverBaseUrl}${currentImage}` : undefined
   );
   const [imageError, setImageError] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -89,7 +90,7 @@ export const ProfileImageUpload: React.FC<ProfileImageUploadProps> = ({
       
       if (response.success && response.data) {
         const avatarUrl = response.data.avatar_url;
-        const fullUrl = avatarUrl?.startsWith('http') ? avatarUrl : `http://localhost:8000${avatarUrl}`;
+        const fullUrl = avatarUrl?.startsWith('http') ? avatarUrl : `${serverBaseUrl}${avatarUrl}`;
         const cacheBustedUrl = `${fullUrl}?t=${Date.now()}`;
         console.log('Setting new image URL:', cacheBustedUrl);
         setImageUrl(cacheBustedUrl);
@@ -173,18 +174,16 @@ export const ProfileImageUpload: React.FC<ProfileImageUploadProps> = ({
       />
 
       {/* Upload button */}
-      {isOpen !== false && (
-        <Button
-          variant="outline"
-          size="sm"
-          className="mt-2 w-full"
-          onClick={handleClick}
-          disabled={isUploading}
-        >
-          <Upload className="w-4 h-4 mr-2" />
-          {isUploading ? 'Uploading...' : 'Change Photo'}
-        </Button>
-      )}
+      <Button
+        variant="outline"
+        size="sm"
+        className="mt-2 w-full"
+        onClick={handleClick}
+        disabled={isUploading}
+      >
+        <Upload className="w-4 h-4 mr-2" />
+        {isUploading ? 'Uploading...' : 'Change Photo'}
+      </Button>
     </div>
   );
 };

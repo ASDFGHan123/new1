@@ -170,18 +170,19 @@ class AuditLog(models.Model):
         metadata=None
     ):
         """Create a new audit log entry."""
+        from utils.json_utils import prepare_metadata
         return cls.objects.create(
             action_type=action_type,
             description=description,
             actor=actor,
             target_type=target_type,
-            target_id=target_id,
+            target_id=str(target_id) if target_id else None,
             severity=severity,
             category=category,
             ip_address=ip_address,
             user_agent=user_agent,
             session_id=session_id,
-            metadata=metadata or {}
+            metadata=prepare_metadata(metadata or {})
         )
 
 
@@ -232,12 +233,13 @@ class Trash(models.Model):
     @classmethod
     def move_to_trash(cls, item_type, item_id, deleted_by, delete_reason='', item_data=None):
         """Move an item to trash."""
+        from utils.json_utils import prepare_metadata
         return cls.objects.create(
             item_type=item_type,
             item_id=str(item_id),
             deleted_by=deleted_by,
             delete_reason=delete_reason,
-            item_data=item_data or {}
+            item_data=prepare_metadata(item_data or {})
         )
 
 
@@ -370,6 +372,81 @@ class SystemSettings(models.Model):
     
     def __str__(self):
         return f"{self.key} = {self.value[:50]}"
+
+
+class MessageTemplate(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    name = models.CharField(max_length=200)
+    content = models.TextField()
+    category = models.CharField(max_length=100, blank=True)
+    usage_count = models.PositiveIntegerField(default=0)
+    created_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='message_templates'
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'message_templates'
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['category']),
+            models.Index(fields=['created_at']),
+        ]
+
+    def __str__(self):
+        return self.name
+
+
+class AdminOutgoingMessage(models.Model):
+    class MessageType(models.TextChoices):
+        SYSTEM = 'system', 'System'
+        BROADCAST = 'broadcast', 'Broadcast'
+        TARGETED = 'targeted', 'Targeted'
+
+    class MessageStatus(models.TextChoices):
+        SENT = 'sent', 'Sent'
+        DELIVERED = 'delivered', 'Delivered'
+        FAILED = 'failed', 'Failed'
+
+    class MessagePriority(models.TextChoices):
+        LOW = 'low', 'Low'
+        NORMAL = 'normal', 'Normal'
+        HIGH = 'high', 'High'
+        URGENT = 'urgent', 'Urgent'
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    type = models.CharField(max_length=20, choices=MessageType.choices)
+    content = models.TextField()
+    recipients = models.JSONField(default=list, blank=True)
+    recipient_count = models.PositiveIntegerField(default=0)
+    sent_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='admin_outgoing_messages'
+    )
+    sent_at = models.DateTimeField(auto_now_add=True)
+    status = models.CharField(max_length=20, choices=MessageStatus.choices, default=MessageStatus.SENT)
+    priority = models.CharField(max_length=20, choices=MessagePriority.choices, default=MessagePriority.NORMAL)
+
+    class Meta:
+        db_table = 'admin_outgoing_messages'
+        ordering = ['-sent_at']
+        indexes = [
+            models.Index(fields=['type']),
+            models.Index(fields=['status']),
+            models.Index(fields=['priority']),
+            models.Index(fields=['sent_at']),
+        ]
+
+    def __str__(self):
+        return f"{self.type}: {self.content[:50]}"
 
 
 

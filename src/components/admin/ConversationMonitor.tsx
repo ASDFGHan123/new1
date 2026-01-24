@@ -51,6 +51,7 @@ import {
 import { useState, useEffect } from "react";
 import { openPrintWindow, generateConversationReportHTML } from "@/lib/printUtils";
 import { ParticipantRow } from "./ParticipantRow";
+import { apiService } from "@/lib/api";
 
 interface Message {
   id: string;
@@ -92,20 +93,11 @@ export const ConversationMonitor = ({ onTrashConversation }: ConversationMonitor
   const fetchConversations = async () => {
     setLoading(true);
     try {
-      let token = localStorage.getItem('admin_access_token');
-      if (!token) {
-        token = localStorage.getItem('chat_access_token');
+      const resp = await apiService.httpRequest<any>('/admin/conversations/');
+      if (!resp.success) {
+        throw new Error(resp.error || 'Failed to load conversations');
       }
-      if (!token) {
-        token = localStorage.getItem('access_token');
-      }
-      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-      if (token) {
-        headers['Authorization'] = `Bearer ${token}`;
-      }
-      const response = await fetch('http://localhost:8000/api/admin/conversations/', { headers });
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
-      const data = await response.json();
+      const data = resp.data;
       
       let results = [];
       if (Array.isArray(data)) {
@@ -223,18 +215,9 @@ export const ConversationMonitor = ({ onTrashConversation }: ConversationMonitor
 
   const handleViewMessageHistory = async (conversation: any) => {
     try {
-      let token = localStorage.getItem('admin_access_token');
-      if (!token) {
-        token = localStorage.getItem('chat_access_token');
-      }
-      if (!token) {
-        token = localStorage.getItem('access_token');
-      }
-      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-      if (token) headers['Authorization'] = `Bearer ${token}`;
-      const res = await fetch(`http://localhost:8000/api/chat/conversations/${conversation.id}/messages/`, { headers });
-      if (res.ok) {
-        const data = await res.json();
+      const resp = await apiService.httpRequest<any>(`/chat/conversations/${conversation.id}/messages/`);
+      if (resp.success) {
+        const data = resp.data;
         const msgList = Array.isArray(data) ? data : (data.results || []);
         const messages = msgList.map((msg: any) => ({
           id: msg.id || '',
@@ -255,19 +238,9 @@ export const ConversationMonitor = ({ onTrashConversation }: ConversationMonitor
 
   const handleViewParticipants = async (conversation: any) => {
     try {
-      let token = localStorage.getItem('admin_access_token');
-      if (!token) {
-        token = localStorage.getItem('chat_access_token');
-      }
-      if (!token) {
-        token = localStorage.getItem('access_token');
-      }
-      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-      if (token) headers['Authorization'] = `Bearer ${token}`;
-      const res = await fetch(`http://localhost:8000/api/chat/conversations/${conversation.id}/`, { headers });
-      if (res.ok) {
-        const data = await res.json();
-        const participants = Array.isArray(data.participants) ? data.participants : (conversation.participantsList || []);
+      const resp = await apiService.httpRequest<any>(`/chat/conversations/${conversation.id}/`);
+      if (resp.success && resp.data) {
+        const participants = Array.isArray(resp.data.participants) ? resp.data.participants : (conversation.participantsList || []);
         setSelectedParticipants(participants);
       } else {
         setSelectedParticipants(conversation.participantsList || []);
@@ -291,22 +264,8 @@ export const ConversationMonitor = ({ onTrashConversation }: ConversationMonitor
 
     if (action === "delete") {
       try {
-        let token = localStorage.getItem('admin_access_token');
-        if (!token) {
-          token = localStorage.getItem('chat_access_token');
-        }
-        if (!token) {
-          token = localStorage.getItem('access_token');
-        }
-        const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-        if (token) {
-          headers['Authorization'] = `Bearer ${token}`;
-        }
-        const response = await fetch(`http://localhost:8000/api/chat/conversations/${conversationToModerate.id}/`, {
-          method: 'DELETE',
-          headers
-        });
-        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const resp = await apiService.deleteConversation(String(conversationToModerate.id));
+        if (!resp.success) throw new Error(resp.error || 'Failed to delete conversation');
         
         setConversations(prev => prev.filter(conv => conv.id !== conversationToModerate.id));
         if (onTrashConversation) {
@@ -360,7 +319,7 @@ export const ConversationMonitor = ({ onTrashConversation }: ConversationMonitor
   };
 
   const handlePrintConversations = () => {
-    const lang = i18n.language as 'en' | 'ps' | 'da';
+    const lang = i18n.language as any;
     const printData = generateConversationReportHTML(filteredAndSortedConversations, lang);
     openPrintWindow({
       ...printData,

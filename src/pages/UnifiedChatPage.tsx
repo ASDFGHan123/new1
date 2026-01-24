@@ -20,10 +20,7 @@ export const UnifiedChatPage = () => {
   const handleLogin = async (identifier: string, password: string) => {
     try {
       setAuthRetries(0);
-      const result = await login({ identifier, password });
-      if (!result?.success) {
-        throw new Error(result?.error || 'Login failed');
-      }
+      await login({ identifier, password });
     } catch (error) {
       console.error('Login error:', error);
       throw error; // Re-throw to be handled by LoginForm
@@ -33,10 +30,7 @@ export const UnifiedChatPage = () => {
   const handleSignup = async (username: string, password: string) => {
     try {
       setAuthRetries(0);
-      const result = await signup({ username, email: username, password, confirmPassword: password });
-      if (!result?.success) {
-        throw new Error(result?.error || 'Signup failed');
-      }
+      await signup({ username, email: username, password, confirmPassword: password });
     } catch (error) {
       console.error('Signup error:', error);
       throw error; // Re-throw to be handled by LoginForm

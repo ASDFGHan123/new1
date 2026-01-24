@@ -46,6 +46,7 @@ class TrashItem(models.Model):
     
     def restore(self):
         """Restore item from trash."""
+        from utils.json_utils import prepare_metadata
         if self.item_type == 'user':
             user = User.objects.get(id=self.item_id)
             user.is_active = True
