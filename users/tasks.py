@@ -2,18 +2,18 @@
 Celery tasks for user management.
 """
 from celery import shared_task
-from users.services.simple_online_status import mark_inactive_users_offline
+from django.core.management import call_command
 import logging
 
 logger = logging.getLogger(__name__)
 
 
 @shared_task
-def check_and_mark_offline_users():
-    """Celery task to check and mark inactive users as offline. Runs every minute."""
+def cleanup_online_status():
+    """Mark users as offline if no heartbeat for 20 seconds."""
     try:
-        count = mark_inactive_users_offline()
-        return f"Marked {count} users as offline"
+        out = call_command('cleanup_online_status')
+        return out
     except Exception as e:
-        logger.error(f"Error in check_and_mark_offline_users task: {str(e)}")
+        logger.error(f"Error in cleanup_online_status task: {str(e)}")
         return f"Error: {str(e)}"

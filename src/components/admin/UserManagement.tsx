@@ -13,6 +13,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { UserManagementTable } from "./UserManagementTable";
+import { usePermissions } from "@/contexts/PermissionsContext";
 import { ModeratorAssignment } from "./ModeratorAssignment";
 import { openPrintWindow, generateUserListHTML } from "@/lib/printUtils";
 import { apiService, type User } from "@/lib/api";
@@ -33,6 +34,7 @@ interface UserManagementProps {
 export const UserManagement = React.memo(({ users: propUsers = [], approveUser, rejectUser, addUser, updateUser, forceLogoutUser, deleteUser, onUserDeleted }: UserManagementProps) => {
   const { t } = useTranslation();
   const { toast } = useToast();
+  const { can } = usePermissions();
   
   const [users, setUsers] = useState<User[]>(propUsers);
   const [loading, setLoading] = useState(true);
@@ -841,6 +843,7 @@ export const UserManagement = React.memo(({ users: propUsers = [], approveUser, 
                 filteredUsers={filteredUsers}
                 userDepartments={userDepartments}
                 actionLoading={actionLoading}
+                can={can}
                 onApprove={approveUserInternal}
                 onReject={rejectUserInternal}
                 onEdit={handleEditUser}

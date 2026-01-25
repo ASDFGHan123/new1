@@ -37,6 +37,7 @@ import { Label } from "@/components/ui/label";
 import { useState, useEffect } from "react";
 import { Loader2 } from "lucide-react";
 import { apiService } from "@/lib/api";
+import { usePermissions } from "@/contexts/PermissionsContext";
 
 const getSeverityColor = (severity: string) => {
   switch (severity) {
@@ -62,6 +63,7 @@ const getSeverityBg = (severity: string) => {
 
 export const AuditLogs = () => {
   const { t } = useTranslation();
+  const { can } = usePermissions();
   const [auditLogs, setAuditLogs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
@@ -70,6 +72,18 @@ export const AuditLogs = () => {
   const [selectedLog, setSelectedLog] = useState<any | null>(null);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const itemsPerPage = 10;
+
+  // If user cannot view audit logs, show access denied
+  if (!can('view_audit_logs')) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Audit Logs</CardTitle>
+          <CardDescription>You do not have permission to view audit logs.</CardDescription>
+        </CardHeader>
+      </Card>
+    );
+  }
 
   useEffect(() => {
     fetchAuditLogs();

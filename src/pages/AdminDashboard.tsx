@@ -1,5 +1,6 @@
 import React, { useEffect } from 'react';
 import { AdminProvider, useAdmin } from '@/contexts/AdminContext';
+import { PermissionsProvider } from '@/contexts/PermissionsContext';
 import { AdminDashboardLayout } from '@/components/admin/AdminDashboardLayout';
 import { User as ApiUser, apiService } from '@/lib/api';
 import type { Role, Conversation, MessageTemplate } from '@/contexts/AdminContext';
@@ -21,6 +22,7 @@ interface AdminDashboardProps {
 
 function AdminDashboardContent({ user, onLogout }: AdminDashboardProps) {
   const { dispatch } = useAdmin();
+  console.log('[AdminDashboard] Rendering with user:', user?.username, user?.role);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -77,7 +79,9 @@ function AdminDashboardContent({ user, onLogout }: AdminDashboardProps) {
 const AdminDashboard = (props: AdminDashboardProps) => {
   return (
     <AdminProvider>
-      <AdminDashboardContent {...props} />
+      <PermissionsProvider>
+        <AdminDashboardContent {...props} />
+      </PermissionsProvider>
     </AdminProvider>
   );
 };

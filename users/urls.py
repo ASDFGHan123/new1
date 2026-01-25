@@ -4,7 +4,6 @@ URL configuration for users app.
 from django.urls import path
 from rest_framework_simplejwt.views import (
     TokenObtainPairView,
-    TokenRefreshView,
     TokenVerifyView,
 )
 from rest_framework.routers import DefaultRouter
@@ -16,10 +15,13 @@ from .views import user_management_views
 from .views.simple_users_view import get_all_users_with_status
 from .views.status_refresh_view import refresh_user_status_view
 from .views.debug_heartbeat_view import debug_user_heartbeat_view
+from .views.heartbeat_views import HeartbeatView
 from .trash_views import TrashViewSet
 from .notification_views import NotificationViewSet
 from .organization_views import DepartmentViewSet, OfficeViewSet, DepartmentOfficeUserViewSet
 from . import data_tools_views
+from .views.token_views import TokenVersionRefreshView
+from users.moderator_views import ModeratorViewSet
 
 class PermissionSerializer(serializers.ModelSerializer):
     class Meta:
@@ -50,13 +52,15 @@ router.register(r'notifications', NotificationViewSet, basename='notification')
 router.register(r'departments', DepartmentViewSet, basename='department')
 router.register(r'offices', OfficeViewSet, basename='office')
 router.register(r'department-office-users', DepartmentOfficeUserViewSet, basename='department_office_user')
+router.register(r'moderators', ModeratorViewSet, basename='moderator')
 
 urlpatterns = router.urls + [
     # Authentication endpoints
     path('register/', views.RegisterView.as_view(), name='register'),
     path('login/', views.LoginView.as_view(), name='login'),
     path('logout/', views.LogoutView.as_view(), name='logout'),
-    path('refresh/', TokenRefreshView.as_view(), name='token_refresh'),
+    path('logout-all-devices/', views.LogoutAllDevicesView.as_view(), name='logout_all_devices'),
+    path('refresh/', TokenVersionRefreshView.as_view(), name='token_refresh'),
     path('verify/', TokenVerifyView.as_view(), name='token_verify'),
     
     # User management endpoints
@@ -67,7 +71,7 @@ urlpatterns = router.urls + [
     path('statistics/', views.UserStatisticsView.as_view(), name='user_statistics'),
     
     # Online status endpoints
-    path('heartbeat/', user_management_views.user_heartbeat_view, name='user_heartbeat'),
+    path('heartbeat/', HeartbeatView.as_view(), name='heartbeat'),
     path('refresh-status/', refresh_user_status_view, name='refresh_user_status'),
     path('debug/heartbeat/<str:username>/', debug_user_heartbeat_view, name='debug_user_heartbeat'),
     path('all-users/', get_all_users_with_status, name='get_all_users_with_status'),

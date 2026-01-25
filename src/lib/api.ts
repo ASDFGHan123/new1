@@ -534,6 +534,40 @@ class ApiService {
     return { data: undefined, success: true };
   }
 
+  async logoutAllDevices(): Promise<ApiResponse<void>> {
+    try {
+      await this.request('/auth/logout-all-devices/', {
+        method: 'POST',
+      });
+    } catch (error) {
+      console.warn('Server logout-all-devices failed, clearing tokens locally:', error);
+    } finally {
+      this.authToken = null;
+      this.refreshToken = null;
+      this.refreshPromise = null;
+
+      if (typeof window !== 'undefined') {
+        sessionStorage.removeItem('access_token');
+        sessionStorage.removeItem('refresh_token');
+        sessionStorage.removeItem('offchat_user');
+        localStorage.removeItem('access_token');
+        localStorage.removeItem('refresh_token');
+        localStorage.removeItem('offchat_user');
+
+        sessionStorage.removeItem('chat_access_token');
+        sessionStorage.removeItem('chat_refresh_token');
+        sessionStorage.removeItem('admin_access_token');
+        sessionStorage.removeItem('admin_refresh_token');
+        localStorage.removeItem('chat_access_token');
+        localStorage.removeItem('chat_refresh_token');
+        localStorage.removeItem('admin_access_token');
+        localStorage.removeItem('admin_refresh_token');
+      }
+    }
+
+    return { data: undefined, success: true };
+  }
+
   initializeAuth() {
     if (typeof window !== 'undefined') {
       // Try chat token first (for chat app)

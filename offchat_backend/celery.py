@@ -13,9 +13,9 @@ app.autodiscover_tasks()
 
 # Celery Beat Schedule - Periodic Tasks
 app.conf.beat_schedule = {
-    'check-offline-users': {
-        'task': 'users.tasks.check_and_mark_offline_users',
-        'schedule': crontab(minute='*/1'),  # Run every minute
+    'cleanup-online-status': {
+        'task': 'users.tasks.cleanup_online_status',
+        'schedule': 10.0,  # Run every 10 seconds
     },
 }
 

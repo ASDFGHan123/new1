@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -53,16 +54,17 @@ export const UnifiedSidebar = ({
   onCreateIndividualChat,
   onDeleteConversation
 }: UnifiedSidebarProps) => {
+  const { t } = useTranslation();
   const [searchTerm, setSearchTerm] = useState("");
   const [showCreateGroup, setShowCreateGroup] = useState(false);
 
   const getConversationTitle = (conversation: Conversation) => {
     if (conversation.type === 'group') {
-      return conversation.groupName || "Unnamed Group";
+      return conversation.groupName || t('chat.unnamedGroup');
     } else {
       const otherUser = conversation.participants?.find(p => String(p.id) !== String(currentUser.id));
       if (otherUser?.username) return otherUser.username;
-      return "Unknown User";
+      return t('chat.unknownUser');
     }
   };
 
@@ -78,10 +80,10 @@ export const UnifiedSidebar = ({
   });
 
   const formatLastMessage = (conversation: Conversation) => {
-    if (!conversation.lastMessage) return "No messages yet";
+    if (!conversation.lastMessage) return t('chat.noMessagesYet');
     
     const message = conversation.lastMessage;
-    const senderName = 'senderName' in message ? message.senderName : 'Unknown';
+    const senderName = 'senderName' in message ? message.senderName : t('common.unknown');
     const content = message.content;
     
     if (content.length > 50) {
@@ -96,12 +98,12 @@ export const UnifiedSidebar = ({
     
     if (diffInHours < 1) {
       const diffInMinutes = Math.floor(diffInHours * 60);
-      return diffInMinutes < 1 ? "Just now" : `${diffInMinutes}m ago`;
+      return diffInMinutes < 1 ? t('common.justNow') : t('common.minutesAgo', { count: diffInMinutes });
     } else if (diffInHours < 24) {
-      return `${Math.floor(diffInHours)}h ago`;
+      return t('common.hoursAgo', { count: Math.floor(diffInHours) });
     } else {
       const diffInDays = Math.floor(diffInHours / 24);
-      return `${diffInDays}d ago`;
+      return t('common.daysAgo', { count: diffInDays });
     }
   };
 
@@ -156,7 +158,7 @@ export const UnifiedSidebar = ({
           </Avatar>
           <div className="flex-1">
             <h3 className="font-semibold">{currentUser.username}</h3>
-            <p className="text-sm text-muted-foreground">Online</p>
+            <p className="text-sm text-muted-foreground">{t('users.online')}</p>
           </div>
         </div>
         
@@ -168,7 +170,7 @@ export const UnifiedSidebar = ({
             onClick={onSearchOpen}
           >
             <Search className="h-4 w-4 mr-2" />
-            Search
+            {t('common.search')}
           </Button>
           <Button
             variant="outline"
@@ -185,7 +187,7 @@ export const UnifiedSidebar = ({
         <div className="relative">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
-            placeholder="Search conversations..."
+            placeholder={t('chat.searchConversations')}
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="pl-10"
@@ -200,11 +202,11 @@ export const UnifiedSidebar = ({
             <div className="text-center py-8">
               <MessageCircle className="h-12 w-12 mx-auto mb-3 text-muted-foreground opacity-50" />
               <p className="text-sm text-muted-foreground">
-                {searchTerm ? "No conversations found" : "No conversations yet"}
+                {searchTerm ? t('chat.noConversationsFound') : t('chat.noConversationsYet')}
               </p>
               {!searchTerm && (
                 <p className="text-xs text-muted-foreground mt-1">
-                  Start by searching for users or creating a group
+                  {t('chat.startBySearchingOrCreatingGroup')}
                 </p>
               )}
             </div>

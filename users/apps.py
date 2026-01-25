@@ -8,3 +8,4 @@ class UsersConfig(AppConfig):
     def ready(self):
         import users.signals
         import users.admin_activity_signals
+        import users.moderator_signals

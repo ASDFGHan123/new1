@@ -11,6 +11,7 @@ import { AuthProvider } from "@/contexts/AuthContext";
 import { NotificationProvider } from "@/hooks/useNotifications";
 import { useRTL } from "@/hooks/useRTL";
 import { usePresenceTracking } from "@/hooks/usePresenceTracking";
+import { useHeartbeat } from "@/hooks/useHeartbeat";
 import { apiService, User, Conversation, MessageTemplate, Role } from "@/lib/api";
 
 // Initialize auth tokens from localStorage on app start
@@ -63,7 +64,6 @@ const queryClient = new QueryClient();
     const { t } = useTranslation();
     useRTL();
     usePresenceTracking();
-    const heartbeatIntervalRef = useRef<NodeJS.Timeout | null>(null);
     const refreshIntervalRef = useRef<NodeJS.Timeout | null>(null);
     
   // Admin force logout user
@@ -128,28 +128,18 @@ const queryClient = new QueryClient();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Heartbeat effect
-  useEffect(() => {
-    const token = localStorage.getItem('admin_access_token');
-    if (!token || !user) return;
+  // Automatic online tracking via heartbeat (10s interval, visibility-aware)
+  useHeartbeat(!!user);
 
-    const sendHeartbeat = async () => {
-      try {
-        await apiService.httpRequest('/users/heartbeat/', { method: 'POST' });
-      } catch (error) {
-        console.error('Heartbeat error:', error);
+  // Mark offline immediately when page unloads
+  useEffect(() => {
+    const handleUnload = () => {
+      if (user) {
+        navigator.sendBeacon('/api/users/heartbeat/', JSON.stringify({ logout: true }));
       }
     };
-
-    // Send initial heartbeat immediately
-    sendHeartbeat();
-
-    // Send heartbeat every 30 seconds
-    heartbeatIntervalRef.current = setInterval(sendHeartbeat, 30000);
-
-    return () => {
-      if (heartbeatIntervalRef.current) clearInterval(heartbeatIntervalRef.current);
-    };
+    window.addEventListener('beforeunload', handleUnload);
+    return () => window.removeEventListener('beforeunload', handleUnload);
   }, [user]);
 
   // Load users from API
@@ -182,7 +172,7 @@ const queryClient = new QueryClient();
 
   // Initial load and auto-refresh
   useEffect(() => {
-    if (user && user.role === 'admin') {
+    if (user && ["admin", "moderator"].includes(user.role || "")) {
       setLoading(true);
       loadUsers().finally(() => setLoading(false));
 
@@ -277,7 +267,6 @@ const queryClient = new QueryClient();
     localStorage.removeItem('admin_access_token');
     localStorage.removeItem('admin_refresh_token');
     localStorage.removeItem('admin_user');
-    if (heartbeatIntervalRef.current) clearInterval(heartbeatIntervalRef.current);
     if (refreshIntervalRef.current) clearInterval(refreshIntervalRef.current);
     setUser(null);
   };
@@ -291,8 +280,8 @@ const queryClient = new QueryClient();
         const userData = response.data;
         console.log('Login response user:', userData.user);
         
-        if (userData.user.role !== "admin" && !userData.user.is_staff) {
-          throw new Error("Access denied. Admin privileges required.");
+        if (!["admin", "moderator"].includes(userData.user.role) && !userData.user.is_staff) {
+          throw new Error("Access denied. Admin or moderator privileges required.");
         }
         
         localStorage.setItem('admin_access_token', userData.access);
@@ -479,7 +468,7 @@ const queryClient = new QueryClient();
         <Route path="/" element={<UnifiedChatPage />} />
         <Route path="/admin-login" element={<AdminLogin onLogin={handleAdminLogin} />} />
         <Route path="/admin" element={
-          user && user.role === "admin" ? (
+          user && ["admin", "moderator"].includes(user.role || "") ? (
             <AdminDashboard
               user={user}
               onLogout={handleLogout}

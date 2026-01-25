@@ -23,10 +23,16 @@ class IsModeratorOrAdmin(permissions.BasePermission):
     """Permission check for moderator or admin."""
     
     def has_permission(self, request, view):
-        return request.user and (
-            request.user.role in ['admin', 'moderator'] and 
-            request.user.is_authenticated
+        if not getattr(request, 'user', None) or not request.user.is_authenticated:
+            return False
+
+        is_admin = (
+            getattr(request.user, 'is_superuser', False)
+            or getattr(request.user, 'is_staff', False)
+            or getattr(request.user, 'role', None) == 'admin'
         )
+        is_moderator = getattr(request.user, 'role', None) == 'moderator'
+        return is_admin or is_moderator
 
 
 class ModeratorViewSet(viewsets.ModelViewSet):

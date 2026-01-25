@@ -126,6 +126,8 @@ class User(AbstractBaseUser, PermissionsMixin):
     # Email verification
     email_verified = models.BooleanField(default=False)
     email_verification_token = models.CharField(max_length=255, blank=True)
+
+    token_version = models.PositiveIntegerField(default=0)
     
     # Admin flags
     is_staff = models.BooleanField(default=False)

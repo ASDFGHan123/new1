@@ -5,6 +5,9 @@ Defines all moderator capabilities and permission checks.
 from django.contrib.auth import get_user_model
 from django.db import models
 from admin_panel.models import AuditLog
+import logging
+
+logger = logging.getLogger(__name__)
 
 User = get_user_model()
 
@@ -299,26 +302,41 @@ class ModeratorPermissionHelper:
     @staticmethod
     def assign_moderator_role(user, role_type='junior'):
         """Assign moderator role to a user."""
+        logger.info(f"Assigning moderator role {role_type} to user {user.username}")
         if user.role != 'moderator':
             user.role = 'moderator'
             user.save(update_fields=['role'])
         
-        role = ModeratorPermissionHelper.create_moderator_role(role_type)
+        try:
+            role = ModeratorPermissionHelper.create_moderator_role(role_type)
+        except Exception as e:
+            logger.error(f"Failed to create moderator role {role_type}: {e}")
+            raise
         
-        profile, created = ModeratorProfile.objects.get_or_create(user=user)
+        try:
+            profile, created = ModeratorProfile.objects.get_or_create(user=user)
+        except Exception as e:
+            logger.error(f"Failed to get/create ModeratorProfile for {user.username}: {e}")
+            raise
+        
+        logger.info(f"ModeratorProfile created={created} for user {user.username}")
+
         profile.role = role
         profile.is_active_moderator = True
         profile.save()
         
         # Log the action
-        AuditLog.log_action(
-            action_type=AuditLog.ActionType.ROLE_CHANGED,
-            description=f'User {user.username} assigned as {role_type} moderator',
-            actor=None,
-            target_type=AuditLog.TargetType.USER,
-            target_id=str(user.id),
-            severity=AuditLog.SeverityLevel.WARNING
-        )
+        try:
+            AuditLog.log_action(
+                action_type=AuditLog.ActionType.ROLE_CHANGED,
+                description=f'User {user.username} assigned as {role_type} moderator',
+                actor=None,
+                target_type=AuditLog.TargetType.USER,
+                target_id=str(user.id),
+                severity=AuditLog.SeverityLevel.WARNING
+            )
+        except Exception as e:
+            logger.warning(f"Failed to log audit for moderator assignment: {e}")
         
         return profile
     

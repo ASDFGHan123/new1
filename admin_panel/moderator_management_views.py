@@ -15,7 +15,15 @@ User = get_user_model()
 class IsAdmin(permissions.BasePermission):
     """Permission check for admin only."""
     def has_permission(self, request, view):
-        return request.user and request.user.role == 'admin' and request.user.is_authenticated
+        return (
+            bool(getattr(request, 'user', None))
+            and request.user.is_authenticated
+            and (
+                getattr(request.user, 'is_superuser', False)
+                or getattr(request.user, 'is_staff', False)
+                or getattr(request.user, 'role', None) == 'admin'
+            )
+        )
 
 
 class AdminModeratorViewSet(viewsets.ViewSet):

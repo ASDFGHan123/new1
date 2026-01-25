@@ -1,0 +1,57 @@
+{
+  "reports": {
+    "generated": "Generated",
+    "system": "System",
+    "offchat": "OffChat Admin Dashboard",
+    "confidential": "© 2026 OffChat Admin Dashboard - Confidential Report",
+    "date": "Report Date",
+    "period": "Report Period",
+    "users": "User Management Report",
+    "analytics": "Message Analytics Report",
+    "audit": "Audit Logs Report",
+    "trash": "Trash Management Report",
+    "backup": "Backup Status Report",
+    "summary": "Summary",
+    "totalItems": "Total Items",
+    "activeItems": "Active Items",
+    "inactiveItems": "Inactive Items"
+  },
+  "tables": {
+    "title": "Title",
+    "type": "Type",
+    "participants": "Participants",
+    "messages": "Messages",
+    "status": "Status",
+    "lastactivity": "Last activity",
+    "username": "Username",
+    "email": "Email",
+    "role": "Role",
+    "joindate": "Join date",
+    "action": "Action",
+    "actor": "Actor",
+    "timestamp": "Timestamp",
+    "description": "Description",
+    "severity": "Severity",
+    "content": "Content",
+    "recipients": "Recipients",
+    "priority": "Priority",
+    "sentAt": "Sent at",
+    "deletedAt": "Deleted at",
+    "details": "Details"
+  },
+  "stats": {
+    "totalUsers": "Total users",
+    "activeUsers": "Active users",
+    "suspendedUsers": "Suspended users",
+    "bannedUsers": "Banned users",
+    "totalMessages": "Total messages",
+    "todayMessages": "Today's messages",
+    "averageMessages": "Average messages"
+  },
+  "conversations": {
+    "title": "Conversation Report",
+    "monitoring": "Conversation Monitoring Report",
+    "total": "Total conversations",
+    "active": "Active conversations"
+  }
+}

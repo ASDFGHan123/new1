@@ -35,6 +35,13 @@ class BlacklistValidatingJWTAuthentication(JWTAuthentication):
             
             # Get the user associated with the token
             user = self.get_user(validated_token)
+
+            token_version = validated_token.get('tv')
+            if token_version is None:
+                raise InvalidToken('Invalid token')
+
+            if int(token_version) != int(getattr(user, 'token_version', 0)):
+                raise InvalidToken('Token revoked')
             
             return user, validated_token
             

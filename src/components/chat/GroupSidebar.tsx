@@ -1,9 +1,11 @@
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
+
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -17,13 +19,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { 
-  Users, 
-  Search, 
-  Plus, 
-  Settings, 
-  MessageCircle, 
-  Hash, 
+import {
+  Users,
+  Search,
+  Plus,
+  Settings,
+  MessageCircle,
+  Hash,
   Lock,
   Globe,
   MoreVertical,
@@ -33,7 +35,7 @@ import {
   MessageSquare,
   Crown,
   Shield,
-  User
+  User,
 } from "lucide-react";
 import { Group, User as UserType, GroupFilters } from "@/types/group";
 import { CreateGroupDialog } from "./CreateGroupDialog";
@@ -65,25 +67,31 @@ export const GroupSidebar = ({
   onAddMembers,
   onRemoveMember,
   onLeaveGroup,
-  onDeleteGroup
+  onDeleteGroup,
 }: GroupSidebarProps) => {
+  const { t } = useTranslation();
   const [searchTerm, setSearchTerm] = useState("");
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [filters, setFilters] = useState<GroupFilters>({
     sortBy: "lastActivity",
     sortOrder: "desc",
     showPrivate: true,
-    showPublic: true
+    showPublic: true,
   });
   const [showFilters, setShowFilters] = useState(false);
   const [showMembersDialog, setShowMembersDialog] = useState(false);
-  const [selectedGroupForMembers, setSelectedGroupForMembers] = useState<Group | null>(null);
+  const [selectedGroupForMembers, setSelectedGroupForMembers] = useState<
+    Group | null
+  >(null);
 
   const filteredGroups = groups
-    .filter(group => {
+    .filter((group) => {
       // Search filter
-      if (searchTerm && !group.name.toLowerCase().includes(searchTerm.toLowerCase()) &&
-          !group.description?.toLowerCase().includes(searchTerm.toLowerCase())) {
+      if (
+        searchTerm &&
+        !group.name.toLowerCase().includes(searchTerm.toLowerCase()) &&
+        !group.description?.toLowerCase().includes(searchTerm.toLowerCase())
+      ) {
         return false;
       }
 
@@ -106,10 +114,13 @@ export const GroupSidebar = ({
           comparison = a.name.localeCompare(b.name);
           break;
         case "lastActivity":
-          comparison = new Date(b.lastActivity || 0).getTime() - new Date(a.lastActivity || 0).getTime();
+          comparison =
+            new Date(b.lastActivity || 0).getTime() -
+            new Date(a.lastActivity || 0).getTime();
           break;
         case "created":
-          comparison = new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+          comparison =
+            new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
           break;
         case "members":
           comparison = a.members.length - b.members.length;
@@ -122,11 +133,16 @@ export const GroupSidebar = ({
     });
 
   const getGroupIcon = (group: Group) => {
-    return group.isPrivate ? <Lock className="h-4 w-4" /> : <Globe className="h-4 w-4" />;
+    return group.isPrivate ? (
+      <Lock className="h-4 w-4" />
+    ) : (
+      <Globe className="h-4 w-4" />
+    );
   };
 
   const getRoleForUser = (group: Group) => {
-    return group.members.find(m => m.userId === currentUser.id)?.role || "member";
+    return group.members.find((m) => m.userId === currentUser.id)?.role ||
+      "member";
   };
 
   const isAdmin = (group: Group) => getRoleForUser(group) === "admin";
@@ -139,10 +155,10 @@ export const GroupSidebar = ({
     const hours = Math.floor(minutes / 60);
     const days = Math.floor(hours / 24);
 
-    if (minutes < 1) return "Just now";
-    if (minutes < 60) return `${minutes}m ago`;
-    if (hours < 24) return `${hours}h ago`;
-    if (days < 7) return `${days}d ago`;
+    if (minutes < 1) return t("common.justNow");
+    if (minutes < 60) return t("common.minutesAgo", { count: minutes });
+    if (hours < 24) return t("common.hoursAgo", { count: hours });
+    if (days < 7) return t("common.daysAgo", { count: days });
     return date.toLocaleDateString();
   };
 
@@ -153,8 +169,9 @@ export const GroupSidebar = ({
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
             <Users className="h-5 w-5 text-primary" />
-            <h2 className="text-lg font-semibold">Groups</h2>
+            <h2 className="text-lg font-semibold">{t("chat.groups")}</h2>
           </div>
+
           <CreateGroupDialog
             currentUser={currentUser}
             availableUsers={availableUsers}
@@ -173,7 +190,7 @@ export const GroupSidebar = ({
           <Input
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            placeholder="Search groups..."
+            placeholder={t("chat.searchGroups")}
             className="pl-10 h-9"
           />
         </div>
@@ -184,34 +201,44 @@ export const GroupSidebar = ({
             <DropdownMenuTrigger asChild>
               <Button variant="outline" size="sm" className="h-8">
                 <Filter className="h-4 w-4 mr-1" />
-                Filters
+                {t("chat.filters")}
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-56">
               <div className="p-3 space-y-3">
                 <div>
-                  <label className="text-sm font-medium">Sort by</label>
+                  <label className="text-sm font-medium">{t("chat.sortBy")}</label>
                   <Select
                     value={filters.sortBy}
-                    onValueChange={(value: any) => setFilters(prev => ({ ...prev, sortBy: value }))}
+                    onValueChange={(value: any) =>
+                      setFilters((prev) => ({ ...prev, sortBy: value }))
+                    }
                   >
                     <SelectTrigger className="w-full mt-1">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="name">Name</SelectItem>
-                      <SelectItem value="lastActivity">Last Activity</SelectItem>
-                      <SelectItem value="created">Date Created</SelectItem>
-                      <SelectItem value="members">Member Count</SelectItem>
+                      <SelectItem value="name">{t("common.name")}</SelectItem>
+                      <SelectItem value="lastActivity">
+                        {t("chat.lastActivity")}
+                      </SelectItem>
+                      <SelectItem value="created">
+                        {t("chat.dateCreated")}
+                      </SelectItem>
+                      <SelectItem value="members">
+                        {t("chat.memberCount")}
+                      </SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
 
                 <div>
-                  <label className="text-sm font-medium">Order</label>
+                  <label className="text-sm font-medium">{t("chat.order")}</label>
                   <Select
                     value={filters.sortOrder}
-                    onValueChange={(value: any) => setFilters(prev => ({ ...prev, sortOrder: value }))}
+                    onValueChange={(value: any) =>
+                      setFilters((prev) => ({ ...prev, sortOrder: value }))
+                    }
                   >
                     <SelectTrigger className="w-full mt-1">
                       <SelectValue />
@@ -220,13 +247,13 @@ export const GroupSidebar = ({
                       <SelectItem value="asc">
                         <div className="flex items-center gap-2">
                           <SortAsc className="h-4 w-4" />
-                          Ascending
+                          {t("chat.ascending")}
                         </div>
                       </SelectItem>
                       <SelectItem value="desc">
                         <div className="flex items-center gap-2">
                           <SortDesc className="h-4 w-4" />
-                          Descending
+                          {t("chat.descending")}
                         </div>
                       </SelectItem>
                     </SelectContent>
@@ -234,25 +261,30 @@ export const GroupSidebar = ({
                 </div>
 
                 <div>
-                  <label className="text-sm font-medium">Show</label>
+                  <label className="text-sm font-medium">{t("chat.show")}</label>
                   <div className="flex flex-col gap-2 mt-1">
                     <label className="flex items-center space-x-2">
                       <input
                         type="checkbox"
                         checked={filters.showPublic}
-                        onChange={(e) => setFilters(prev => ({ ...prev, showPublic: e.target.checked }))}
+                        onChange={(e) =>
+                          setFilters((prev) => ({ ...prev, showPublic: e.target.checked }))
+                        }
                         className="rounded"
                       />
-                      <span className="text-sm">Public groups</span>
+                      <span className="text-sm">{t("chat.publicGroups")}</span>
                     </label>
+
                     <label className="flex items-center space-x-2">
                       <input
                         type="checkbox"
                         checked={filters.showPrivate}
-                        onChange={(e) => setFilters(prev => ({ ...prev, showPrivate: e.target.checked }))}
+                        onChange={(e) =>
+                          setFilters((prev) => ({ ...prev, showPrivate: e.target.checked }))
+                        }
                         className="rounded"
                       />
-                      <span className="text-sm">Private groups</span>
+                      <span className="text-sm">{t("chat.privateGroups")}</span>
                     </label>
                   </div>
                 </div>
@@ -261,7 +293,7 @@ export const GroupSidebar = ({
           </DropdownMenu>
 
           <div className="text-xs text-muted-foreground">
-            {filteredGroups.length} of {groups.length}
+            {filteredGroups.length} {t("common.of")} {groups.length}
           </div>
         </div>
       </div>
@@ -272,9 +304,9 @@ export const GroupSidebar = ({
           {filteredGroups.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">
               <Users className="h-12 w-12 mx-auto mb-4 opacity-50" />
-              <p className="text-lg font-medium mb-2">No groups found</p>
+              <p className="text-lg font-medium mb-2">{t("chat.noGroupsFound")}</p>
               <p className="text-sm mb-4">
-                {searchTerm ? "Try adjusting your search" : "Create your first group to get started"}
+                {searchTerm ? t("chat.tryAdjustingSearch") : t("chat.createFirstGroup")}
               </p>
               {!searchTerm && (
                 <CreateGroupDialog
@@ -284,7 +316,7 @@ export const GroupSidebar = ({
                   trigger={
                     <Button size="sm">
                       <Plus className="h-4 w-4 mr-2" />
-                      Create Group
+                      {t("chat.createGroup")}
                     </Button>
                   }
                 />
@@ -340,7 +372,7 @@ export const GroupSidebar = ({
                             setShowMembersDialog(true);
                           }}
                         >
-                          {group.members.length} members
+                          {group.members.length} {t("chat.members")}
                         </button>
                         {group.lastActivity && (
                           <>
@@ -374,7 +406,7 @@ export const GroupSidebar = ({
                             }}
                           >
                             <Users className="h-4 w-4 mr-2" />
-                            View Members
+                            {t("chat.viewMembers")}
                           </DropdownMenuItem>
                           
                           {(isAdmin(group) || isModerator(group)) && (
@@ -390,7 +422,7 @@ export const GroupSidebar = ({
                               trigger={
                                 <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
                                   <Settings className="h-4 w-4 mr-2" />
-                                  Manage Group
+                                  {t("chat.manageGroup")}
                                 </DropdownMenuItem>
                               }
                             />
@@ -401,7 +433,7 @@ export const GroupSidebar = ({
                             className="text-destructive"
                           >
                             <Users className="h-4 w-4 mr-2" />
-                            Leave Group
+                            {t("chat.leaveGroup")}
                           </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
@@ -424,19 +456,19 @@ export const GroupSidebar = ({
         <div className="grid grid-cols-3 gap-4 text-center">
           <div>
             <p className="text-lg font-bold text-primary">{groups.length}</p>
-            <p className="text-xs text-muted-foreground">Total Groups</p>
+            <p className="text-xs text-muted-foreground">{t("chat.totalGroups")}</p>
           </div>
           <div>
             <p className="text-lg font-bold text-primary">
               {groups.filter(g => g.isPrivate).length}
             </p>
-            <p className="text-xs text-muted-foreground">Private</p>
+            <p className="text-xs text-muted-foreground">{t("chat.private")}</p>
           </div>
           <div>
             <p className="text-lg font-bold text-primary">
               {groups.filter(g => g.unreadCount > 0).length}
             </p>
-            <p className="text-xs text-muted-foreground">Unread</p>
+            <p className="text-xs text-muted-foreground">{t("chat.unread")}</p>
           </div>
         </div>
       </div>
@@ -449,3 +481,6 @@ export const GroupSidebar = ({
           onOpenChange={setShowMembersDialog}
         />
       )}
+    </div>
+  );
+};

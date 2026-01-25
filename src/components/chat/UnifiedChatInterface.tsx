@@ -83,11 +83,16 @@ export const UnifiedChatInterface = ({ initialConversationId }: { initialConvers
   const [recordingDuration, setRecordingDuration] = useState(0);
   const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
+  const [micPermissionError, setMicPermissionError] = useState<string | null>(null);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [showMembersDialog, setShowMembersDialog] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const formRef = useRef<HTMLFormElement>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const recordingMimeTypeRef = useRef<string | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
+  const recordingIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   const currentConversation = chat.currentConversation;
 
@@ -116,8 +121,9 @@ export const UnifiedChatInterface = ({ initialConversationId }: { initialConvers
     const filesToSend = [...attachments];
     
     if (audioBlob && audioUrl) {
-      const audioFile = new File([audioBlob], `voice-message-${Date.now()}.webm`, {
-        type: 'audio/webm'
+      const mimeType = recordingMimeTypeRef.current || audioBlob.type || 'audio/ogg';
+      const audioFile = new File([audioBlob], `voice-message-${Date.now()}.ogg`, {
+        type: mimeType
       });
       filesToSend.push(audioFile);
     }
@@ -139,7 +145,7 @@ export const UnifiedChatInterface = ({ initialConversationId }: { initialConvers
       if (conversationId.startsWith('group-')) {
         await chat.editMessage(conversationId, messageId, content);
       } else {
-        const response = await apiService.request(`/chat/messages/${messageId}/`, {
+        const response = await apiService.httpRequest(`/chat/messages/${messageId}/`, {
           method: 'PATCH',
           body: JSON.stringify({ content })
         });
@@ -166,7 +172,7 @@ export const UnifiedChatInterface = ({ initialConversationId }: { initialConvers
       if (conversationId.startsWith('group-')) {
         chat.deleteMessage(conversationId, messageId);
       } else {
-        const response = await apiService.request(`/chat/messages/${messageId}/`, {
+        const response = await apiService.httpRequest(`/chat/messages/${messageId}/`, {
           method: 'DELETE'
         });
         
@@ -299,13 +305,69 @@ export const UnifiedChatInterface = ({ initialConversationId }: { initialConvers
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
-  const startRecording = () => {
-    setIsRecording(true);
-    setRecordingDuration(0);
+  const startRecording = async () => {
+    setMicPermissionError(null);
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true
+        }
+      });
+
+      const preferredTypes = [
+        'audio/ogg;codecs=opus',
+        'audio/ogg'
+      ];
+      const supportedType = preferredTypes.find((t) =>
+        typeof MediaRecorder !== 'undefined' && MediaRecorder.isTypeSupported(t)
+      );
+
+      if (!supportedType) {
+        stream.getTracks().forEach(track => track.stop());
+        setMicPermissionError('Voice recording is not supported in this browser (no supported audio format: ogg).');
+        return;
+      }
+
+      recordingMimeTypeRef.current = supportedType;
+      const mediaRecorder = new MediaRecorder(stream, { mimeType: supportedType });
+      mediaRecorderRef.current = mediaRecorder;
+      audioChunksRef.current = [];
+
+      mediaRecorder.ondataavailable = (event) => {
+        audioChunksRef.current.push(event.data);
+      };
+
+      mediaRecorder.onstop = () => {
+        const blob = new Blob(audioChunksRef.current, { type: recordingMimeTypeRef.current || 'audio/ogg' });
+        setAudioBlob(blob);
+        setAudioUrl(URL.createObjectURL(blob));
+        stream.getTracks().forEach(track => track.stop());
+      };
+
+      mediaRecorder.start();
+      setIsRecording(true);
+      setRecordingDuration(0);
+
+      recordingIntervalRef.current = setInterval(() => {
+        setRecordingDuration((prev) => prev + 1);
+      }, 1000);
+    } catch (error) {
+      console.error('Error accessing microphone:', error);
+      setMicPermissionError('Microphone access denied. Please enable microphone permissions in your browser settings.');
+    }
   };
 
   const stopRecording = () => {
+    if (mediaRecorderRef.current && isRecording) {
+      mediaRecorderRef.current.stop();
+    }
     setIsRecording(false);
+    if (recordingIntervalRef.current) {
+      clearInterval(recordingIntervalRef.current);
+      recordingIntervalRef.current = null;
+    }
   };
 
   const cancelRecording = () => {
@@ -313,6 +375,11 @@ export const UnifiedChatInterface = ({ initialConversationId }: { initialConvers
     setAudioBlob(null);
     setAudioUrl(null);
     setRecordingDuration(0);
+    recordingMimeTypeRef.current = null;
+    if (recordingIntervalRef.current) {
+      clearInterval(recordingIntervalRef.current);
+      recordingIntervalRef.current = null;
+    }
   };
 
   if (!currentConversation) {
@@ -735,7 +802,7 @@ export const UnifiedChatInterface = ({ initialConversationId }: { initialConvers
                 multiple
                 onChange={(e) => addFiles(e.target.files)}
                 className="hidden"
-                accept="image/*,application/pdf,.doc,.docx,.txt"
+                accept="image/jpeg,image/png,image/gif,image/webp,audio/mpeg,audio/wav,audio/ogg,video/mp4,video/webm,video/ogg,application/pdf,text/plain,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-powerpoint,application/vnd.openxmlformats-officedocument.presentationml.presentation"
               />
               <Button
                 type="button"

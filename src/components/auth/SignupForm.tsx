@@ -137,87 +137,87 @@ export const SignupForm = ({ onToggleMode, onSignup }: SignupFormProps) => {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="firstName">First Name</Label>
+              <Label htmlFor="firstName">{t('auth.firstName')}</Label>
               <Input
                 id="firstName"
                 type="text"
-                placeholder="Enter first name"
+                placeholder={t('auth.enterFirstName')}
                 value={firstName}
                 onChange={(e) => setFirstName(e.target.value)}
                 className="transition-all duration-300 focus:shadow-glow"
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="lastName">Last Name</Label>
+              <Label htmlFor="lastName">{t('auth.lastName')}</Label>
               <Input
                 id="lastName"
                 type="text"
-                placeholder="Enter last name"
+                placeholder={t('auth.enterLastName')}
                 value={lastName}
                 onChange={(e) => setLastName(e.target.value)}
                 className="transition-all duration-300 focus:shadow-glow"
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="fatherName">Father Name</Label>
+              <Label htmlFor="fatherName">{t('auth.fatherName')}</Label>
               <Input
                 id="fatherName"
                 type="text"
-                placeholder="Enter father name"
+                placeholder={t('auth.enterFatherName')}
                 value={fatherName}
                 onChange={(e) => setFatherName(e.target.value)}
                 className="transition-all duration-300 focus:shadow-glow"
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="position">Position</Label>
+              <Label htmlFor="position">{t('auth.position')}</Label>
               <Input
                 id="position"
                 type="text"
-                placeholder="Enter position"
+                placeholder={t('auth.enterPosition')}
                 value={position}
                 onChange={(e) => setPosition(e.target.value)}
                 className="transition-all duration-300 focus:shadow-glow"
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="phoneNumber">Phone Number</Label>
+              <Label htmlFor="phoneNumber">{t('auth.phoneNumber')}</Label>
               <Input
                 id="phoneNumber"
                 type="tel"
-                placeholder="Enter phone number"
+                placeholder={t('auth.enterPhoneNumber')}
                 value={phoneNumber}
                 onChange={(e) => setPhoneNumber(e.target.value)}
                 className="transition-all duration-300 focus:shadow-glow"
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="idCardNumber">ID Card Number</Label>
+              <Label htmlFor="idCardNumber">{t('auth.idCardNumber')}</Label>
               <Input
                 id="idCardNumber"
                 type="text"
-                placeholder="Enter ID card number"
+                placeholder={t('auth.enterIdCardNumber')}
                 value={idCardNumber}
                 onChange={(e) => setIdCardNumber(e.target.value)}
                 className="transition-all duration-300 focus:shadow-glow"
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="nationalIdCardNumber">National ID Card Number</Label>
+              <Label htmlFor="nationalIdCardNumber">{t('auth.nationalIdCardNumber')}</Label>
               <Input
                 id="nationalIdCardNumber"
                 type="text"
-                placeholder="Enter national ID card number"
+                placeholder={t('auth.enterNationalIdCardNumber')}
                 value={nationalIdCardNumber}
                 onChange={(e) => setNationalIdCardNumber(e.target.value)}
                 className="transition-all duration-300 focus:shadow-glow"
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="description">Description</Label>
+              <Label htmlFor="description">{t('auth.description')}</Label>
               <textarea
                 id="description"
-                placeholder="Enter description"
+                placeholder={t('auth.enterDescription')}
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 className="w-full px-3 py-2 border border-input rounded-md bg-background text-foreground transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-primary"
@@ -252,13 +252,13 @@ export const SignupForm = ({ onToggleMode, onSignup }: SignupFormProps) => {
               </div>
             </div>
             <div className="space-y-2">
-              <Label>Department & Office (Optional)</Label>
+              <Label>{t('auth.departmentOfficeOptional')}</Label>
               <select
                 value={selectedDept}
                 onChange={(e) => setSelectedDept(e.target.value)}
                 className="w-full px-3 py-2 border border-input rounded-md bg-background text-foreground transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-primary"
               >
-                <option value="">Select a department</option>
+                <option value="">{t('auth.selectDepartment')}</option>
                 {departments.map((dept) => (
                   <option key={dept.id} value={dept.id}>{dept.name}</option>
                 ))}
@@ -266,14 +266,14 @@ export const SignupForm = ({ onToggleMode, onSignup }: SignupFormProps) => {
             </div>
             {selectedDept && (
               <div className="space-y-2">
-                <Label htmlFor="office">Office</Label>
+                <Label htmlFor="office">{t('auth.office')}</Label>
                 <select
                   id="office"
                   value={selectedOffice}
                   onChange={(e) => setSelectedOffice(e.target.value)}
                   className="w-full px-3 py-2 border border-input rounded-md bg-background text-foreground transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-primary"
                 >
-                  <option value="">Select an office</option>
+                  <option value="">{t('auth.selectOffice')}</option>
                   {offices.map((office) => (
                     <option key={office.id} value={office.id}>{office.name} - {office.location}</option>
                   ))}

@@ -32,6 +32,11 @@ class PresenceConsumer(AsyncWebsocketConsumer):
             if not self.user:
                 await self.close()
                 return
+
+            token_version = access_token.get('tv')
+            if token_version is None or int(token_version) != int(getattr(self.user, 'token_version', 0)):
+                await self.close()
+                return
         except Exception as e:
             print(f"Token validation error: {e}")
             await self.close()

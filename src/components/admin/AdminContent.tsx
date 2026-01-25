@@ -1,6 +1,7 @@
 import React, { Suspense, useState, useRef, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useAdmin } from '@/contexts/AdminContext';
+import { usePermissions } from '@/contexts/PermissionsContext';
 import { StatsCards } from './StatsCards';
 import { UserManagement } from './UserManagement';
 import { MessageAnalytics } from './MessageAnalytics';
@@ -17,6 +18,7 @@ import { UserAssignmentPanel } from './UserAssignmentPanel';
 import { Button } from '@/components/ui/button';
 import { Loading } from '@/components/ui/loading';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
+import { AlertCircle } from 'lucide-react';
 import { apiService } from '@/lib/api';
 
 // Lazy load heavy components
@@ -40,15 +42,45 @@ interface ProfileUser {
   role?: string;
   online_status?: string;
   last_seen?: string;
+  status?: "online" | "away" | "offline";
 }
 
-export function AdminContent({ user }: AdminContentProps = {}) {
+export function AdminContent({ user }: AdminContentProps) {
   const { t } = useTranslation();
-  const { state } = useAdmin();
+  const { state, dispatch } = useAdmin();
+  const { can, loading: permsLoading } = usePermissions();
+  console.log('[AdminContent] Permissions:', { can: can('view_users'), loading: permsLoading });
+
+  // Debug: manual fetch button
+  const handleFetchPermissions = async () => {
+    console.log('[AdminContent] Manual permissions fetch...');
+    try {
+      const resp = await apiService.httpRequest('/admin/my-permissions/');
+      console.log('[AdminContent] Manual response:', resp);
+    } catch (err) {
+      console.error('[AdminContent] Manual fetch error:', err);
+    }
+  };
+
+  // Debug: force refresh permissions
+  const handleRefreshPermissions = async () => {
+    window.location.reload();
+  };
+
+  // Always show debug button for moderators
+  const DebugButton = () => (
+    <div className="fixed bottom-4 right-4 z-50">
+      <button
+        onClick={handleFetchPermissions}
+        className="px-3 py-2 bg-orange-600 text-white rounded text-sm shadow-lg"
+      >
+        Debug Permissions
+      </button>
+    </div>
+  );
   const [showEditProfile, setShowEditProfile] = useState(false);
-  const trashManagerRef = useRef<{ refresh: () => Promise<void> }>(null);
   const [profileUser, setProfileUser] = useState<ProfileUser | null>(null);
-  const [profileLoading, setProfileLoading] = useState(false);
+  const trashManagerRef = useRef<{ refresh: () => Promise<void> }>(null);
 
   const exportUserData = async (userId: string, options: any) => {
     await apiService.httpRequest('/users/data/export/', {
@@ -70,45 +102,52 @@ export function AdminContent({ user }: AdminContentProps = {}) {
     }
   };
 
+  // Fetch full profile for the profile tab
   useEffect(() => {
-    if (state.activeTab !== 'profile') {
-      return;
+    if (state.activeTab === 'profile' && user?.id && !profileUser) {
+      apiService.httpRequest<ProfileUser>(`/users/profile/`)
+        .then(resp => {
+          if (resp.success && resp.data) {
+            setProfileUser(resp.data);
+          }
+        })
+        .catch(err => {
+          console.error('Failed to load profile:', err);
+        });
     }
-
-    let intervalId: number | undefined;
-    let cancelled = false;
-
-    const loadProfile = async () => {
-      setProfileLoading(true);
-      try {
-        const resp = await apiService.httpRequest<ProfileUser>('/users/profile/');
-        if (!cancelled && resp.success && resp.data) {
-          setProfileUser(resp.data);
-        }
-      } finally {
-        if (!cancelled) {
-          setProfileLoading(false);
-        }
-      }
-    };
-
-    loadProfile();
-    intervalId = window.setInterval(loadProfile, 30000);
-
-    return () => {
-      cancelled = true;
-      if (intervalId) {
-        window.clearInterval(intervalId);
-      }
-    };
-  }, [state.activeTab]);
+  }, [state.activeTab, user?.id, profileUser]);
 
   const renderContent = () => {
+    // Show access denied if permissions are still loading or user has none
+    if (permsLoading) {
+      return <Loading />;
+    }
+    if (!can('view_users') && !can('view_conversations') && !can('view_settings') && !can('view_backups') && !can('view_audit_logs')) {
+      return (
+        <div className="flex items-center justify-center h-full">
+          <div className="text-center space-y-4 max-w-md">
+            <AlertCircle className="w-12 h-12 mx-auto text-muted-foreground" />
+            <h2 className="text-xl font-semibold">Access Denied</h2>
+            <p className="text-muted-foreground">
+              You don’t have permission to access any admin features. Contact an administrator if you believe this is an error.
+            </p>
+            <button onClick={handleFetchPermissions} className="px-4 py-2 bg-blue-600 text-white rounded mr-2">
+              Debug: Fetch Permissions
+            </button>
+            <button onClick={handleRefreshPermissions} className="px-4 py-2 bg-orange-600 text-white rounded">
+              Refresh Page
+            </button>
+          </div>
+        </div>
+      );
+    }
+
     switch (state.activeTab) {
       case 'overview':
         return (
           <div className="space-y-6">
             <StatsCards />
+            <DebugButton />
             <MessageAnalytics />
           </div>
         );
@@ -129,7 +168,7 @@ export function AdminContent({ user }: AdminContentProps = {}) {
           </ErrorBoundary>
         );
       case 'data':
-        const dataUser = profileUser || (user as any);
+        const dataUser = user as any;
         const dataUserId = String(dataUser?.id || '');
         const dataUsername = String(dataUser?.username || '');
         return (
@@ -169,8 +208,9 @@ export function AdminContent({ user }: AdminContentProps = {}) {
       case 'trash':
         return <TrashManager ref={trashManagerRef} />;
       case 'profile':
-        const effectiveUser = profileUser || (user as any);
-        const onlineStatus = (effectiveUser?.online_status || effectiveUser?.status || 'offline') as string;
+        // Use fetched profileUser if available, otherwise fall back to prop user
+        const effectiveUser = (profileUser || user) as ProfileUser;
+        const onlineStatus = effectiveUser?.online_status || effectiveUser?.status || 'offline';
         const statusText =
           onlineStatus === 'online'
             ? t('users.online')
@@ -215,7 +255,7 @@ export function AdminContent({ user }: AdminContentProps = {}) {
                   </div>
                   <div>
                     <label className="text-sm font-medium text-muted-foreground">{t('users.lastActive')}</label>
-                    <p className="text-lg">{profileLoading ? t('common.loading') : lastSeenText}</p>
+                    <p className="text-lg">{lastSeenText}</p>
                   </div>
                   <Button onClick={() => setShowEditProfile(true)} className="mt-4">
                     {t('common.edit')}
@@ -226,7 +266,7 @@ export function AdminContent({ user }: AdminContentProps = {}) {
             <EditProfileDialog
               isOpen={showEditProfile}
               onClose={() => setShowEditProfile(false)}
-              user={effectiveUser}
+              user={effectiveUser as any}
             />
           </div>
         );

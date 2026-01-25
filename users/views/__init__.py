@@ -7,6 +7,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.contrib.auth import authenticate, get_user_model
+from django.db import models
 from django.db.models import Q, Count, Avg
 from django.utils import timezone
 from datetime import timedelta
@@ -80,6 +81,8 @@ class RegisterView(APIView):
             
             # Generate tokens
             refresh = RefreshToken.for_user(user)
+            refresh['tv'] = user.token_version
+            refresh.access_token['tv'] = user.token_version
             
             return Response({
                 'user': UserSerializer(user).data,
@@ -145,11 +148,12 @@ class LoginView(APIView):
                 )
             
             # Mark user online
-            from users.services.simple_online_status import mark_user_online
-            mark_user_online(user.id)
+            user.set_online()
             
             # Generate tokens
             refresh = RefreshToken.for_user(user)
+            refresh['tv'] = user.token_version
+            refresh.access_token['tv'] = user.token_version
             
             return Response({
                 'user': UserSerializer(user).data,
@@ -219,8 +223,7 @@ class LogoutView(APIView):
                     pass
             
             # Update user's online status
-            from users.services.simple_online_status import mark_user_offline
-            mark_user_offline(request.user.id)
+            request.user.set_offline()
             
             # Log user activity
             UserActivity.objects.create(
@@ -247,6 +250,21 @@ class LogoutView(APIView):
         else:
             ip = request.META.get('REMOTE_ADDR')
         return ip
+
+
+class LogoutAllDevicesView(APIView):
+    """Invalidate all JWT sessions for the current user (logout all devices)."""
+
+    def post(self, request):
+        try:
+            request.user.token_version = models.F('token_version') + 1
+            request.user.save(update_fields=['token_version'])
+
+            request.user.set_offline()
+
+            return Response({'message': 'Logged out from all devices'}, status=status.HTTP_200_OK)
+        except Exception:
+            return Response({'error': 'Logout failed'}, status=status.HTTP_400_BAD_REQUEST)
 
 
 class UserProfileView(APIView):
@@ -690,12 +708,11 @@ class AdminForceLogoutView(APIView):
             
             # Invalidate all active sessions
             UserSession.objects.filter(user=user, is_active=True).update(is_active=False)
-            
-            # Delete all active tokens
-            BlacklistedToken.objects.filter(
-                user=user, 
-                expires_at__gt=timezone.now()
-            ).delete()
+
+            # Invalidate all issued JWTs (logout all devices)
+            user.token_version = models.F('token_version') + 1
+            user.save(update_fields=['token_version'])
+            user.refresh_from_db(fields=['token_version'])
             
             # Log admin action
             UserActivity.objects.create(

@@ -3,8 +3,10 @@ Comprehensive user management API views.
 """
 import logging
 import os
+import uuid
 from django.http import JsonResponse
 from django.utils import timezone
+from django.utils.text import get_valid_filename
 from rest_framework import status, permissions
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
@@ -481,21 +483,25 @@ def upload_profile_image_view(request):
         if user.avatar:
             user.avatar.delete(save=False)
         
-        # Write file directly to disk
+        # Write file directly to disk (streaming) to reduce memory usage and latency
         avatar_dir = os.path.join(settings.MEDIA_ROOT, 'avatars')
         os.makedirs(avatar_dir, exist_ok=True)
-        
-        # Sanitize filename
-        filename = image_file.name.replace(' ', '_')
+
+        original_name = get_valid_filename(os.path.basename(image_file.name))
+        _, ext = os.path.splitext(original_name)
+        if not ext:
+            ext = '.jpg'
+        filename = f"{uuid.uuid4().hex}{ext.lower()}"
         file_path = os.path.join(avatar_dir, filename)
-        
-        # Read and write file
+
+        bytes_written = 0
         image_file.seek(0)
-        file_content = image_file.read()
         with open(file_path, 'wb') as f:
-            f.write(file_content)
-        
-        logger.info(f"Wrote {len(file_content)} bytes to {file_path}")
+            for chunk in image_file.chunks():
+                f.write(chunk)
+                bytes_written += len(chunk)
+
+        logger.info(f"Wrote {bytes_written} bytes to {file_path}")
         
         # Update user model with explicit field update
         from django.db.models import F

@@ -11,6 +11,8 @@
             
             # Generate tokens
             refresh = RefreshToken.for_user(user)
+            refresh['tv'] = user.token_version
+            refresh.access_token['tv'] = user.token_version
             
             return Response({
                 'user': UserSerializer(user).data,

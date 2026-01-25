@@ -94,6 +94,7 @@ export const GroupChatInterface = ({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const formRef = useRef<HTMLFormElement>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const recordingMimeTypeRef = useRef<string | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const recordingIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -178,7 +179,7 @@ export const GroupChatInterface = ({
         
         // Call the original callback if provided
         if (onSendMessage) {
-          onSendMessage(currentGroupId, content, attachments);
+          onSendMessage(currentGroupId, content);
         }
       } else {
         throw new Error(response.error || 'Failed to send message');
@@ -199,7 +200,7 @@ export const GroupChatInterface = ({
     
     try {
       // Call the edit message API endpoint
-      const response = await apiService.request(`/chat/messages/${messageId}/`, {
+      const response = await apiService.httpRequest(`/chat/messages/${messageId}/`, {
         method: 'PATCH',
         body: JSON.stringify({ content })
       });
@@ -236,7 +237,7 @@ export const GroupChatInterface = ({
     setDeleteMessageLoading(messageId);
     
     try {
-      const response = await apiService.request(`/chat/messages/${messageId}/`, {
+      const response = await apiService.httpRequest(`/chat/messages/${messageId}/`, {
         method: 'DELETE'
       });
       
@@ -324,7 +325,23 @@ export const GroupChatInterface = ({
           autoGainControl: true
         }
       });
-      const mediaRecorder = new MediaRecorder(stream);
+
+      const preferredTypes = [
+        'audio/ogg;codecs=opus',
+        'audio/ogg',
+      ];
+      const supportedType = preferredTypes.find((t) =>
+        typeof MediaRecorder !== 'undefined' && MediaRecorder.isTypeSupported(t)
+      );
+
+      if (!supportedType) {
+        stream.getTracks().forEach(track => track.stop());
+        setMicPermissionError('Voice recording is not supported in this browser (no supported audio format: ogg).');
+        return;
+      }
+
+      recordingMimeTypeRef.current = supportedType;
+      const mediaRecorder = new MediaRecorder(stream, { mimeType: supportedType });
       mediaRecorderRef.current = mediaRecorder;
       audioChunksRef.current = [];
 
@@ -333,7 +350,7 @@ export const GroupChatInterface = ({
       };
 
       mediaRecorder.onstop = () => {
-        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+        const audioBlob = new Blob(audioChunksRef.current, { type: recordingMimeTypeRef.current || 'audio/ogg' });
         setAudioBlob(audioBlob);
         const audioUrl = URL.createObjectURL(audioBlob);
         setAudioUrl(audioUrl);
@@ -395,6 +412,7 @@ export const GroupChatInterface = ({
     setAudioBlob(null);
     setAudioUrl(null);
     setRecordingDuration(0);
+    recordingMimeTypeRef.current = null;
   };
 
   const formatDuration = (seconds: number) => {
@@ -440,8 +458,9 @@ export const GroupChatInterface = ({
     // Add audio blob to attachments if recording
     if (audioBlob && audioUrl) {
       // Convert audio blob to file for upload
-      const audioFile = new File([audioBlob], `voice-message-${Date.now()}.webm`, {
-        type: 'audio/webm'
+      const mimeType = recordingMimeTypeRef.current || audioBlob.type || 'audio/ogg';
+      const audioFile = new File([audioBlob], `voice-message-${Date.now()}.ogg`, {
+        type: mimeType
       });
       filesToSend.push(audioFile);
     }
@@ -888,7 +907,7 @@ export const GroupChatInterface = ({
               ))}
               {audioBlob && (
                 <div className="flex items-center gap-2 bg-red-50 border border-red-200 px-3 py-2 rounded-lg">
-                  {getFileIcon("Voice Message", "audio/webm")}
+                  {getFileIcon("Voice Message", recordingMimeTypeRef.current || "audio/ogg")}
                   <div className="flex flex-col">
                     <span className="text-sm">Voice Message</span>
                     <span className="text-xs text-red-600">{formatDuration(recordingDuration)}</span>
@@ -959,7 +978,7 @@ export const GroupChatInterface = ({
                     multiple
                     onChange={(e) => addFiles(e.target.files)}
                     className="hidden"
-                    accept="image/*,application/pdf,.doc,.docx,.txt"
+                    accept="image/jpeg,image/png,image/gif,image/webp,audio/mpeg,audio/wav,audio/ogg,video/mp4,video/webm,video/ogg,application/pdf,text/plain,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-powerpoint,application/vnd.openxmlformats-officedocument.presentationml.presentation"
                   />
                   <Button
                     type="button"
@@ -1064,13 +1083,7 @@ export const GroupChatInterface = ({
           </div>
         </DialogContent>
       </Dialog>
+
     </div>
   );
 };
-
-      {/* Members Dialog */}
-      <GroupMembersDialog
-        group={currentGroup}
-        open={showMembersDialog}
-        onOpenChange={setShowMembersDialog}
-      />

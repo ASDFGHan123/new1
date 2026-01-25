@@ -11,6 +11,7 @@ interface UserManagementTableProps {
   filteredUsers: User[];
   userDepartments: { [key: string]: any };
   actionLoading: { [key: string]: boolean };
+  can: (action: string) => boolean;
   onApprove: (userId: string) => void;
   onReject: (userId: string) => void;
   onEdit: (user: User) => void;
@@ -22,6 +23,7 @@ export function UserManagementTable({
   filteredUsers,
   userDepartments,
   actionLoading,
+  can,
   onApprove,
   onReject,
   onEdit,
@@ -100,7 +102,7 @@ export function UserManagementTable({
             </TableCell>
             <TableCell>
               <div className="flex gap-2 flex-wrap">
-                {user.status === "pending" ? (
+                {user.status === "pending" && can('approve_user') ? (
                   <>
                     <Button 
                       size="sm" 
@@ -126,30 +128,36 @@ export function UserManagementTable({
                     </Button>
                   </>
                 ) : null}
-                <Button 
-                  size="sm" 
-                  variant="outline" 
-                  onClick={() => onEdit(user)}
-                  disabled={actionLoading[user.id]}
-                >
-                  Edit
-                </Button>
-                <Button 
-                  size="sm" 
-                  variant="outline" 
-                  onClick={() => onForceLogout(user.id)}
-                  disabled={actionLoading[user.id]}
-                >
-                  Force Logout
-                </Button>
-                <Button 
-                  size="sm" 
-                  variant="destructive" 
-                  onClick={() => onDelete(user.id)}
-                  disabled={actionLoading[user.id]}
-                >
-                  Delete
-                </Button>
+                {can('edit_user') && (
+                  <Button 
+                    size="sm" 
+                    variant="outline" 
+                    onClick={() => onEdit(user)}
+                    disabled={actionLoading[user.id]}
+                  >
+                    Edit
+                  </Button>
+                )}
+                {can('force_logout_user') && (
+                  <Button 
+                    size="sm" 
+                    variant="outline" 
+                    onClick={() => onForceLogout(user.id)}
+                    disabled={actionLoading[user.id]}
+                  >
+                    Force Logout
+                  </Button>
+                )}
+                {can('delete_user') && (
+                  <Button 
+                    size="sm" 
+                    variant="destructive" 
+                    onClick={() => onDelete(user.id)}
+                    disabled={actionLoading[user.id]}
+                  >
+                    Delete
+                  </Button>
+                )}
               </div>
             </TableCell>
           </TableRow>

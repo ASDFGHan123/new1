@@ -1,4 +1,5 @@
 import React from 'react';
+import { useTranslation } from "react-i18next";
 import {
   Dialog,
   DialogContent,
@@ -21,13 +22,15 @@ export const ProfileImageUploadDialog: React.FC<ProfileImageUploadDialogProps> =
   onImageUpdated,
   user
 }) => {
+  const { t } = useTranslation();
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-[400px]">
         <DialogHeader>
-          <DialogTitle>Update Profile Picture</DialogTitle>
+          <DialogTitle>{t('profile.updateProfilePicture')}</DialogTitle>
           <DialogDescription>
-            Upload a new profile picture for your account.
+            {t('profile.uploadNewProfilePictureDescription')}
           </DialogDescription>
         </DialogHeader>
         <div className="flex justify-center py-6">

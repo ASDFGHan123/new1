@@ -111,6 +111,8 @@ def login_view(request):
         
         # Generate tokens
         refresh = RefreshToken.for_user(user)
+        refresh['tv'] = user.token_version
+        refresh.access_token['tv'] = user.token_version
         
         logger.info(f"User logged in: {username}")
         
@@ -159,6 +161,8 @@ def signup_view(request):
         
         # Generate tokens
         refresh = RefreshToken.for_user(user)
+        refresh['tv'] = user.token_version
+        refresh.access_token['tv'] = user.token_version
         
         logger.info(f"New user registered: {username}")
         

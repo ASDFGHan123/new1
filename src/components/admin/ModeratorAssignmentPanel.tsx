@@ -1,6 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { api } from '@/lib/api';
+import { apiService } from '@/lib/api';
 import { useToast } from '@/components/ui/use-toast';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Shield, ShieldOff, Settings, UserPlus } from 'lucide-react';
+import { ModeratorPermissionsManager } from './ModeratorPermissionsManager';
 
 export function ModeratorAssignmentPanel() {
   const [users, setUsers] = useState([]);
@@ -8,6 +13,7 @@ export function ModeratorAssignmentPanel() {
   const [selectedUser, setSelectedUser] = useState(null);
   const [roleType, setRoleType] = useState('junior');
   const [loading, setLoading] = useState(false);
+  const [permissionsUserId, setPermissionsUserId] = useState<string | null>(null);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -17,8 +23,10 @@ export function ModeratorAssignmentPanel() {
 
   const fetchUsers = async () => {
     try {
-      const response = await api.get('/api/users/');
-      setUsers(response.data.filter(u => u.role !== 'admin'));
+      const response = await apiService.httpRequest<{ users: any[] }>('/users/all-users/');
+      if (response.success && response.data?.users) {
+        setUsers(response.data.users.filter((u: any) => u.role !== 'admin'));
+      }
     } catch (error) {
       toast({ title: 'Error', description: 'Failed to load users' });
     }
@@ -26,10 +34,12 @@ export function ModeratorAssignmentPanel() {
 
   const fetchModerators = async () => {
     try {
-      const response = await api.get('/api/admin/moderators/list_moderators/');
-      setModerators(response.data);
+      const response = await apiService.httpRequest<{ moderators: any[] }>('/admin/permissions/moderators/');
+      if (response.success && response.data) {
+        setModerators(response.data.moderators);
+      }
     } catch (error) {
-      console.error('Failed to load moderators');
+      console.error('Failed to load moderators:', error);
     }
   };
 
@@ -41,9 +51,12 @@ export function ModeratorAssignmentPanel() {
 
     setLoading(true);
     try {
-      const response = await api.post('/api/admin/moderators/assign_moderator/', {
-        user_id: selectedUser.id,
-        role_type: roleType
+      const response = await apiService.httpRequest('/admin/moderators/assign_moderator/', {
+        method: 'POST',
+        body: JSON.stringify({
+          user_id: selectedUser.id,
+          role_type: roleType
+        }),
       });
 
       toast({
@@ -58,19 +71,20 @@ export function ModeratorAssignmentPanel() {
     } catch (error) {
       toast({
         title: 'Error',
-        description: error.response?.data?.error || 'Failed to assign moderator'
+        description: (error as any)?.response?.data?.error || 'Failed to assign moderator'
       });
     } finally {
       setLoading(false);
     }
   };
 
-  const handleRemoveModerator = async (userId) => {
+  const handleRemoveModerator = async (userId: string) => {
     if (!window.confirm('Remove moderator role?')) return;
 
     try {
-      await api.post('/api/admin/moderators/remove_moderator/', {
-        user_id: userId
+      await apiService.httpRequest('/admin/moderators/remove_moderator/', {
+        method: 'POST',
+        body: JSON.stringify({ user_id: userId }),
       });
 
       toast({ title: 'Success', description: 'Moderator role removed' });
@@ -83,108 +97,125 @@ export function ModeratorAssignmentPanel() {
 
   const regularUsers = users.filter(u => u.role === 'user');
 
+  if (permissionsUserId) {
+    const moderator = moderators.find(m => m.user_id === permissionsUserId);
+    if (!moderator) return null;
+    return (
+      <ModeratorPermissionsManager
+        userId={permissionsUserId}
+        username={moderator.username}
+        currentPermissions={moderator.permissions || []}
+        onClose={() => setPermissionsUserId(null)}
+        onUpdate={() => {
+          fetchModerators();
+          setPermissionsUserId(null);
+        }}
+      />
+    );
+  }
+
   return (
     <div className="space-y-6">
       {/* Assign Moderator Section */}
-      <div className="bg-white p-6 rounded-lg shadow">
-        <h2 className="text-xl font-bold mb-4">Assign Moderator Role</h2>
-        
-        <div className="space-y-4">
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <UserPlus className="w-5 h-5" />
+            Assign Moderator Role
+          </CardTitle>
+          <CardDescription>Promote a user to moderator with optional permissions.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
           <div>
             <label className="block text-sm font-medium mb-2">Select User</label>
-            <select
-              value={selectedUser?.id || ''}
-              onChange={(e) => {
-                const user = regularUsers.find(u => u.id === e.target.value);
-                setSelectedUser(user);
-              }}
-              className="w-full border rounded px-3 py-2"
-            >
-              <option value="">Choose a user...</option>
-              {regularUsers.map(user => (
-                <option key={user.id} value={user.id}>
-                  {user.username} ({user.email})
-                </option>
-              ))}
-            </select>
+            <Select value={selectedUser?.id || ''} onValueChange={(value) => {
+              const user = regularUsers.find(u => u.id === value);
+              setSelectedUser(user || null);
+            }}>
+              <SelectTrigger>
+                <SelectValue placeholder="Choose a user..." />
+              </SelectTrigger>
+              <SelectContent>
+                {regularUsers.map(user => (
+                  <SelectItem key={user.id} value={user.id}>
+                    {user.username} ({user.email})
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
           <div>
             <label className="block text-sm font-medium mb-2">Role Type</label>
-            <select
-              value={roleType}
-              onChange={(e) => setRoleType(e.target.value)}
-              className="w-full border rounded px-3 py-2"
-            >
-              <option value="junior">Junior Moderator</option>
-              <option value="senior">Senior Moderator</option>
-              <option value="lead">Lead Moderator</option>
-            </select>
+            <Select value={roleType} onValueChange={setRoleType}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="junior">Junior Moderator</SelectItem>
+                <SelectItem value="senior">Senior Moderator</SelectItem>
+                <SelectItem value="lead">Lead Moderator</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
 
-          <div className="bg-blue-50 p-3 rounded text-sm text-blue-700">
-            <p className="font-medium mb-2">Permissions:</p>
-            {roleType === 'junior' && (
-              <ul className="list-disc list-inside space-y-1">
-                <li>View users and conversations</li>
-                <li>Delete messages</li>
-                <li>Warn users</li>
-              </ul>
-            )}
-            {roleType === 'senior' && (
-              <ul className="list-disc list-inside space-y-1">
-                <li>All Junior permissions</li>
-                <li>Suspend users</li>
-                <li>View audit logs</li>
-              </ul>
-            )}
-            {roleType === 'lead' && (
-              <ul className="list-disc list-inside space-y-1">
-                <li>All Senior permissions</li>
-                <li>Ban users</li>
-                <li>Manage other moderators</li>
-              </ul>
-            )}
-          </div>
-
-          <button
+          <Button
             onClick={handleAssignModerator}
             disabled={!selectedUser || loading}
-            className="w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700 disabled:bg-gray-400"
+            className="w-full"
           >
             {loading ? 'Assigning...' : 'Assign Moderator'}
-          </button>
-        </div>
-      </div>
+          </Button>
+        </CardContent>
+      </Card>
 
       {/* Current Moderators Section */}
-      <div className="bg-white p-6 rounded-lg shadow">
-        <h2 className="text-xl font-bold mb-4">Current Moderators</h2>
-        
-        {moderators.length === 0 ? (
-          <p className="text-gray-500">No moderators assigned yet</p>
-        ) : (
-          <div className="space-y-3">
-            {moderators.map(mod => (
-              <div key={mod.id} className="flex items-center justify-between border p-3 rounded">
-                <div>
-                  <p className="font-medium">{mod.user}</p>
-                  <p className="text-sm text-gray-600">{mod.role.name}</p>
-                  <p className="text-xs text-gray-500">
-                    Warnings: {mod.warnings_issued} | Suspensions: {mod.suspensions_issued} | Bans: {mod.bans_issued}
-                  </p>
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Shield className="w-5 h-5" />
+            Current Moderators
+          </CardTitle>
+          <CardDescription>Manage moderator roles and permissions.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {moderators.length === 0 ? (
+            <p className="text-muted-foreground">No moderators assigned yet</p>
+          ) : (
+            <div className="space-y-3">
+              {moderators.map(mod => (
+                <div key={mod.id} className="flex items-center justify-between border rounded-lg p-4">
+                  <div>
+                    <p className="font-medium">{mod.username}</p>
+                    <p className="text-sm text-muted-foreground">{mod.email}</p>
+                    <p className="text-xs text-muted-foreground">
+                      Permissions: {mod.permissions?.length || 0} assigned
+                    </p>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setPermissionsUserId(mod.user_id)}
+                    >
+                      <Settings className="w-4 h-4 mr-1" />
+                      Permissions
+                    </Button>
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      onClick={() => handleRemoveModerator(mod.user_id)}
+                    >
+                      <ShieldOff className="w-4 h-4 mr-1" />
+                      Remove
+                    </Button>
+                  </div>
                 </div>
-                <button
-                  onClick={() => handleRemoveModerator(mod.user_id)}
-                  className="bg-red-600 text-white px-3 py-1 rounded hover:bg-red-700 text-sm"
-                >
-                  Remove
-                </button>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }

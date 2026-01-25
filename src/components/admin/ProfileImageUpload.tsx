@@ -3,6 +3,7 @@ import { Upload, Camera, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { apiService, API_BASE_URL } from '@/lib/api';
+import { useTranslation } from "react-i18next";
 
 interface ProfileImageUploadProps {
   currentImage?: string;
@@ -21,6 +22,7 @@ export const ProfileImageUpload: React.FC<ProfileImageUploadProps> = ({
   isOpen,
   onClose
 }) => {
+  const { t } = useTranslation();
   const displayUsername = username || user?.username || 'Admin';
   const serverBaseUrl = API_BASE_URL.replace(/\/?api\/?$/, '');
   const [isDragging, setIsDragging] = useState(false);
@@ -66,8 +68,8 @@ export const ProfileImageUpload: React.FC<ProfileImageUploadProps> = ({
     // Validate file type
     if (!file.type.startsWith('image/')) {
       toast({
-        title: 'Invalid File',
-        description: 'Please select an image file.',
+        title: t('profile.invalidFile'),
+        description: t('profile.pleaseSelectImageFile'),
         variant: 'destructive'
       });
       return;
@@ -76,8 +78,8 @@ export const ProfileImageUpload: React.FC<ProfileImageUploadProps> = ({
     // Validate file size (5MB max)
     if (file.size > 5 * 1024 * 1024) {
       toast({
-        title: 'File Too Large',
-        description: 'Please select an image smaller than 5MB.',
+        title: t('profile.fileTooLarge'),
+        description: t('profile.pleaseSelectImageSmallerThan5MB'),
         variant: 'destructive'
       });
       return;
@@ -96,8 +98,8 @@ export const ProfileImageUpload: React.FC<ProfileImageUploadProps> = ({
         setImageUrl(cacheBustedUrl);
         setImageError(false);
         toast({
-          title: 'Success',
-          description: 'Profile image updated successfully!'
+          title: t('common.success'),
+          description: t('profile.profileImageUpdatedSuccessfully')
         });
         onImageUpdated?.();
       } else {
@@ -106,8 +108,8 @@ export const ProfileImageUpload: React.FC<ProfileImageUploadProps> = ({
     } catch (error) {
       console.error('Upload error:', error);
       toast({
-        title: 'Upload Failed',
-        description: error instanceof Error ? error.message : 'Failed to upload image',
+        title: t('profile.uploadFailed'),
+        description: error instanceof Error ? error.message : t('profile.failedToUploadImage'),
         variant: 'destructive'
       });
     } finally {
@@ -182,7 +184,7 @@ export const ProfileImageUpload: React.FC<ProfileImageUploadProps> = ({
         disabled={isUploading}
       >
         <Upload className="w-4 h-4 mr-2" />
-        {isUploading ? 'Uploading...' : 'Change Photo'}
+        {isUploading ? t('profile.uploading') : t('profile.changePhoto')}
       </Button>
     </div>
   );

@@ -77,6 +77,7 @@ export const ChatInterface = ({ user, onLogout, onUpdateUser, onTrashMessage, co
   const [retryCount, setRetryCount] = useState(0);
   
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const recordingMimeTypeRef = useRef<string | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const recordingIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -177,7 +178,7 @@ export const ChatInterface = ({ user, onLogout, onUpdateUser, onTrashMessage, co
     setEditMessageLoading(messageId);
     
     try {
-      const response = await apiService.request(`/chat/messages/${messageId}/`, {
+      const response = await apiService.httpRequest(`/chat/messages/${messageId}/`, {
         method: 'PATCH',
         body: JSON.stringify({ content })
       });
@@ -207,7 +208,7 @@ export const ChatInterface = ({ user, onLogout, onUpdateUser, onTrashMessage, co
     setDeleteMessageLoading(messageId);
     
     try {
-      const response = await apiService.request(`/chat/messages/${messageId}/`, {
+      const response = await apiService.httpRequest(`/chat/messages/${messageId}/`, {
         method: 'DELETE'
       });
       
@@ -280,7 +281,23 @@ export const ChatInterface = ({ user, onLogout, onUpdateUser, onTrashMessage, co
           autoGainControl: true
         }
       });
-      const mediaRecorder = new MediaRecorder(stream);
+
+      const preferredTypes = [
+        'audio/ogg;codecs=opus',
+        'audio/ogg',
+      ];
+      const supportedType = preferredTypes.find((t) =>
+        typeof MediaRecorder !== 'undefined' && MediaRecorder.isTypeSupported(t)
+      );
+
+      if (!supportedType) {
+        stream.getTracks().forEach(track => track.stop());
+        setMicPermissionError('Voice recording is not supported in this browser (no supported audio format: ogg).');
+        return;
+      }
+
+      recordingMimeTypeRef.current = supportedType;
+      const mediaRecorder = new MediaRecorder(stream, { mimeType: supportedType });
       mediaRecorderRef.current = mediaRecorder;
       audioChunksRef.current = [];
 
@@ -289,7 +306,7 @@ export const ChatInterface = ({ user, onLogout, onUpdateUser, onTrashMessage, co
       };
 
       mediaRecorder.onstop = () => {
-        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+        const audioBlob = new Blob(audioChunksRef.current, { type: recordingMimeTypeRef.current || 'audio/ogg' });
         setAudioBlob(audioBlob);
         const audioUrl = URL.createObjectURL(audioBlob);
         setAudioUrl(audioUrl);
@@ -353,6 +370,7 @@ export const ChatInterface = ({ user, onLogout, onUpdateUser, onTrashMessage, co
     setAudioBlob(null);
     setAudioUrl(null);
     setRecordingDuration(0);
+    recordingMimeTypeRef.current = null;
   };
 
   const formatDuration = (seconds: number) => {
@@ -455,8 +473,9 @@ export const ChatInterface = ({ user, onLogout, onUpdateUser, onTrashMessage, co
     
     // Add audio blob to attachments if recording
     if (audioBlob && audioUrl) {
-      const audioFile = new File([audioBlob], `voice-message-${Date.now()}.webm`, {
-        type: 'audio/webm'
+      const mimeType = recordingMimeTypeRef.current || audioBlob.type || 'audio/ogg';
+      const audioFile = new File([audioBlob], `voice-message-${Date.now()}.ogg`, {
+        type: mimeType
       });
       filesToSend.push(audioFile);
     }
@@ -838,7 +857,7 @@ export const ChatInterface = ({ user, onLogout, onUpdateUser, onTrashMessage, co
               ))}
               {audioBlob && (
                 <div className="flex items-center gap-2 bg-red-50 border border-red-200 px-3 py-2 rounded-lg">
-                  {getFileIcon("Voice Message", "audio/webm")}
+                  {getFileIcon("Voice Message", recordingMimeTypeRef.current || "audio/ogg")}
                   <div className="flex flex-col">
                     <span className="text-sm">Voice Message</span>
                     <span className="text-xs text-red-600">{formatDuration(recordingDuration)}</span>
@@ -924,7 +943,7 @@ export const ChatInterface = ({ user, onLogout, onUpdateUser, onTrashMessage, co
                     multiple
                     onChange={(e) => addFiles(e.target.files)}
                     className="hidden"
-                    accept="image/*,application/pdf,.doc,.docx,.txt"
+                    accept="image/jpeg,image/png,image/gif,image/webp,audio/mpeg,audio/wav,audio/ogg,video/mp4,video/webm,video/ogg,application/pdf,text/plain,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-powerpoint,application/vnd.openxmlformats-officedocument.presentationml.presentation"
                   />
                   <Button
                     type="button"
