@@ -128,7 +128,7 @@ class Migration(migrations.Migration):
                 ('duration', models.CharField(blank=True, max_length=50)),
                 ('is_active', models.BooleanField(default=True)),
                 (
-                    'appeal_status',
+                    'appeal_status', 
                     models.CharField(
                         choices=[
                             ('none', 'No Appeal'),
@@ -157,6 +157,7 @@ class Migration(migrations.Migration):
                 'verbose_name_plural': 'Moderation Actions',
                 'ordering': ['-created_at'],
             },
+            
         ),
         migrations.AddIndex(
             model_name='moderationaction',

@@ -64,7 +64,7 @@ export const GroupMembersDialog = ({
                 <div className="flex items-center gap-3 flex-1">
                   <Avatar className="h-10 w-10">
                     <AvatarImage src={member.avatar} />
-                    <AvatarFallback className="bg-primary text-primary-foreground">
+                    <AvatarFallback showDefaultIcon={false} className="bg-primary text-primary-foreground">
                       {member.username.slice(0, 2).toUpperCase()}
                     </AvatarFallback>
                   </Avatar>

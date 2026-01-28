@@ -545,17 +545,23 @@ class AdminUserDetailView(APIView):
             
             if not permanent:
                 # Move to trash
-                from users.trash_models import TrashItem
+                from admin_panel.models import Trash
                 from users.services.user_management_service import UserManagementService
                 user_data = UserManagementService._serialize_user(user)
-                TrashItem.objects.create(
-                    item_type='user',
-                    item_id=user.id,
-                    item_data=user_data,
+                Trash.move_to_trash(
+                    item_type=Trash.ItemType.USER,
+                    item_id=str(user.id),
                     deleted_by=request.user,
-                    expires_at=timezone.now() + timedelta(days=30)
+                    delete_reason=f'User moved to trash: {user.username}',
+                    item_data=user_data,
+                    source_tab=Trash.SourceTab.USERS
                 )
-            
+
+                user.deactivate_user()
+                return Response({
+                    'message': 'User moved to trash successfully'
+                }, status=status.HTTP_200_OK)
+
             user.delete()
             
             return Response({

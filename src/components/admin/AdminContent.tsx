@@ -9,7 +9,7 @@ import { AuditLogs } from './AuditLogs';
 import { BackupManager } from './BackupManager';
 import { ProfileImageUpload } from './ProfileImageUpload';
 import { EditProfileDialog } from './EditProfileDialog';
-import { TrashManager } from './TrashManager';
+import { TrashSectioned } from './TrashSectioned';
 import { SettingsManager } from './SettingsManager';
 import { PermissionsManager } from './PermissionsManager';
 import { ModerationPanel } from './ModerationPanel';
@@ -80,7 +80,6 @@ export function AdminContent({ user }: AdminContentProps) {
   );
   const [showEditProfile, setShowEditProfile] = useState(false);
   const [profileUser, setProfileUser] = useState<ProfileUser | null>(null);
-  const trashManagerRef = useRef<{ refresh: () => Promise<void> }>(null);
 
   const exportUserData = async (userId: string, options: any) => {
     await apiService.httpRequest('/users/data/export/', {
@@ -97,9 +96,8 @@ export function AdminContent({ user }: AdminContentProps) {
   };
 
   const handleUserDeleted = async () => {
-    if (trashManagerRef.current) {
-      await trashManagerRef.current.refresh();
-    }
+    // Refresh trash data when user is deleted
+    // This will be handled by the TrashSectioned component's internal state
   };
 
   // Fetch full profile for the profile tab
@@ -206,7 +204,7 @@ export function AdminContent({ user }: AdminContentProps) {
       case 'settings':
         return <SettingsManager />;
       case 'trash':
-        return <TrashManager ref={trashManagerRef} />;
+        return <TrashSectioned />;
       case 'profile':
         // Use fetched profileUser if available, otherwise fall back to prop user
         const effectiveUser = (profileUser || user) as ProfileUser;

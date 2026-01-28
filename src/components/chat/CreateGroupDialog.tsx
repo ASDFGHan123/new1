@@ -187,7 +187,7 @@ export const CreateGroupDialog = ({
               <div className="flex flex-col items-center space-y-3">
                 <Avatar className="h-20 w-20">
                   <AvatarImage src={groupAvatar} />
-                  <AvatarFallback className="bg-primary text-primary-foreground text-lg">
+                  <AvatarFallback showDefaultIcon={false} className="bg-primary text-primary-foreground text-lg">
                     {groupName.slice(0, 2).toUpperCase() || "GR"}
                   </AvatarFallback>
                 </Avatar>

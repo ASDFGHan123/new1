@@ -31,12 +31,21 @@ class DepartmentViewSet(viewsets.ModelViewSet):
         action = request.data.get('action', 'permanent') if request.data else 'permanent'
         
         if action == 'trash':
-            TrashItem.objects.create(
-                item_type='department',
+            from admin_panel.models import Trash
+            Trash.move_to_trash(
+                item_type=Trash.ItemType.DEPARTMENT,
                 item_id=str(department.id),
                 deleted_by=request.user,
-                item_data={'name': department.name, 'description': department.description},
-                expires_at=timezone.now() + timedelta(days=30)
+                delete_reason=f'Department deleted: {department.name}',
+                item_data={
+                    'name': department.name,
+                    'description': department.description,
+                    'manager': department.manager or '',
+                    'code': department.code,
+                    'head_id': str(department.head_id) if department.head_id else None,
+                    'head_username': department.head.username if department.head else None
+                },
+                source_tab=Trash.SourceTab.DEPARTMENTS
             )
             AuditLoggingService.log_admin_action(
                 action_type=AuditLog.ActionType.ITEM_MOVED_TO_TRASH,
@@ -94,12 +103,21 @@ class OfficeViewSet(viewsets.ModelViewSet):
         action = request.data.get('action', 'permanent') if request.data else 'permanent'
         
         if action == 'trash':
-            TrashItem.objects.create(
-                item_type='office',
+            from admin_panel.models import Trash
+            Trash.move_to_trash(
+                item_type=Trash.ItemType.OFFICE,
                 item_id=str(office.id),
                 deleted_by=request.user,
-                item_data={'name': office.name, 'description': office.description, 'department_id': str(office.department_id)},
-                expires_at=timezone.now() + timedelta(days=30)
+                delete_reason=f'Office deleted: {office.name}',
+                item_data={
+                    'name': office.name,
+                    'description': office.description,
+                    'manager': office.manager or '',
+                    'code': office.code or '',
+                    'department_id': str(office.department_id),
+                    'department_name': office.department.name if office.department else None
+                },
+                source_tab=Trash.SourceTab.DEPARTMENTS
             )
             office.delete()
             return Response(status=status.HTTP_204_NO_CONTENT)

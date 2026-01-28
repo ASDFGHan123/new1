@@ -11,9 +11,10 @@ from admin_panel import views_conversations
 from admin_panel import views_message_templates
 from admin_panel import views_message_history
 from admin_panel import views_backups
+from admin_panel import views_trash
 from admin_panel.moderator_management_views import AdminModeratorViewSet
 from admin_panel.views_permissions import MyPermissionsView
-from admin_panel.views_permissions_ui import AvailablePermissionsView, SetModeratorPermissionsView
+from admin_panel.views_permissions_ui import AvailablePermissionsView, ModeratorsWithPermissionsView, SetModeratorPermissionsView
 
 router = DefaultRouter()
 router.register(r'pending-users', moderation_views.PendingUsersViewSet, basename='pending-users')
@@ -37,6 +38,12 @@ urlpatterns = [
     
     # Conversations endpoints
     path('conversations/', views_conversations.AdminConversationsView.as_view(), name='admin_conversations'),
+    
+    # Trash endpoints
+    path('trash/', views_trash.TrashListView.as_view(), name='trash_list'),
+    path('trash/<uuid:trash_id>/restore/', views_trash.TrashRestoreView.as_view(), name='trash_restore'),
+    path('trash/<uuid:trash_id>/', views_trash.TrashPermanentDeleteView.as_view(), name='trash_permanent_delete'),
+    path('trash/empty/', views_trash.TrashEmptyView.as_view(), name='trash_empty'),
     
     # System settings endpoints - bulk update must come before detail
     path('settings/bulk/update/', views_settings.SystemSettingsBulkUpdateView.as_view(), name='system_settings_bulk_update'),

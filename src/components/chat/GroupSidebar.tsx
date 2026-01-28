@@ -336,22 +336,108 @@ export const GroupSidebar = ({
                       ? "bg-primary/10 border border-primary/20"
                       : "hover:bg-muted/50"
                   }`}
-                  onClick={() => onSelectGroup(group.id)}
-                >
-                  <div className="flex items-start gap-3">
-                    {/* Group Avatar */}
-                    <div className="relative">
-                      <Avatar className="h-10 w-10">
-                        <AvatarImage src={group.avatar} />
-                        <AvatarFallback className="bg-primary text-primary-foreground">
-                          {group.name.slice(0, 2).toUpperCase()}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div className="absolute -bottom-1 -right-1">
-                        {getGroupIcon(group)}
-                      </div>
+
+    {/* Groups List */}
+    <ScrollArea className="flex-1">
+      <div className="p-2 space-y-1">
+        {filteredGroups.length === 0 ? (
+          <div className="text-center py-8 text-muted-foreground">
+            <Users className="h-12 w-12 mx-auto mb-4 opacity-50" />
+            <p className="text-lg font-medium mb-2">{t("chat.noGroupsFound")}</p>
+            <p className="text-sm mb-4">
+              {searchTerm ? t("chat.tryAdjustingSearch") : t("chat.createFirstGroup")}
+            </p>
+            {!searchTerm && (
+              <CreateGroupDialog
+                currentUser={currentUser}
+                availableUsers={availableUsers}
+                onCreateGroup={onCreateGroup}
+                trigger={
+                  <Button size="sm">
+                    <Plus className="h-4 w-4 mr-2" />
+                    {t("chat.createGroup")}
+                  </Button>
+                }
+              />
+            )}
+          </div>
+        ) : (
+          filteredGroups.map((group) => {
+            const isActive = currentGroupId === group.id;
+            const userRole = getRoleForUser(group);
+            const hasUnread = group.unreadCount > 0;
+
+            return (
+              <div
+                key={group.id}
+                className={`group relative rounded-lg p-3 cursor-pointer transition-colors ${
+                  isActive
+                    ? "bg-primary/10 border border-primary/20"
+                    : "hover:bg-muted/50"
+                }`}
+                onClick={() => onSelectGroup(group.id)}
+              >
+                <div className="flex items-start gap-3">
+                  {/* Group Avatar */}
+                  <div className="relative">
+                    <Avatar className="h-10 w-10">
+                      <AvatarImage src={group.avatar} />
+                      <AvatarFallback showDefaultIcon={false} className="bg-primary text-primary-foreground">
+                        {group.name.slice(0, 2).toUpperCase()}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="absolute -bottom-1 -right-1">
+                      {getGroupIcon(group)}
+                    </div>
+                  </div>
+
+                  {/* Group Info */}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1">
+                      <p className="font-medium truncate text-sm">{group.name}</p>
+                      {hasUnread && (
+                        <Badge variant="destructive" className="text-xs px-1 py-0">
+                          {group.unreadCount}
+                        </Badge>
+                      )}
+                    </div>
+                    
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                      <button
+                        className="hover:text-primary hover:underline cursor-pointer transition-colors"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSelectedGroupForMembers(group);
+                          setShowMembersDialog(true);
+                        }}
+                      >
+                        {group.members.length} {t("chat.members")}
+                      </button>
+                      {group.lastActivity && (
+                        <>
+                          <span>•</span>
+                          <span>{formatLastActivity(group.lastActivity)}</span>
+                        </>
+                      )}
                     </div>
 
+                    {group.description && (
+                      <p className="text-xs text-muted-foreground truncate mt-1">
+                        {group.description}
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Actions Menu */}
+                  <div className="opacity-0 group-hover:opacity-100 transition-opacity">
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
+                          <MoreVertical className="h-3 w-3" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem
                     {/* Group Info */}
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-1">

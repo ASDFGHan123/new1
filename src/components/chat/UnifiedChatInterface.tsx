@@ -466,14 +466,14 @@ export const UnifiedChatInterface = ({ initialConversationId }: { initialConvers
               {currentConversation.type === 'group' ? (
                 <Avatar className="h-10 w-10">
                   <AvatarImage src={currentConversation.groupAvatar} />
-                  <AvatarFallback className="bg-primary text-primary-foreground">
+                  <AvatarFallback showDefaultIcon={false} className="bg-primary text-primary-foreground">
                     {(currentConversation.groupName || t('common.unknown')).slice(0, 2).toUpperCase()}
                   </AvatarFallback>
                 </Avatar>
               ) : (
                 <Avatar className="h-10 w-10">
                   <AvatarImage src={getOtherUser(currentConversation)?.avatar} />
-                  <AvatarFallback className="bg-primary text-primary-foreground">
+                  <AvatarFallback showDefaultIcon={false} className="bg-primary text-primary-foreground">
                     {(getOtherUser(currentConversation)?.username || t('common.unknown')).slice(0, 2).toUpperCase()}
                   </AvatarFallback>
                 </Avatar>

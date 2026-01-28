@@ -354,7 +354,8 @@ class ApiService {
         } else if (response.status === 403) {
           throw new Error('Insufficient permissions');
         } else if (response.status === 404) {
-          throw new Error('Resource not found');
+          const errorMessage = data.error || data.detail || data.message || 'Resource not found';
+          throw new Error(errorMessage);
         } else if (response.status === 400) {
           const errorMessage = Object.entries(data)
             .map(([key, value]) => `${key}: ${Array.isArray(value) ? value.join(', ') : value}`)

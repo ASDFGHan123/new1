@@ -10,7 +10,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { organizationApi } from '@/lib/organization-api';
+import { apiService } from '@/lib/api';
 
 interface Department {
   id: string;
@@ -56,8 +56,9 @@ export function DepartmentPanel() {
 
   const fetchDepartments = async () => {
     try {
-      const data = await organizationApi.getDepartments();
-      setDepartments(Array.isArray(data) ? data : data.results || []);
+      const response = await apiService.httpRequest('/users/departments/');
+      const data = response.data || response;
+      setDepartments(Array.isArray(data) ? data : data?.results || []);
     } catch (err) {
       console.error('Error fetching departments:', err);
     }
@@ -68,14 +69,20 @@ export function DepartmentPanel() {
     setLoading(true);
     try {
       if (editingId) {
-        await organizationApi.updateDepartment(editingId, formData);
-        setEditingId(null);
+        await apiService.httpRequest(`/users/departments/${editingId}/`, {
+          method: 'PUT',
+          body: JSON.stringify(formData)
+        });
       } else {
-        await organizationApi.createDepartment(formData);
+        await apiService.httpRequest('/users/departments/', {
+          method: 'POST',
+          body: JSON.stringify(formData)
+        });
       }
-      setFormData({ name: '', description: '', manager: '', code: '', head: '' });
-      setShowForm(false);
       fetchDepartments();
+      setShowForm(false);
+      setFormData({ name: '', description: '', manager: '', code: '', head: '' });
+      setEditingId(null);
     } catch (err) {
       console.error('Error saving department:', err);
     } finally {
@@ -96,7 +103,10 @@ export function DepartmentPanel() {
   const confirmDelete = async (action: 'trash' | 'permanent') => {
     if (!deleteDialog.deptId) return;
     try {
-      await organizationApi.deleteDepartment(deleteDialog.deptId, { action });
+      await apiService.httpRequest(`/users/departments/${deleteDialog.deptId}/`, {
+        method: 'DELETE',
+        body: JSON.stringify({ action })
+      });
       setDeleteDialog({ open: false, deptId: null });
       fetchDepartments();
     } catch (err) {
@@ -239,8 +249,9 @@ function DepartmentMembers({ departmentId }: DepartmentMembersProps) {
     setIsLoading(true);
     setErrorMessage('');
     try {
-      const data = await organizationApi.getDepartmentMembers(departmentId);
-      setDepartmentMembers(Array.isArray(data) ? data : data.results || []);
+      const data = await apiService.httpRequest(`/users/departments/${departmentId}/members/`);
+      const members = data.data || data;
+      setDepartmentMembers(Array.isArray(members) ? members : members?.results || []);
     } catch (err) {
       console.error('Error fetching members:', err);
       setErrorMessage(t('departments.failedToLoadMembers'));
@@ -289,8 +300,9 @@ function OfficeList({ departmentId }: OfficeListProps) {
 
   const loadOffices = async () => {
     try {
-      const data = await organizationApi.getDepartmentOffices(departmentId);
-      setOfficeList(Array.isArray(data) ? data : data.results || []);
+      const data = await apiService.httpRequest(`/users/departments/${departmentId}/offices/`);
+      const offices = data.data || data;
+      setOfficeList(Array.isArray(offices) ? offices : offices?.results || []);
     } catch (err) {
       console.error('Error fetching offices:', err);
     }
@@ -301,10 +313,16 @@ function OfficeList({ departmentId }: OfficeListProps) {
     setErrorMessage('');
     try {
       if (editingOfficeId) {
-        await organizationApi.updateOffice(editingOfficeId, { ...officeFormData, department: departmentId });
+        await apiService.httpRequest(`/users/offices/${editingOfficeId}/`, {
+          method: 'PUT',
+          body: JSON.stringify({ ...officeFormData, department: departmentId })
+        });
         setEditingOfficeId(null);
       } else {
-        await organizationApi.createOffice({ ...officeFormData, department: departmentId });
+        await apiService.httpRequest('/users/offices/', {
+          method: 'POST',
+          body: JSON.stringify({ ...officeFormData, department: departmentId })
+        });
       }
       setOfficeFormData({ name: '', manager: '', code: '', description: '' });
       setIsFormVisible(false);
@@ -339,7 +357,10 @@ function OfficeList({ departmentId }: OfficeListProps) {
   const confirmDeleteOffice = async (action: 'trash' | 'permanent') => {
     if (!deleteDialogState.officeId) return;
     try {
-      await organizationApi.deleteOffice(deleteDialogState.officeId, { action });
+      await apiService.httpRequest(`/users/offices/${deleteDialogState.officeId}/`, {
+        method: 'DELETE',
+        body: JSON.stringify({ action })
+      });
       setDeleteDialogState({ open: false, officeId: null });
       loadOffices();
     } catch (err) {

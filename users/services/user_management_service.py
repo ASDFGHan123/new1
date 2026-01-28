@@ -247,21 +247,21 @@ class UserManagementService:
             user = User.objects.get(id=user_id)
             
             if permanent:
-                # Create trash item before deletion
-                from users.trash_models import TrashItem
-                user_data = cls._serialize_user(user)
-                TrashItem.objects.create(
-                    item_type='user',
-                    item_id=user.id,
-                    item_data=user_data,
-                    deleted_by=None,
-                    expires_at=timezone.now() + timedelta(days=30)
-                )
                 user.delete()
                 return {'message': 'User permanently deleted', 'deleted': True}
-            else:
-                user.deactivate_user()
-                return {'message': 'User deactivated', 'deactivated': True}
+
+            from admin_panel.models import Trash
+            user_data = cls._serialize_user(user)
+            Trash.move_to_trash(
+                item_type=Trash.ItemType.USER,
+                item_id=str(user.id),
+                deleted_by=None,  # This is a system/service operation, no specific user
+                delete_reason=f'User moved to trash: {user.username}',
+                item_data=user_data,
+                source_tab=Trash.SourceTab.USERS
+            )
+            user.deactivate_user()
+            return {'message': 'User moved to trash', 'trashed': True}
                 
         except User.DoesNotExist:
             raise ValidationError("User not found")

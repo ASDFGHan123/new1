@@ -152,7 +152,7 @@ export const UnifiedSidebar = ({
         <div className="flex items-center gap-3 mb-4">
           <Avatar className="h-10 w-10">
             <AvatarImage src={currentUser.avatar} />
-            <AvatarFallback className="bg-primary text-primary-foreground">
+            <AvatarFallback showDefaultIcon={false} className="bg-primary text-primary-foreground">
               {(currentUser.username || '??').slice(0, 2).toUpperCase()}
             </AvatarFallback>
           </Avatar>
@@ -225,7 +225,7 @@ export const UnifiedSidebar = ({
                   <div className="relative">
                     <Avatar className="h-12 w-12">
                       <AvatarImage src={getConversationAvatar(conversation)} />
-                      <AvatarFallback className="bg-muted">
+                      <AvatarFallback showDefaultIcon={false} className="bg-muted">
                         {getConversationAvatarFallback(conversation)}
                       </AvatarFallback>
                     </Avatar>

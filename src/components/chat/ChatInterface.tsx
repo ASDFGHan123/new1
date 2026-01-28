@@ -555,7 +555,7 @@ export const ChatInterface = ({ user, onLogout, onUpdateUser, onTrashMessage, co
               <div className="relative">
                 <Avatar className="h-10 w-10">
                   <AvatarImage src={avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.username}`} />
-                  <AvatarFallback className="bg-primary text-primary-foreground">
+                  <AvatarFallback showDefaultIcon={false} className="bg-primary text-primary-foreground">
                     {user.username.slice(0, 2).toUpperCase()}
                   </AvatarFallback>
                 </Avatar>

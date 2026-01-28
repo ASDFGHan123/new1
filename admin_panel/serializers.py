@@ -59,14 +59,71 @@ class TrashSerializer(serializers.ModelSerializer):
     Serializer for Trash model.
     """
     deleted_by = serializers.StringRelatedField()
+    source_tab_display = serializers.CharField(source='get_source_tab_display', read_only=True)
+    is_restorable = serializers.SerializerMethodField()
+    restore_unavailable_reason = serializers.SerializerMethodField()
     
     class Meta:
         model = Trash
         fields = [
             'id', 'item_type', 'item_id', 'item_data', 'deleted_by',
-            'delete_reason', 'deleted_at'
+            'delete_reason', 'deleted_at', 'source_tab', 'source_tab_display',
+            'is_restorable', 'restore_unavailable_reason'
         ]
-        read_only_fields = ['id', 'deleted_at']
+        read_only_fields = ['id', 'deleted_at', 'source_tab_display']
+
+    def get_is_restorable(self, obj):
+        if obj.item_type == Trash.ItemType.USER:
+            return User.objects.filter(id=obj.item_id).exists()
+        if obj.item_type == Trash.ItemType.CONVERSATION:
+            return Conversation.objects.filter(id=obj.item_id).exists()
+        if obj.item_type == Trash.ItemType.MESSAGE:
+            return Message.objects.filter(id=obj.item_id).exists()
+        if obj.item_type == Trash.ItemType.DEPARTMENT:
+            name = (obj.item_data or {}).get('name')
+            if not name:
+                return False
+            # Restorable if it doesn't already exist by name
+            from users.models_organization import Department
+            return not Department.objects.filter(name=name).exists()
+        if obj.item_type == Trash.ItemType.OFFICE:
+            data = obj.item_data or {}
+            name = data.get('name')
+            department_id = data.get('department_id')
+            if not name or not department_id:
+                return False
+            from users.models_organization import Department, Office
+            department = Department.objects.filter(id=department_id).first()
+            if not department:
+                return False
+            return not Office.objects.filter(department=department, name=name).exists()
+        return False
+
+    def get_restore_unavailable_reason(self, obj):
+        if obj.item_type in [Trash.ItemType.USER, Trash.ItemType.CONVERSATION, Trash.ItemType.MESSAGE]:
+            if not self.get_is_restorable(obj):
+                return f'Could not restore {obj.item_type} item - original item not found'
+            return ''
+        if obj.item_type == Trash.ItemType.DEPARTMENT:
+            if not self.get_is_restorable(obj):
+                name = (obj.item_data or {}).get('name')
+                if not name:
+                    return 'Could not restore DEPARTMENT - missing name'
+                return f'Could not restore DEPARTMENT - a department named "{name}" already exists'
+            return ''
+        if obj.item_type == Trash.ItemType.OFFICE:
+            if not self.get_is_restorable(obj):
+                data = obj.item_data or {}
+                name = data.get('name')
+                department_id = data.get('department_id')
+                if not name or not department_id:
+                    return 'Could not restore OFFICE - missing name or department_id'
+                from users.models_organization import Department
+                if not Department.objects.filter(id=department_id).exists():
+                    return 'Could not restore OFFICE - department not found. Restore the department first.'
+                return f'Could not restore OFFICE - an office named "{name}" already exists in this department'
+            return ''
+        return 'This item type cannot be restored'
 
 
 class BackupSerializer(serializers.ModelSerializer):

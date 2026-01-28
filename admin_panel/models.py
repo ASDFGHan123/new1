@@ -197,6 +197,21 @@ class Trash(models.Model):
         MESSAGE = 'MESSAGE', 'Message'
         GROUP = 'GROUP', 'Group'
         FILE = 'FILE', 'File'
+        DEPARTMENT = 'DEPARTMENT', 'Department'
+        OFFICE = 'OFFICE', 'Office'
+        MESSAGE_TEMPLATE = 'MESSAGE_TEMPLATE', 'Message Template'
+        ROLE = 'ROLE', 'Role'
+    
+    class SourceTab(models.TextChoices):
+        USERS = 'USERS', 'Users'
+        CHAT = 'CHAT', 'Chat'
+        DEPARTMENTS = 'DEPARTMENTS', 'Departments'
+        MESSAGE_TEMPLATES = 'MESSAGE_TEMPLATES', 'Message Templates'
+        ROLES_PERMISSIONS = 'ROLES_PERMISSIONS', 'Roles & Permissions'
+        SETTINGS = 'SETTINGS', 'Settings'
+        AUDIT_LOGS = 'AUDIT_LOGS', 'Audit Logs'
+        BACKUP = 'BACKUP', 'Backup'
+        ANALYTICS = 'ANALYTICS', 'Analytics'
     
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     
@@ -204,6 +219,14 @@ class Trash(models.Model):
     item_type = models.CharField(max_length=20, choices=ItemType.choices)
     item_id = models.CharField(max_length=255)
     item_data = models.JSONField(default=dict, blank=True)
+    
+    # Source information
+    source_tab = models.CharField(
+        max_length=30, 
+        choices=SourceTab.choices, 
+        default=SourceTab.USERS,
+        help_text="Admin dashboard tab where the item was deleted from"
+    )
     
     # Deletion details
     deleted_by = models.ForeignKey(
@@ -223,6 +246,7 @@ class Trash(models.Model):
         ordering = ['-deleted_at']
         indexes = [
             models.Index(fields=['item_type']),
+            models.Index(fields=['source_tab']),
             models.Index(fields=['deleted_by']),
             models.Index(fields=['deleted_at']),
         ]
@@ -231,15 +255,30 @@ class Trash(models.Model):
         return f"{self.item_type} {self.item_id} in trash"
     
     @classmethod
-    def move_to_trash(cls, item_type, item_id, deleted_by, delete_reason='', item_data=None):
+    def move_to_trash(cls, item_type, item_id, deleted_by, delete_reason='', item_data=None, source_tab=None):
         """Move an item to trash."""
         from utils.json_utils import prepare_metadata
+        
+        # Determine source tab based on item type if not provided
+        if source_tab is None:
+            if item_type in [cls.ItemType.USER, cls.ItemType.ROLE]:
+                source_tab = cls.SourceTab.USERS
+            elif item_type in [cls.ItemType.CONVERSATION, cls.ItemType.MESSAGE, cls.ItemType.GROUP]:
+                source_tab = cls.SourceTab.CHAT
+            elif item_type in [cls.ItemType.DEPARTMENT, cls.ItemType.OFFICE]:
+                source_tab = cls.SourceTab.DEPARTMENTS
+            elif item_type == cls.ItemType.MESSAGE_TEMPLATE:
+                source_tab = cls.SourceTab.MESSAGE_TEMPLATES
+            else:
+                source_tab = cls.SourceTab.USERS  # Default
+        
         return cls.objects.create(
             item_type=item_type,
             item_id=str(item_id),
             deleted_by=deleted_by,
             delete_reason=delete_reason,
-            item_data=prepare_metadata(item_data or {})
+            item_data=prepare_metadata(item_data or {}),
+            source_tab=source_tab
         )
 
 
