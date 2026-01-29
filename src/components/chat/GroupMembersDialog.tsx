@@ -62,11 +62,9 @@ export const GroupMembersDialog = ({
                 className="flex items-center justify-between p-3 rounded-lg hover:bg-muted/50 transition-colors"
               >
                 <div className="flex items-center gap-3 flex-1">
-                  <Avatar className="h-10 w-10">
+                  <Avatar className="h-8 w-8">
                     <AvatarImage src={member.avatar} />
-                    <AvatarFallback showDefaultIcon={false} className="bg-primary text-primary-foreground">
-                      {member.username.slice(0, 2).toUpperCase()}
-                    </AvatarFallback>
+                    <AvatarFallback />
                   </Avatar>
 
                   <div className="flex-1 min-w-0">

@@ -297,9 +297,7 @@ export const RealTimeChatInterface: React.FC<RealTimeChatInterfaceProps> = ({ cl
                   <div className="relative">
                     <Avatar className="h-10 w-10">
                       <AvatarImage src={conversation.participants[0]?.avatar} />
-                      <AvatarFallback>
-                        {conversation.participants[0]?.username?.slice(0, 2).toUpperCase()}
-                      </AvatarFallback>
+                      <AvatarFallback />
                     </Avatar>
                     {conversation.type === 'individual' && (
                       <div className="absolute -bottom-1 -right-1">
@@ -351,9 +349,7 @@ export const RealTimeChatInterface: React.FC<RealTimeChatInterfaceProps> = ({ cl
                 <div className="flex items-center gap-3">
                   <Avatar className="h-10 w-10">
                     <AvatarImage src={currentConversation.participants[0]?.avatar} />
-                    <AvatarFallback>
-                      {currentConversation.participants[0]?.username?.slice(0, 2).toUpperCase()}
-                    </AvatarFallback>
+                    <AvatarFallback />
                   </Avatar>
                   <div>
                     <h3 className="font-semibold">
@@ -431,9 +427,7 @@ export const RealTimeChatInterface: React.FC<RealTimeChatInterfaceProps> = ({ cl
                       {!isOwn && showAvatar && (
                         <Avatar className="h-8 w-8">
                           <AvatarImage src={currentConversation.participants.find(p => p.id === msg.senderId)?.avatar} />
-                          <AvatarFallback className="text-xs">
-                            {currentConversation.participants.find(p => p.id === msg.senderId)?.username?.slice(0, 2).toUpperCase()}
-                          </AvatarFallback>
+                          <AvatarFallback />
                         </Avatar>
                       )}
 

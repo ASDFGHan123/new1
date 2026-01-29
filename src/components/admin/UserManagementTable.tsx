@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
@@ -31,6 +31,46 @@ export function UserManagementTable({
   onDelete,
 }: UserManagementTableProps) {
   const { toast } = useToast();
+  const [avatarTimestamps, setAvatarTimestamps] = useState<{ [key: string]: number }>({});
+
+  // Function to get avatar URL with cache-busting
+  const getAvatarUrl = (avatar?: string) => {
+    if (!avatar) return undefined;
+    const timestamp = avatarTimestamps[avatar] || Date.now();
+    return `${avatar}?t=${timestamp}`;
+  };
+
+  // Function to refresh avatar for a specific user
+  const refreshAvatar = (userId: string, avatar?: string) => {
+    if (avatar) {
+      setAvatarTimestamps(prev => ({
+        ...prev,
+        [avatar]: Date.now()
+      }));
+    }
+  };
+
+  // Listen for user updates and refresh avatars
+  useEffect(() => {
+    // Create a map of current avatar URLs to timestamps
+    const newTimestamps: { [key: string]: number } = {};
+    
+    filteredUsers.forEach(user => {
+      if (user.avatar) {
+        // Always use a fresh timestamp to ensure the latest image is loaded
+        newTimestamps[user.avatar] = Date.now();
+      }
+    });
+    
+    // Update timestamps if they've changed
+    const hasChanges = Object.keys(newTimestamps).some(avatar => 
+      avatarTimestamps[avatar] !== newTimestamps[avatar]
+    );
+    
+    if (hasChanges) {
+      setAvatarTimestamps(newTimestamps);
+    }
+  }, [filteredUsers]); // Only depend on filteredUsers
 
   return (
     <Table>
@@ -51,8 +91,8 @@ export function UserManagementTable({
             <TableCell>
               <div className="flex items-center space-x-3">
                 <Avatar className="w-8 h-8">
-                  <AvatarImage src={user.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.username}`} />
-                  <AvatarFallback>{user.username.slice(0, 2).toUpperCase()}</AvatarFallback>
+                  <AvatarImage src={getAvatarUrl(user.avatar)} />
+                  <AvatarFallback />
                 </Avatar>
                 <p className="font-medium text-foreground">{user.username}</p>
               </div>

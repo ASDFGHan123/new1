@@ -8,7 +8,7 @@ import { useTranslation } from "react-i18next";
 interface ProfileImageUploadProps {
   currentImage?: string;
   username?: string;
-  onImageUpdated?: () => void;
+  onImageUpdated?: (newAvatarUrl?: string) => void;
   user?: { id: string; username: string; avatar?: string; status: "online" | "away" | "offline"; role?: string };
   isOpen?: boolean;
   onClose?: () => void;
@@ -75,11 +75,11 @@ export const ProfileImageUpload: React.FC<ProfileImageUploadProps> = ({
       return;
     }
 
-    // Validate file size (5MB max)
-    if (file.size > 5 * 1024 * 1024) {
+    // Validate file size (3MB max for faster upload)
+    if (file.size > 3 * 1024 * 1024) {
       toast({
         title: t('profile.fileTooLarge'),
-        description: t('profile.pleaseSelectImageSmallerThan5MB'),
+        description: t('profile.pleaseSelectImageSmallerThan3MB'),
         variant: 'destructive'
       });
       return;
@@ -88,7 +88,13 @@ export const ProfileImageUpload: React.FC<ProfileImageUploadProps> = ({
     setIsUploading(true);
 
     try {
-      const response = await apiService.uploadProfileImage(file);
+      // Create a smaller version if the image is too large
+      let optimizedFile = file;
+      if (file.size > 500 * 1024) { // If larger than 500KB
+        optimizedFile = await optimizeImage(file);
+      }
+
+      const response = await apiService.uploadProfileImage(optimizedFile);
       
       if (response.success && response.data) {
         const avatarUrl = response.data.avatar_url;
@@ -101,7 +107,7 @@ export const ProfileImageUpload: React.FC<ProfileImageUploadProps> = ({
           title: t('common.success'),
           description: t('profile.profileImageUpdatedSuccessfully')
         });
-        onImageUpdated?.();
+        onImageUpdated?.(avatarUrl);
       } else {
         throw new Error(response.error || 'Upload failed');
       }
@@ -117,6 +123,45 @@ export const ProfileImageUpload: React.FC<ProfileImageUploadProps> = ({
     }
   };
 
+  // Optimize image function
+  const optimizeImage = async (file: File): Promise<File> => {
+    return new Promise((resolve) => {
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      const img = new Image();
+      
+      img.onload = () => {
+        // Calculate new dimensions (max 800px)
+        const maxWidth = 800;
+        const maxHeight = 800;
+        let width = img.width;
+        let height = img.height;
+        
+        if (width > maxWidth || height > maxHeight) {
+          const ratio = Math.min(maxWidth / width, maxHeight / height);
+          width *= ratio;
+          height *= ratio;
+        }
+        
+        canvas.width = width;
+        canvas.height = height;
+        
+        // Draw and compress
+        ctx?.drawImage(img, 0, 0, width, height);
+        canvas.toBlob((blob) => {
+          if (blob) {
+            resolve(new File([blob], file.name, { type: 'image/jpeg', lastModified: Date.now() }));
+          } else {
+            resolve(file); // Fallback to original file
+          }
+        }, 'image/jpeg', 0.8);
+      };
+      
+      img.onerror = () => resolve(file); // Fallback to original file
+      img.src = URL.createObjectURL(file);
+    });
+  };
+
   const handleClick = () => {
     fileInputRef.current?.click();
   };
@@ -129,12 +174,12 @@ export const ProfileImageUpload: React.FC<ProfileImageUploadProps> = ({
         className={`
           w-24 h-24 rounded-full border-2 border-dashed cursor-pointer transition-all
           ${isDragging ? 'border-blue-500 bg-blue-50' : 'border-gray-300 hover:border-gray-400'}
-          ${isUploading ? 'opacity-50' : ''}
+          ${isUploading ? 'opacity-75 border-blue-400 bg-blue-50' : ''}
         `}
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
-        onClick={handleClick}
+        onClick={!isUploading ? handleClick : undefined}
       >
         {imageUrl && !imageError ? (
           <img
@@ -157,14 +202,30 @@ export const ProfileImageUpload: React.FC<ProfileImageUploadProps> = ({
         )}
         
         {/* Upload overlay */}
-        <div className="absolute inset-0 rounded-full bg-black bg-opacity-50 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity">
+        <div className={`absolute inset-0 rounded-full flex items-center justify-center transition-all ${
+          isUploading 
+            ? 'bg-black bg-opacity-60' 
+            : 'bg-black bg-opacity-0 hover:bg-opacity-50'
+        }`}>
           {isUploading ? (
-            <Loader2 className="w-6 h-6 text-white animate-spin" />
+            <div className="text-center">
+              <Loader2 className="w-6 h-6 text-white animate-spin mx-auto mb-1" />
+              <span className="text-xs text-white">Uploading...</span>
+            </div>
           ) : (
             <Camera className="w-6 h-6 text-white" />
           )}
         </div>
       </div>
+
+      {/* Progress indicator */}
+      {isUploading && (
+        <div className="absolute -bottom-6 left-0 right-0">
+          <div className="text-xs text-center text-blue-600 font-medium">
+            Optimizing & uploading...
+          </div>
+        </div>
+      )}
 
       {/* Hidden file input */}
       <input
@@ -173,6 +234,7 @@ export const ProfileImageUpload: React.FC<ProfileImageUploadProps> = ({
         accept="image/*"
         onChange={handleFileSelect}
         className="hidden"
+        disabled={isUploading}
       />
 
       {/* Upload button */}

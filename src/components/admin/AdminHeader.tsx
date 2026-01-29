@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -18,11 +18,87 @@ interface AdminHeaderProps {
     role?: string; 
   };
   onLogout?: () => void;
+  onProfileUpdate?: (updatedUser?: { avatar?: string }) => void;
 }
 
-export function AdminHeader({ user, onLogout }: AdminHeaderProps) {
+export function AdminHeader({ user, onLogout, onProfileUpdate }: AdminHeaderProps) {
   const { t } = useTranslation();
   const [showEditProfile, setShowEditProfile] = useState(false);
+  const [avatarTimestamp, setAvatarTimestamp] = useState(Date.now());
+  const [forceRefresh, setForceRefresh] = useState(0);
+  const [uniqueId, setUniqueId] = useState(Math.random().toString(36).substr(2, 9));
+  const [currentUser, setCurrentUser] = useState(user); // Local copy of user
+  const avatarImageRef = useRef<HTMLImageElement>(null); // Ref to avatar image
+
+  // Update local user when prop changes
+  useEffect(() => {
+    console.log('AdminHeader: User prop changed:', user?.username, user?.avatar);
+    setCurrentUser(user);
+  }, [user]);
+
+  // Debug: Log when user prop changes
+  useEffect(() => {
+    console.log('AdminHeader: Local user state changed:', currentUser?.username, currentUser?.avatar);
+  }, [currentUser]);
+
+  const handleProfileUpdate = (updatedUser?: { avatar?: string }) => {
+    console.log('AdminHeader: Profile update received', updatedUser);
+    
+    // Immediately update local user state if avatar provided
+    if (updatedUser?.avatar && currentUser) {
+      const updatedLocalUser = { ...currentUser, avatar: updatedUser.avatar };
+      console.log('AdminHeader: Updating local user state:', updatedLocalUser);
+      setCurrentUser(updatedLocalUser);
+      
+      // Force direct DOM manipulation as backup
+      setTimeout(() => {
+        if (avatarImageRef.current) {
+          console.log('AdminHeader: Forcing direct DOM avatar reload');
+          avatarImageRef.current.src = `${updatedUser.avatar}?t=${Date.now()}&force=direct`;
+          avatarImageRef.current.onload = () => {
+            console.log('AdminHeader: Direct DOM avatar loaded successfully');
+          };
+        }
+      }, 50);
+    }
+    
+    // Force multiple refreshes to ensure avatar updates
+    const now = Date.now();
+    setAvatarTimestamp(now);
+    setForceRefresh(prev => prev + 1);
+    setUniqueId(Math.random().toString(36).substr(2, 9)); // Generate new unique ID
+    
+    // Call parent update
+    onProfileUpdate?.(updatedUser);
+    
+    // Force multiple refreshes at different intervals
+    setTimeout(() => {
+      setAvatarTimestamp(now + 1);
+      setForceRefresh(prev => prev + 1);
+      setUniqueId(Math.random().toString(36).substr(2, 9));
+    }, 100);
+    
+    setTimeout(() => {
+      setAvatarTimestamp(now + 2);
+      setForceRefresh(prev => prev + 1);
+      setUniqueId(Math.random().toString(36).substr(2, 9));
+    }, 300);
+    
+    setTimeout(() => {
+      setAvatarTimestamp(now + 3);
+      setForceRefresh(prev => prev + 1);
+      setUniqueId(Math.random().toString(36).substr(2, 9));
+    }, 500);
+  };
+
+  // Update avatar timestamp when user avatar changes
+  useEffect(() => {
+    console.log('AdminHeader: useEffect triggered, user.avatar:', user?.avatar);
+    if (user?.avatar) {
+      console.log('AdminHeader: User avatar changed, updating timestamp');
+      setAvatarTimestamp(Date.now());
+    }
+  }, [user?.avatar]);
 
   return (
     <header className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
@@ -36,17 +112,21 @@ export function AdminHeader({ user, onLogout }: AdminHeaderProps) {
           <ThemeToggle />
           <NotificationCenter />
           
-          {user && (
+          {currentUser && (
             <div className="flex items-center space-x-3">
               <div className="flex items-center space-x-2">
                 <Avatar className="h-8 w-8">
-                  <AvatarImage src={user.avatar} />
-                  <AvatarFallback>
-                    {user.username.substring(0, 2).toUpperCase()}
-                  </AvatarFallback>
+                  <AvatarImage 
+                    ref={avatarImageRef}
+                    src={currentUser.avatar ? `${currentUser.avatar}?t=${avatarTimestamp}&r=${forceRefresh}&u=${uniqueId}` : undefined} 
+                    onLoad={() => {
+                      console.log('AdminHeader: Avatar image loaded with URL:', currentUser.avatar ? `${currentUser.avatar}?t=${avatarTimestamp}&r=${forceRefresh}&u=${uniqueId}` : 'no avatar');
+                    }}
+                  />
+                  <AvatarFallback />
                 </Avatar>
                 <Badge variant="secondary" className="text-xs">
-                  {user.role || t('users.admin')}
+                  {currentUser.role || t('users.admin')}
                 </Badge>
               </div>
               
@@ -63,10 +143,11 @@ export function AdminHeader({ user, onLogout }: AdminHeaderProps) {
       </div>
       
       <EditProfileDialog
-        isOpen={showEditProfile}
-        onClose={() => setShowEditProfile(false)}
-        user={user}
-      />
+              isOpen={showEditProfile}
+              onClose={() => setShowEditProfile(false)}
+              user={currentUser as any}
+              onProfileUpdated={handleProfileUpdate}
+            /> 
     </header>
   );
 }

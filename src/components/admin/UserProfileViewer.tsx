@@ -53,12 +53,12 @@ export const UserProfileViewer = ({ user, isOpen, onClose, onExportData, onDelet
           {/* User Header */}
           <div className="flex items-center space-x-4">
             <Avatar className="w-16 h-16">
-              <AvatarImage src={user.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.username}`} />
-              <AvatarFallback>{user.username.slice(0, 2).toUpperCase()}</AvatarFallback>
+              <AvatarImage src={user.avatar} />
+              <AvatarFallback />
             </Avatar>
             <div className="flex-1">
               <h3 className="text-xl font-semibold">{user.username}</h3>
-              <p className="text-muted-foreground">{user.email}</p>
+              <p className="text-sm text-muted-foreground">{user.report_count || 0} reports filed</p>
               <div className="flex items-center space-x-2 mt-2">
                 <Badge variant={getStatusColor(user.status)}>{user.status}</Badge>
                 <Badge variant="outline">{user.role}</Badge>
@@ -78,7 +78,7 @@ export const UserProfileViewer = ({ user, isOpen, onClose, onExportData, onDelet
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <p className="text-lg font-semibold">{user.joinDate}</p>
+                <p className="text-sm text-muted-foreground">{user.join_date ? new Date(user.join_date).toLocaleDateString() : 'N/A'}</p>
               </CardContent>
             </Card>
 
@@ -90,7 +90,7 @@ export const UserProfileViewer = ({ user, isOpen, onClose, onExportData, onDelet
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <p className="text-lg font-semibold">{user.lastActive}</p>
+                <p className="text-lg font-semibold">{user.last_seen ? new Date(user.last_seen).toLocaleString() : 'Never'}</p>
               </CardContent>
             </Card>
 
@@ -102,7 +102,7 @@ export const UserProfileViewer = ({ user, isOpen, onClose, onExportData, onDelet
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <p className="text-lg font-semibold">{user.messageCount.toLocaleString()}</p>
+                <p className="text-lg font-semibold">{user.message_count.toLocaleString()}</p>
               </CardContent>
             </Card>
 
@@ -114,7 +114,7 @@ export const UserProfileViewer = ({ user, isOpen, onClose, onExportData, onDelet
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <p className="text-lg font-semibold text-red-500">{user.reportCount}</p>
+                <p className="text-lg font-semibold text-red-500">{user.report_count}</p>
               </CardContent>
             </Card>
           </div>

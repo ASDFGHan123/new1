@@ -128,8 +128,8 @@ export const EnhancedUserList = ({ users, onViewProfile, onModerate, onDataManag
                 <TableCell>
                   <div className="flex items-center space-x-3">
                     <Avatar className="w-8 h-8">
-                      <AvatarImage src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${user.username}`} />
-                      <AvatarFallback>{user.username.slice(0, 2).toUpperCase()}</AvatarFallback>
+                      <AvatarImage src={user.avatar} />
+                      <AvatarFallback />
                     </Avatar>
                     <div>
                       <p className="font-medium">{user.username}</p>
@@ -143,16 +143,16 @@ export const EnhancedUserList = ({ users, onViewProfile, onModerate, onDataManag
                 <TableCell>
                   <Badge variant="outline">{user.role}</Badge>
                 </TableCell>
-                <TableCell>{(user.messageCount || 0).toLocaleString()}</TableCell>
+                <TableCell>{(user.message_count || 0).toLocaleString()}</TableCell>
                 <TableCell>
-                  {user.reportCount > 0 ? (
-                    <Badge variant="destructive">{user.reportCount}</Badge>
+                  {user.report_count > 0 ? (
+                    <Badge variant="destructive">{user.report_count}</Badge>
                   ) : (
                     <span className="text-muted-foreground">0</span>
                   )}
                 </TableCell>
                 <TableCell className="text-sm text-muted-foreground">
-                  {user.lastActive}
+                  {user.last_seen ? new Date(user.last_seen).toLocaleDateString() : 'Never'}
                 </TableCell>
                 <TableCell>
                   <DropdownMenu>

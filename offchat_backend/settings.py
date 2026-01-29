@@ -59,7 +59,7 @@ SECRET_KEY = config(
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = config('DEBUG', default=True, cast=bool)
 
-ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='localhost,127.0.0.1,192.168.2.9,testserver', cast=lambda v: [s.strip() for s in v.split(',')])
+ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='localhost,127.0.0.1,192.168.2.9,192.168.2.33,testserver', cast=lambda v: [s.strip() for s in v.split(',')])
 
 # CORS settings for React frontend
 CORS_ALLOWED_ORIGINS = [
@@ -80,6 +80,10 @@ CORS_ALLOWED_ORIGINS = [
     "http://192.168.2.9:8082",  # React dev server on network
     "http://192.168.2.9:8080",  # Alternative React port on network
     "http://192.168.2.9:8081",  # Alternative React port on network
+    "http://192.168.2.33:5173",  # React dev server on network (new IP)
+    "http://192.168.2.33:8082",  # React dev server on network (new IP)
+    "http://192.168.2.33:8080",  # Alternative React port on network (new IP)
+    "http://192.168.2.33:8081",  # Alternative React port on network (new IP)
 ]
 
 CORS_ALLOW_CREDENTIALS = True

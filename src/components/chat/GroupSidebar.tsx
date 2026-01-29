@@ -1,51 +1,39 @@
-import { useState } from "react";
-import { useTranslation } from "react-i18next";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Badge } from "@/components/ui/badge";
-import { ScrollArea } from "@/components/ui/scroll-area";
-
+import React, { useState, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Button } from '@/components/ui/button';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Badge } from '@/components/ui/badge';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+} from '@/components/ui/dropdown-menu';
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
+  MoreHorizontal,
   Users,
-  Search,
   Plus,
-  Settings,
-  MessageCircle,
-  Hash,
-  Lock,
-  Globe,
-  MoreVertical,
-  Filter,
-  SortAsc,
-  SortDesc,
-  MessageSquare,
+  Search,
   Crown,
   Shield,
-  User,
-} from "lucide-react";
-import { Group, User as UserType, GroupFilters } from "@/types/group";
-import { CreateGroupDialog } from "./CreateGroupDialog";
-import { GroupManagementDialog } from "./GroupManagementDialog";
-import { GroupMembersDialog } from "./GroupMembersDialog";
+  Settings,
+  Trash2,
+  Eye,
+  MessageSquare,
+  Lock,
+  Globe,
+} from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { CreateGroupDialog } from './CreateGroupDialog';
+import { GroupMembersDialog } from './GroupMembersDialog';
+import type { User, Group } from '@/types/group';
 
 interface GroupSidebarProps {
+  currentUser: User;
   groups: Group[];
-  currentUser: UserType;
-  availableUsers: UserType[];
+  availableUsers: User[];
   currentGroupId?: string;
   onSelectGroup: (groupId: string) => void;
   onCreateGroup: (groupData: any) => void;
@@ -56,9 +44,9 @@ interface GroupSidebarProps {
   onDeleteGroup: (groupId: string) => void;
 }
 
-export const GroupSidebar = ({
-  groups,
+export function GroupSidebar({
   currentUser,
+  groups,
   availableUsers,
   currentGroupId,
   onSelectGroup,
@@ -68,87 +56,33 @@ export const GroupSidebar = ({
   onRemoveMember,
   onLeaveGroup,
   onDeleteGroup,
-}: GroupSidebarProps) => {
+}: GroupSidebarProps) {
   const { t } = useTranslation();
-  const [searchTerm, setSearchTerm] = useState("");
-  const [showCreateDialog, setShowCreateDialog] = useState(false);
-  const [filters, setFilters] = useState<GroupFilters>({
-    sortBy: "lastActivity",
-    sortOrder: "desc",
-    showPrivate: true,
-    showPublic: true,
-  });
-  const [showFilters, setShowFilters] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
   const [showMembersDialog, setShowMembersDialog] = useState(false);
-  const [selectedGroupForMembers, setSelectedGroupForMembers] = useState<
-    Group | null
-  >(null);
+  const [selectedGroupForMembers, setSelectedGroupForMembers] = useState<Group | null>(null);
 
-  const filteredGroups = groups
-    .filter((group) => {
-      // Search filter
-      if (
-        searchTerm &&
-        !group.name.toLowerCase().includes(searchTerm.toLowerCase()) &&
-        !group.description?.toLowerCase().includes(searchTerm.toLowerCase())
-      ) {
-        return false;
-      }
-
-      // Privacy filter
-      if (!filters.showPrivate && group.isPrivate) return false;
-      if (!filters.showPublic && !group.isPrivate) return false;
-
-      // Member count filter
-      if (filters.memberCount && group.members.length !== filters.memberCount) {
-        return false;
-      }
-
-      return true;
-    })
-    .sort((a, b) => {
-      let comparison = 0;
-
-      switch (filters.sortBy) {
-        case "name":
-          comparison = a.name.localeCompare(b.name);
-          break;
-        case "lastActivity":
-          comparison =
-            new Date(b.lastActivity || 0).getTime() -
-            new Date(a.lastActivity || 0).getTime();
-          break;
-        case "created":
-          comparison =
-            new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
-          break;
-        case "members":
-          comparison = a.members.length - b.members.length;
-          break;
-        default:
-          comparison = 0;
-      }
-
-      return filters.sortOrder === "asc" ? comparison : -comparison;
-    });
-
-  const getGroupIcon = (group: Group) => {
-    return group.isPrivate ? (
-      <Lock className="h-4 w-4" />
-    ) : (
-      <Globe className="h-4 w-4" />
+  const filteredGroups = useMemo(() => {
+    if (!searchTerm) return groups;
+    
+    const lowerSearchTerm = searchTerm.toLowerCase();
+    return groups.filter(group =>
+      group.name.toLowerCase().includes(lowerSearchTerm) ||
+      group.description?.toLowerCase().includes(lowerSearchTerm)
     );
+  }, [groups, searchTerm]);
+
+  const getRoleForUser = (group: Group): string => {
+    const member = group.members?.find(m => m.userId === currentUser.id);
+    return member?.role || 'member';
   };
 
-  const getRoleForUser = (group: Group) => {
-    return group.members.find((m) => m.userId === currentUser.id)?.role ||
-      "member";
+  const canManageGroup = (group: Group): boolean => {
+    const role = getRoleForUser(group);
+    return role === 'admin' || role === 'moderator';
   };
 
-  const isAdmin = (group: Group) => getRoleForUser(group) === "admin";
-  const isModerator = (group: Group) => getRoleForUser(group) === "moderator";
-
-  const formatLastActivity = (date: Date) => {
+  const formatLastActivity = (date: Date): string => {
     const now = new Date();
     const diff = now.getTime() - date.getTime();
     const minutes = Math.floor(diff / 60000);
@@ -160,6 +94,11 @@ export const GroupSidebar = ({
     if (hours < 24) return t("common.hoursAgo", { count: hours });
     if (days < 7) return t("common.daysAgo", { count: days });
     return date.toLocaleDateString();
+  };
+
+  const handleShowMembers = (group: Group) => {
+    setSelectedGroupForMembers(group);
+    setShowMembersDialog(true);
   };
 
   return (
@@ -177,7 +116,7 @@ export const GroupSidebar = ({
             availableUsers={availableUsers}
             onCreateGroup={onCreateGroup}
             trigger={
-              <Button size="sm" className="h-8 w-8 p-0">
+              <Button size="sm">
                 <Plus className="h-4 w-4" />
               </Button>
             }
@@ -185,116 +124,14 @@ export const GroupSidebar = ({
         </div>
 
         {/* Search */}
-        <div className="relative mb-3">
+        <div className="relative">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
+            placeholder={t("chat.searchGroups")}
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            placeholder={t("chat.searchGroups")}
-            className="pl-10 h-9"
+            className="pl-10"
           />
-        </div>
-
-        {/* Filters */}
-        <div className="flex items-center gap-2">
-          <DropdownMenu open={showFilters} onOpenChange={setShowFilters}>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm" className="h-8">
-                <Filter className="h-4 w-4 mr-1" />
-                {t("chat.filters")}
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-56">
-              <div className="p-3 space-y-3">
-                <div>
-                  <label className="text-sm font-medium">{t("chat.sortBy")}</label>
-                  <Select
-                    value={filters.sortBy}
-                    onValueChange={(value: any) =>
-                      setFilters((prev) => ({ ...prev, sortBy: value }))
-                    }
-                  >
-                    <SelectTrigger className="w-full mt-1">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="name">{t("common.name")}</SelectItem>
-                      <SelectItem value="lastActivity">
-                        {t("chat.lastActivity")}
-                      </SelectItem>
-                      <SelectItem value="created">
-                        {t("chat.dateCreated")}
-                      </SelectItem>
-                      <SelectItem value="members">
-                        {t("chat.memberCount")}
-                      </SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div>
-                  <label className="text-sm font-medium">{t("chat.order")}</label>
-                  <Select
-                    value={filters.sortOrder}
-                    onValueChange={(value: any) =>
-                      setFilters((prev) => ({ ...prev, sortOrder: value }))
-                    }
-                  >
-                    <SelectTrigger className="w-full mt-1">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="asc">
-                        <div className="flex items-center gap-2">
-                          <SortAsc className="h-4 w-4" />
-                          {t("chat.ascending")}
-                        </div>
-                      </SelectItem>
-                      <SelectItem value="desc">
-                        <div className="flex items-center gap-2">
-                          <SortDesc className="h-4 w-4" />
-                          {t("chat.descending")}
-                        </div>
-                      </SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div>
-                  <label className="text-sm font-medium">{t("chat.show")}</label>
-                  <div className="flex flex-col gap-2 mt-1">
-                    <label className="flex items-center space-x-2">
-                      <input
-                        type="checkbox"
-                        checked={filters.showPublic}
-                        onChange={(e) =>
-                          setFilters((prev) => ({ ...prev, showPublic: e.target.checked }))
-                        }
-                        className="rounded"
-                      />
-                      <span className="text-sm">{t("chat.publicGroups")}</span>
-                    </label>
-
-                    <label className="flex items-center space-x-2">
-                      <input
-                        type="checkbox"
-                        checked={filters.showPrivate}
-                        onChange={(e) =>
-                          setFilters((prev) => ({ ...prev, showPrivate: e.target.checked }))
-                        }
-                        className="rounded"
-                      />
-                      <span className="text-sm">{t("chat.privateGroups")}</span>
-                    </label>
-                  </div>
-                </div>
-              </div>
-            </DropdownMenuContent>
-          </DropdownMenu>
-
-          <div className="text-xs text-muted-foreground">
-            {filteredGroups.length} {t("common.of")} {groups.length}
-          </div>
         </div>
       </div>
 
@@ -336,200 +173,103 @@ export const GroupSidebar = ({
                       ? "bg-primary/10 border border-primary/20"
                       : "hover:bg-muted/50"
                   }`}
-
-    {/* Groups List */}
-    <ScrollArea className="flex-1">
-      <div className="p-2 space-y-1">
-        {filteredGroups.length === 0 ? (
-          <div className="text-center py-8 text-muted-foreground">
-            <Users className="h-12 w-12 mx-auto mb-4 opacity-50" />
-            <p className="text-lg font-medium mb-2">{t("chat.noGroupsFound")}</p>
-            <p className="text-sm mb-4">
-              {searchTerm ? t("chat.tryAdjustingSearch") : t("chat.createFirstGroup")}
-            </p>
-            {!searchTerm && (
-              <CreateGroupDialog
-                currentUser={currentUser}
-                availableUsers={availableUsers}
-                onCreateGroup={onCreateGroup}
-                trigger={
-                  <Button size="sm">
-                    <Plus className="h-4 w-4 mr-2" />
-                    {t("chat.createGroup")}
-                  </Button>
-                }
-              />
-            )}
-          </div>
-        ) : (
-          filteredGroups.map((group) => {
-            const isActive = currentGroupId === group.id;
-            const userRole = getRoleForUser(group);
-            const hasUnread = group.unreadCount > 0;
-
-            return (
-              <div
-                key={group.id}
-                className={`group relative rounded-lg p-3 cursor-pointer transition-colors ${
-                  isActive
-                    ? "bg-primary/10 border border-primary/20"
-                    : "hover:bg-muted/50"
-                }`}
-                onClick={() => onSelectGroup(group.id)}
-              >
-                <div className="flex items-start gap-3">
-                  {/* Group Avatar */}
-                  <div className="relative">
-                    <Avatar className="h-10 w-10">
-                      <AvatarImage src={group.avatar} />
-                      <AvatarFallback showDefaultIcon={false} className="bg-primary text-primary-foreground">
-                        {group.name.slice(0, 2).toUpperCase()}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div className="absolute -bottom-1 -right-1">
-                      {getGroupIcon(group)}
-                    </div>
-                  </div>
-
-                  {/* Group Info */}
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-1">
-                      <p className="font-medium truncate text-sm">{group.name}</p>
-                      {hasUnread && (
-                        <Badge variant="destructive" className="text-xs px-1 py-0">
-                          {group.unreadCount}
-                        </Badge>
-                      )}
-                    </div>
-                    
-                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                      <button
-                        className="hover:text-primary hover:underline cursor-pointer transition-colors"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setSelectedGroupForMembers(group);
-                          setShowMembersDialog(true);
-                        }}
-                      >
-                        {group.members.length} {t("chat.members")}
-                      </button>
-                      {group.lastActivity && (
-                        <>
-                          <span>•</span>
-                          <span>{formatLastActivity(group.lastActivity)}</span>
-                        </>
-                      )}
-                    </div>
-
-                    {group.description && (
-                      <p className="text-xs text-muted-foreground truncate mt-1">
-                        {group.description}
-                      </p>
-                    )}
-                  </div>
-
-                  {/* Actions Menu */}
-                  <div className="opacity-0 group-hover:opacity-100 transition-opacity">
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
-                          <MoreVertical className="h-3 w-3" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem
-                    {/* Group Info */}
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1">
-                        <p className="font-medium truncate text-sm">{group.name}</p>
+                  onClick={() => onSelectGroup(group.id)}
+                >
+                  <div className="flex items-start justify-between">
+                    <div className="flex items-start gap-3 flex-1 min-w-0">
+                      {/* Group Avatar */}
+                      <div className="relative">
+                        <Avatar className="h-10 w-10">
+                          <AvatarImage src={group.avatar} alt={group.name} />
+                          <AvatarFallback>
+                            {group.name.slice(0, 2).toUpperCase()}
+                          </AvatarFallback>
+                        </Avatar>
                         {hasUnread && (
-                          <Badge variant="destructive" className="text-xs px-1 py-0">
-                            {group.unreadCount}
+                          <div className="absolute -top-1 -right-1 h-3 w-3 bg-red-500 rounded-full border-2 border-background" />
+                        )}
+                      </div>
+
+                      {/* Group Info */}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1">
+                          <h3 className="font-medium truncate">{group.name}</h3>
+                          {group.isPrivate && (
+                            <Lock className="h-3 w-3 text-muted-foreground" />
+                          )}
+                          {userRole === 'admin' && (
+                            <Crown className="h-3 w-3 text-yellow-500" />
+                          )}
+                          {userRole === 'moderator' && (
+                            <Shield className="h-3 w-3 text-blue-500" />
+                          )}
+                        </div>
+
+                        {group.description && (
+                          <p className="text-sm text-muted-foreground line-clamp-2 mb-1">
+                            {group.description}
+                          </p>
+                        )}
+
+                        <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                          <div className="flex items-center gap-1">
+                            <Users className="h-3 w-3" />
+                            <span>{group.members?.length || 0}</span>
+                          </div>
+                          {group.lastActivity && (
+                            <div className="flex items-center gap-1">
+                              <MessageSquare className="h-3 w-3" />
+                              <span>{formatLastActivity(new Date(group.lastActivity))}</span>
+                            </div>
+                          )}
+                        </div>
+
+                        {hasUnread && (
+                          <Badge variant="destructive" className="mt-2 text-xs">
+                            {group.unreadCount} {t("chat.unread")}
                           </Badge>
                         )}
                       </div>
-                      
-                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                        <button
-                          className="hover:text-primary hover:underline cursor-pointer transition-colors"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setSelectedGroupForMembers(group);
-                            setShowMembersDialog(true);
-                          }}
+                    </div>
+
+                    {/* Actions */}
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="opacity-0 group-hover:opacity-100 transition-opacity"
+                          onClick={(e) => e.stopPropagation()}
                         >
-                          {group.members.length} {t("chat.members")}
-                        </button>
-                        {group.lastActivity && (
+                          <MoreHorizontal className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem onClick={() => handleShowMembers(group)}>
+                          <Eye className="h-4 w-4 mr-2" />
+                          {t("chat.viewMembers")}
+                        </DropdownMenuItem>
+                        
+                        {canManageGroup(group) && (
                           <>
-                            <span>•</span>
-                            <span>{formatLastActivity(group.lastActivity)}</span>
+                            <DropdownMenuItem onClick={() => onSelectGroup(group.id)}>
+                              <Settings className="h-4 w-4 mr-2" />
+                              {t("chat.groupSettings")}
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
                           </>
                         )}
-                      </div>
 
-                      {group.description && (
-                        <p className="text-xs text-muted-foreground truncate mt-1">
-                          {group.description}
-                        </p>
-                      )}
-                    </div>
-
-                    {/* Actions Menu */}
-                    <div className="opacity-0 group-hover:opacity-100 transition-opacity">
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
-                            <MoreVertical className="h-3 w-3" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setSelectedGroupForMembers(group);
-                              setShowMembersDialog(true);
-                            }}
-                          >
-                            <Users className="h-4 w-4 mr-2" />
-                            {t("chat.viewMembers")}
-                          </DropdownMenuItem>
-                          
-                          {(isAdmin(group) || isModerator(group)) && (
-                            <GroupManagementDialog
-                              group={group}
-                              currentUser={currentUser}
-                              availableUsers={availableUsers}
-                              onUpdateGroup={onUpdateGroup}
-                              onAddMembers={onAddMembers}
-                              onRemoveMember={onRemoveMember}
-                              onLeaveGroup={onLeaveGroup}
-                              onDeleteGroup={onDeleteGroup}
-                              trigger={
-                                <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
-                                  <Settings className="h-4 w-4 mr-2" />
-                                  {t("chat.manageGroup")}
-                                </DropdownMenuItem>
-                              }
-                            />
-                          )}
-                          
-                          <DropdownMenuItem
-                            onClick={() => onLeaveGroup(group.id)}
-                            className="text-destructive"
-                          >
-                            <Users className="h-4 w-4 mr-2" />
-                            {t("chat.leaveGroup")}
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </div>
+                        <DropdownMenuItem
+                          onClick={() => onLeaveGroup(group.id)}
+                          className="text-destructive"
+                        >
+                          <Trash2 className="h-4 w-4 mr-2" />
+                          {t("chat.leaveGroup")}
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   </div>
-
-                  {/* Active indicator */}
-                  {isActive && (
-                    <div className="absolute left-0 top-1/2 transform -translate-y-1/2 w-1 h-8 bg-primary rounded-r-full" />
-                  )}
                 </div>
               );
             })
@@ -569,4 +309,4 @@ export const GroupSidebar = ({
       )}
     </div>
   );
-};
+}

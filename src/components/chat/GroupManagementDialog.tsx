@@ -448,9 +448,7 @@ export const GroupManagementDialog = ({
                         <div className="flex items-center space-x-3">
                           <Avatar className="h-8 w-8">
                             <AvatarImage src={user.avatar} />
-                            <AvatarFallback>
-                              {user.username.slice(0, 2).toUpperCase()}
-                            </AvatarFallback>
+                            <AvatarFallback />
                           </Avatar>
                           <div>
                             <p className="font-medium">{user.username}</p>
@@ -510,9 +508,7 @@ export const GroupManagementDialog = ({
                     <div className="flex items-center space-x-3">
                       <Avatar className="h-10 w-10">
                         <AvatarImage src={user?.avatar || member.avatar} />
-                        <AvatarFallback>
-                          {member.username.slice(0, 2).toUpperCase()}
-                        </AvatarFallback>
+                        <AvatarFallback />
                       </Avatar>
                       <div>
                         <div className="flex items-center gap-2">

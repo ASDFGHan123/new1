@@ -194,6 +194,89 @@ const queryClient = new QueryClient();
     }
   };
 
+  // Refresh user data from server
+  const handleProfileUpdate = async (updatedUser?: { avatar?: string }) => {
+    if (!user) return;
+    
+    console.log('=== PROFILE UPDATE START ===');
+    console.log('App.tsx handleProfileUpdate called with:', updatedUser);
+    console.log('App.tsx current user before update:', user);
+    
+    try {
+      if (updatedUser?.avatar) {
+        // If we have the updated avatar URL, update immediately
+        const newUser = {
+          ...user,
+          avatar: updatedUser.avatar,
+        };
+        
+        console.log('App.tsx updating user state to:', newUser);
+        console.log('App.tsx old avatar:', user.avatar);
+        console.log('App.tsx new avatar:', newUser.avatar);
+        
+        // Update local state immediately
+        setUser(newUser);
+        
+        console.log('App.tsx setUser() called - state should update now');
+        
+        // Update localStorage
+        const storedUser = JSON.parse(localStorage.getItem('user') || '{}');
+        localStorage.setItem('user', JSON.stringify({ ...storedUser, avatar: updatedUser.avatar }));
+        
+        console.log('App.tsx localStorage updated with new avatar');
+        
+        // Force a re-render by updating state again after a delay
+        setTimeout(() => {
+          console.log('App.tsx forcing second state update');
+          setUser(prev => ({ ...prev }));
+        }, 100);
+        
+        // Optionally fetch fresh data to ensure consistency
+        const response = await apiService.httpRequest('/users/profile/');
+        if (response.success && response.data) {
+          const data = response.data as any;
+          const serverUpdatedUser = {
+            id: data.id || user.id,
+            username: data.username || user.username,
+            avatar: data.avatar || updatedUser.avatar, // Use the updated avatar if server doesn't have it yet
+            status: data.status || user.status,
+            role: data.role || user.role,
+          };
+          console.log('App.tsx server updated user:', serverUpdatedUser);
+          setUser(serverUpdatedUser);
+          localStorage.setItem('user', JSON.stringify(serverUpdatedUser));
+        }
+      } else {
+        // Fallback to fetching fresh data from server
+        const response = await apiService.httpRequest('/users/profile/');
+        if (response.success && response.data) {
+          const data = response.data as any;
+          const updatedUser = {
+            id: data.id || user.id,
+            username: data.username || user.username,
+            avatar: data.avatar || user.avatar,
+            status: data.status || user.status,
+            role: data.role || user.role,
+          };
+          
+          console.log('App.tsx fallback updating user to:', updatedUser);
+          
+          // Update local state
+          setUser(updatedUser);
+          
+          // Update localStorage
+          localStorage.setItem('admin_user', JSON.stringify(updatedUser));
+        
+          console.log('Profile updated successfully:', updatedUser);
+        }
+      }
+    } catch (error) {
+      console.error('Failed to refresh profile data:', error);
+    }
+    
+    console.log('=== PROFILE UPDATE END ===');
+  };
+
   // Admin add user (approved by default)
   const handleAddUser = async (username: string, password: string, role: string, avatar?: string) => {
     try {
@@ -472,6 +555,7 @@ const queryClient = new QueryClient();
             <AdminDashboard
               user={user}
               onLogout={handleLogout}
+              onProfileUpdate={handleProfileUpdate}
             />
           ) : (
             <AdminLogin onLogin={handleAdminLogin} />

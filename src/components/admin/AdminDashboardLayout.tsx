@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { AdminSidebar } from './AdminSidebar';
 import { AdminHeader } from './AdminHeader';
 import { AdminContent } from './AdminContent';
@@ -13,10 +13,16 @@ interface AdminDashboardLayoutProps {
     role?: string; 
   };
   onLogout?: () => void;
+  onProfileUpdate?: (updatedUser?: { avatar?: string }) => void;
 }
 
-export function AdminDashboardLayout({ user, onLogout }: AdminDashboardLayoutProps) {
+export function AdminDashboardLayout({ user, onLogout, onProfileUpdate }: AdminDashboardLayoutProps) {
   const { state, dispatch } = useAdmin();
+
+  // Debug: Log when user prop changes
+  useEffect(() => {
+    console.log('AdminDashboardLayout: User prop changed:', user?.username, user?.avatar);
+  }, [user]);
 
   return (
     <div className="flex h-screen bg-background">
@@ -27,8 +33,13 @@ export function AdminDashboardLayout({ user, onLogout }: AdminDashboardLayoutPro
         onLogout={onLogout}
       />
       <div className="flex-1 flex flex-col overflow-hidden">
-        <AdminHeader user={user} onLogout={onLogout} />
-        <AdminContent user={user} />
+        <AdminHeader 
+        key={`header-${user?.avatar || 'no-avatar'}`} // Force re-render when avatar changes
+        user={user} 
+        onLogout={onLogout} 
+        onProfileUpdate={onProfileUpdate} 
+      />
+        <AdminContent user={user} onProfileUpdate={onProfileUpdate} />
       </div>
     </div>
   );

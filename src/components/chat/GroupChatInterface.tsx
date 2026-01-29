@@ -18,7 +18,7 @@ import { Send, Settings, LogOut, Users, MessageCircle, Paperclip, X, FileText, I
 import { ImageUpload } from "@/components/ui/image-upload";
 import { Label } from "@/components/ui/label";
 import { User, Group, GroupMessage, Attachment, GroupMember } from "@/types/group";
-import { GroupSidebar } from "./GroupSidebar";
+import { GroupSidebar } from "./GroupSidebar.js";
 import { GroupManagementDialog } from "./GroupManagementDialog";
 import { GroupMembersDialog } from "./GroupMembersDialog";
 import { ThemeToggle } from "@/components/ThemeToggle";
@@ -636,9 +636,7 @@ export const GroupChatInterface = ({
                   .map((member) => (
                     <Avatar key={member.userId} className="h-8 w-8 border-2 border-card">
                       <AvatarImage src={member.avatar} />
-                      <AvatarFallback className="text-xs">
-                        {member.username.slice(0, 2).toUpperCase()}
-                      </AvatarFallback>
+                      <AvatarFallback />
                     </Avatar>
                   ))}
                 {currentGroup.members.filter(member => {
@@ -1059,9 +1057,7 @@ export const GroupChatInterface = ({
                     <div key={member.userId} className="flex items-center gap-3 p-2 rounded-lg">
                       <Avatar className="h-8 w-8">
                         <AvatarImage src={member.avatar} />
-                        <AvatarFallback className="text-xs">
-                          {member.username.slice(0, 2).toUpperCase()}
-                        </AvatarFallback>
+                        <AvatarFallback />
                       </Avatar>
                       <div className="flex-1">
                         <div className="flex items-center gap-2">

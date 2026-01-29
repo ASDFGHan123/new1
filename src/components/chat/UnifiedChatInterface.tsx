@@ -466,16 +466,14 @@ export const UnifiedChatInterface = ({ initialConversationId }: { initialConvers
               {currentConversation.type === 'group' ? (
                 <Avatar className="h-10 w-10">
                   <AvatarImage src={currentConversation.groupAvatar} />
-                  <AvatarFallback showDefaultIcon={false} className="bg-primary text-primary-foreground">
+                  <AvatarFallback className="bg-primary text-primary-foreground">
                     {(currentConversation.groupName || t('common.unknown')).slice(0, 2).toUpperCase()}
                   </AvatarFallback>
                 </Avatar>
               ) : (
                 <Avatar className="h-10 w-10">
                   <AvatarImage src={getOtherUser(currentConversation)?.avatar} />
-                  <AvatarFallback showDefaultIcon={false} className="bg-primary text-primary-foreground">
-                    {(getOtherUser(currentConversation)?.username || t('common.unknown')).slice(0, 2).toUpperCase()}
-                  </AvatarFallback>
+                  <AvatarFallback />
                 </Avatar>
               )}
               <div>
@@ -868,7 +866,7 @@ export const UnifiedChatInterface = ({ initialConversationId }: { initialConvers
                   <div key={member.id} className="flex items-center gap-3 p-3 rounded-lg hover:bg-muted/50">
                     <Avatar className="h-10 w-10">
                       <AvatarImage src={member.avatar} />
-                      <AvatarFallback>{member.username.slice(0, 2).toUpperCase()}</AvatarFallback>
+                      <AvatarFallback />
                     </Avatar>
                     <div className="flex-1 min-w-0">
                       <p className="font-medium text-sm truncate">{member.username}</p>

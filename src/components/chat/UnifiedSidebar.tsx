@@ -152,9 +152,7 @@ export const UnifiedSidebar = ({
         <div className="flex items-center gap-3 mb-4">
           <Avatar className="h-10 w-10">
             <AvatarImage src={currentUser.avatar} />
-            <AvatarFallback showDefaultIcon={false} className="bg-primary text-primary-foreground">
-              {(currentUser.username || '??').slice(0, 2).toUpperCase()}
-            </AvatarFallback>
+            <AvatarFallback />
           </Avatar>
           <div className="flex-1">
             <h3 className="font-semibold">{currentUser.username}</h3>
@@ -225,9 +223,7 @@ export const UnifiedSidebar = ({
                   <div className="relative">
                     <Avatar className="h-12 w-12">
                       <AvatarImage src={getConversationAvatar(conversation)} />
-                      <AvatarFallback showDefaultIcon={false} className="bg-muted">
-                        {getConversationAvatarFallback(conversation)}
-                      </AvatarFallback>
+                      <AvatarFallback />
                     </Avatar>
                     
                     {conversation.type === 'individual' && (
@@ -250,9 +246,7 @@ export const UnifiedSidebar = ({
                           {(conversation.participants || []).slice(0, 3).map((member, idx) => (
                             <Avatar key={`${member.id}-${idx}`} className="h-4 w-4 border border-card">
                               <AvatarImage src={member.avatar} />
-                              <AvatarFallback className="text-[8px]">
-                                {(member.username || '?').slice(0, 1)}
-                              </AvatarFallback>
+                              <AvatarFallback className="text-[8px]" />
                             </Avatar>
                           ))}
                           {conversation.participants.length > 3 && (

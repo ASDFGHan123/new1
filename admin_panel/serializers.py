@@ -138,7 +138,7 @@ class BackupSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'name', 'description', 'backup_type', 'file',
             'file_size', 'size_mb', 'status', 'progress', 'record_count',
-            'created_by', 'created_at', 'completed_at'
+            'created_by', 'created_at', 'completed_at', 'metadata'
         ]
         read_only_fields = [
             'id', 'file_size', 'size_mb', 'progress', 'record_count', 'created_at', 'completed_at'

@@ -2,12 +2,12 @@ import React, { Suspense, useState, useRef, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useAdmin } from '@/contexts/AdminContext';
 import { usePermissions } from '@/contexts/PermissionsContext';
+import { apiService, API_BASE_URL } from '@/lib/api';
 import { StatsCards } from './StatsCards';
 import { UserManagement } from './UserManagement';
 import { MessageAnalytics } from './MessageAnalytics';
 import { AuditLogs } from './AuditLogs';
 import { BackupManager } from './BackupManager';
-import { ProfileImageUpload } from './ProfileImageUpload';
 import { EditProfileDialog } from './EditProfileDialog';
 import { TrashSectioned } from './TrashSectioned';
 import { SettingsManager } from './SettingsManager';
@@ -19,7 +19,6 @@ import { Button } from '@/components/ui/button';
 import { Loading } from '@/components/ui/loading';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { AlertCircle } from 'lucide-react';
-import { apiService } from '@/lib/api';
 
 // Lazy load heavy components
 const ConversationMonitor = React.lazy(() => import('./ConversationMonitor').then(m => ({ default: m.ConversationMonitor })));
@@ -33,6 +32,7 @@ interface AdminContentProps {
     status: "online" | "away" | "offline"; 
     role?: string; 
   };
+  onProfileUpdate?: (updatedUser?: { avatar?: string }) => void;
 }
 
 interface ProfileUser {
@@ -45,7 +45,7 @@ interface ProfileUser {
   status?: "online" | "away" | "offline";
 }
 
-export function AdminContent({ user }: AdminContentProps) {
+export function AdminContent({ user, onProfileUpdate }: AdminContentProps) {
   const { t } = useTranslation();
   const { state, dispatch } = useAdmin();
   const { can, loading: permsLoading } = usePermissions();
@@ -80,6 +80,7 @@ export function AdminContent({ user }: AdminContentProps) {
   );
   const [showEditProfile, setShowEditProfile] = useState(false);
   const [profileUser, setProfileUser] = useState<ProfileUser | null>(null);
+  const [avatarTimestamp, setAvatarTimestamp] = useState(Date.now());
 
   const exportUserData = async (userId: string, options: any) => {
     await apiService.httpRequest('/users/data/export/', {
@@ -93,6 +94,21 @@ export function AdminContent({ user }: AdminContentProps) {
       method: 'POST',
       body: JSON.stringify({ user_id: userId, options }),
     });
+  };
+
+  const handleProfileUpdate = (updatedUser?: { avatar?: string }) => {
+    console.log('AdminContent: Profile update received', updatedUser);
+    
+    // Update avatar timestamp to force refresh
+    setAvatarTimestamp(Date.now());
+    
+    // Update profileUser if avatar was updated
+    if (updatedUser?.avatar && profileUser) {
+      setProfileUser(prev => prev ? { ...prev, avatar: updatedUser.avatar } : null);
+    }
+    
+    // IMPORTANT: Call parent onProfileUpdate to propagate to AdminHeader
+    onProfileUpdate?.(updatedUser);
   };
 
   const handleUserDeleted = async () => {
@@ -232,11 +248,30 @@ export function AdminContent({ user }: AdminContentProps) {
               <h2 className="text-2xl font-bold mb-6">{t('admin.profile')}</h2>
               <div className="flex items-start space-x-6">
                 <div className="flex-shrink-0">
-                  <ProfileImageUpload 
-                    currentImage={effectiveUser?.avatar}
-                    username={effectiveUser?.username || t('users.admin')}
-                    key={effectiveUser?.avatar}
-                  />
+                  <div className="w-24 h-24 rounded-full overflow-hidden bg-gray-100 flex items-center justify-center">
+                    {effectiveUser?.avatar ? (
+                      <img 
+                        src={
+                          effectiveUser.avatar.startsWith('http') 
+                            ? `${effectiveUser.avatar}?t=${avatarTimestamp}`
+                            : `${API_BASE_URL?.replace(/\/?api\/?$/, '') || ''}${effectiveUser.avatar}?t=${avatarTimestamp}`
+                        }
+                        alt={effectiveUser?.username || t('users.admin')}
+                        className="w-full h-full object-cover"
+                        onError={(e) => {
+                          e.currentTarget.style.display = 'none';
+                        }}
+                        onLoad={() => {
+                          console.log('Profile avatar loaded with timestamp:', avatarTimestamp);
+                        }}
+                      />
+                    ) : null}
+                    <div className={`${effectiveUser?.avatar ? 'hidden' : 'flex'} w-full h-full items-center justify-center bg-gray-900`}>
+                      <svg className="w-8 h-8 text-white" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
+                      </svg>
+                    </div>
+                  </div>
                 </div>
                 <div className="flex-1 space-y-4">
                   <div>
@@ -265,6 +300,7 @@ export function AdminContent({ user }: AdminContentProps) {
               isOpen={showEditProfile}
               onClose={() => setShowEditProfile(false)}
               user={effectiveUser as any}
+              onProfileUpdated={handleProfileUpdate}
             />
           </div>
         );

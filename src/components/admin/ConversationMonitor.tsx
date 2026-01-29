@@ -468,10 +468,7 @@ export const ConversationMonitor = ({ onTrashConversation }: ConversationMonitor
                             </div>
                           ) : (
                             <Avatar className="w-8 h-8">
-                              <AvatarImage src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${conversation.id}`} />
-                              <AvatarFallback>
-                                {conversation.title.split(' ').slice(0, 2).map((n: string) => n[0]).join('')}
-                              </AvatarFallback>
+                              <AvatarFallback />
                             </Avatar>
                           )}
                         </div>
@@ -660,10 +657,7 @@ export const ConversationMonitor = ({ onTrashConversation }: ConversationMonitor
               selectedParticipants.map((participant: any, idx: number) => (
                 <div key={idx} className="flex items-center space-x-3 p-2 rounded-lg hover:bg-muted/50">
                   <Avatar className="w-8 h-8">
-                    <AvatarImage src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${participant.username || participant.id}`} />
-                    <AvatarFallback>
-                      {(participant.username || 'U')[0].toUpperCase()}
-                    </AvatarFallback>
+                    <AvatarImage src={participant.avatar} />
                   </Avatar>
                   <div className="flex-1 min-w-0">
                     <p className="font-medium text-sm">{participant.username || t('common.unknown')}</p>

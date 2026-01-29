@@ -320,6 +320,7 @@ class Backup(models.Model):
     
     # Metadata
     record_count = models.PositiveIntegerField(default=0)
+    metadata = models.JSONField(default=dict, blank=True)
     created_by = models.ForeignKey(
         User,
         on_delete=models.CASCADE,
@@ -346,12 +347,12 @@ class Backup(models.Model):
     
     def start_backup(self):
         """Start the backup process."""
-        self.status = self.BackupStatus.IN_PROGRESS
+        self.status = 'in_progress'
         self.save(update_fields=['status'])
     
     def complete_backup(self, file_size=None, record_count=None):
         """Complete the backup process."""
-        self.status = self.BackupStatus.COMPLETED
+        self.status = 'completed'
         self.progress = 100
         self.completed_at = timezone.now()
         
@@ -366,7 +367,7 @@ class Backup(models.Model):
     
     def fail_backup(self):
         """Mark backup as failed."""
-        self.status = self.BackupStatus.FAILED
+        self.status = 'failed'
         self.completed_at = timezone.now()
         self.save(update_fields=['status', 'completed_at'])
 

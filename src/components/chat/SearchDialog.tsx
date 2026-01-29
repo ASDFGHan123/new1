@@ -147,9 +147,7 @@ export const SearchDialog = ({
                               <div className="relative">
                                 <Avatar className="h-12 w-12">
                                   <AvatarImage src={user.avatar} />
-                                  <AvatarFallback>
-                                    {user.username.slice(0, 2).toUpperCase()}
-                                  </AvatarFallback>
+                                  <AvatarFallback />
                                 </Avatar>
                                 <div 
                                   className={`absolute -bottom-1 -right-1 w-4 h-4 ${getStatusColor(user.status)} rounded-full border-2 border-background`}
@@ -214,9 +212,7 @@ export const SearchDialog = ({
                                     {(conversation.participants || []).slice(0, 4).map((member) => (
                                       <Avatar key={member.id} className="h-6 w-6 border border-background">
                                         <AvatarImage src={member.avatar} />
-                                        <AvatarFallback className="text-[10px]">
-                                          {(member.username || '?').slice(0, 1)}
-                                        </AvatarFallback>
+                                        <AvatarFallback className="text-[10px]" />
                                       </Avatar>
                                     ))}
                                     {(conversation.participants || []).length > 4 && (

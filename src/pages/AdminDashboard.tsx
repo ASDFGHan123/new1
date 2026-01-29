@@ -18,9 +18,10 @@ interface AdminDashboardProps {
     role?: string; 
   };
   onLogout?: () => void;
+  onProfileUpdate?: (updatedUser?: { avatar?: string }) => void;
 }
 
-function AdminDashboardContent({ user, onLogout }: AdminDashboardProps) {
+function AdminDashboardContent({ user, onLogout, onProfileUpdate }: AdminDashboardProps) {
   const { dispatch } = useAdmin();
   console.log('[AdminDashboard] Rendering with user:', user?.username, user?.role);
 
@@ -73,7 +74,7 @@ function AdminDashboardContent({ user, onLogout }: AdminDashboardProps) {
     fetchData();
   }, [dispatch]);
 
-  return <AdminDashboardLayout user={user} onLogout={onLogout} />;
+  return <AdminDashboardLayout user={user} onLogout={onLogout} onProfileUpdate={onProfileUpdate} />;
 }
 
 const AdminDashboard = (props: AdminDashboardProps) => {

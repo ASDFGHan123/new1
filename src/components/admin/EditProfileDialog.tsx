@@ -13,17 +13,20 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { apiService } from '@/lib/api';
+import { ProfileImageUpload } from './ProfileImageUpload';
 
 interface EditProfileDialogProps {
   isOpen: boolean;
   onClose: () => void;
   user?: { id: string; username: string; avatar?: string; status: "online" | "away" | "offline"; role?: string };
+  onProfileUpdated?: (updatedUser?: { avatar?: string }) => void;
 }
 
 export const EditProfileDialog: React.FC<EditProfileDialogProps> = ({
   isOpen,
   onClose,
-  user
+  user,
+  onProfileUpdated
 }) => {
   const { t } = useTranslation();
   const [username, setUsername] = useState('');
@@ -32,6 +35,8 @@ export const EditProfileDialog: React.FC<EditProfileDialogProps> = ({
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [isSaving, setIsSaving] = useState(false);
+  const [avatarUpdated, setAvatarUpdated] = useState(false);
+  const [newAvatarUrl, setNewAvatarUrl] = useState<string | undefined>();
   const { toast } = useToast();
 
   useEffect(() => {
@@ -80,6 +85,10 @@ export const EditProfileDialog: React.FC<EditProfileDialogProps> = ({
           title: t('common.success'),
           description: t('admin.profileUpdated')
         });
+        
+        // Pass updated user data including new avatar if available
+        const updatedUserData = newAvatarUrl ? { avatar: newAvatarUrl } : undefined;
+        onProfileUpdated?.(updatedUserData);
         handleClose();
       } else {
         // Handle validation errors from backend
@@ -101,14 +110,16 @@ export const EditProfileDialog: React.FC<EditProfileDialogProps> = ({
     setCurrentPassword('');
     setNewPassword('');
     setConfirmPassword('');
+    setAvatarUpdated(false);
+    setNewAvatarUrl(undefined);
     onClose();
   };
 
-  const hasChanges = username !== user?.username || newPassword || currentPassword;
+  const hasChanges = username !== user?.username || newPassword || currentPassword || avatarUpdated;
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-[400px]">
+      <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{t('admin.editProfile')}</DialogTitle>
           <DialogDescription>
@@ -116,27 +127,48 @@ export const EditProfileDialog: React.FC<EditProfileDialogProps> = ({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="username">{t('common.username')}</Label>
-            <Input
-              id="username"
-              type="text"
-              placeholder={t('common.username')}
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-            />
+        <div className="space-y-6">
+          {/* Profile Picture Section */}
+          <div className="space-y-4">
+            <Label className="text-base font-semibold">{t('admin.profilePicture')}</Label>
+            <div className="flex justify-center">
+              <ProfileImageUpload
+                currentImage={user?.avatar}
+                username={user?.username}
+                user={user}
+                onImageUpdated={(newAvatarUrl) => {
+                  setAvatarUpdated(true);
+                  setNewAvatarUrl(newAvatarUrl);
+                  onProfileUpdated?.({ avatar: newAvatarUrl });
+                }}
+              />
+            </div>
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="email">{t('common.email')}</Label>
-            <Input
-              id="email"
-              type="email"
-              value={email}
-              disabled
-              className="bg-muted"
-            />
+          {/* Profile Information */}
+          <div className="space-y-4">
+            <h3 className="font-semibold">{t('admin.profileInformation')}</h3>
+            <div className="space-y-2">
+              <Label htmlFor="username">{t('common.username')}</Label>
+              <Input
+                id="username"
+                type="text"
+                placeholder={t('common.username')}
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="email">{t('common.email')}</Label>
+              <Input
+                id="email"
+                type="email"
+                value={email}
+                disabled
+                className="bg-muted"
+              />
+            </div>
           </div>
 
           <div className="border-t pt-4">
