@@ -106,7 +106,16 @@ echo Step 4: Installing Node.js Dependencies
 echo ============================================================
 echo Installing npm packages...
 cd /d "%PROJECT_ROOT%\frontend"
-npm ci
+
+REM Check if package-lock.json exists, if not use npm install instead of npm ci
+if exist "%PROJECT_ROOT%\frontend\package-lock.json" (
+    echo Using package-lock.json for clean install...
+    npm ci --no-audit --no-fund
+) else (
+    echo No package-lock.json found, performing fresh install...
+    npm install --no-audit --no-fund
+)
+
 if errorlevel 1 goto error
 echo [OK] Node.js dependencies installed
 
