@@ -8,6 +8,26 @@ echo   OffChat Admin Dashboard - Complete Development Setup
 echo ============================================================
 echo.
 
+REM Get script directory and project root
+set SCRIPT_DIR=%~dp0
+set PROJECT_ROOT=%SCRIPT_DIR%..
+echo Project root: %PROJECT_ROOT%
+
+REM Check if required directories exist
+if not exist "%PROJECT_ROOT%\backend" (
+    echo ERROR: Backend directory not found at %PROJECT_ROOT%\backend
+    echo Please ensure you are running this script from the correct location
+    pause
+    exit /b 1
+)
+
+if not exist "%PROJECT_ROOT%\frontend" (
+    echo ERROR: Frontend directory not found at %PROJECT_ROOT%\frontend
+    echo Please ensure you are running this script from the correct location
+    pause
+    exit /b 1
+)
+
 REM Check if Python is installed
 echo Checking prerequisites...
 python --version >nul 2>&1
@@ -40,12 +60,12 @@ echo.
 echo ============================================================
 echo Step 1: Setting up Python Virtual Environment
 echo ============================================================
-if exist venv (
+if exist "%PROJECT_ROOT%\venv" (
     echo Virtual environment already exists. Removing old one...
-    rmdir /s /q venv
+    rmdir /s /q "%PROJECT_ROOT%\venv"
 )
 echo Creating new Python virtual environment...
-python -m venv venv
+python -m venv "%PROJECT_ROOT%\venv"
 if errorlevel 1 goto error
 echo [OK] Virtual environment created
 
@@ -54,15 +74,15 @@ echo ============================================================
 echo Step 2: Installing Python Dependencies
 echo ============================================================
 echo Activating virtual environment...
-call venv\Scripts\activate.bat
+call "%PROJECT_ROOT%\venv\Scripts\activate.bat"
 if errorlevel 1 goto error
 
 echo Upgrading pip, setuptools, and wheel...
-call venv\Scripts\python.exe -m pip install --upgrade pip setuptools wheel
+call "%PROJECT_ROOT%\venv\Scripts\python.exe" -m pip install --upgrade pip setuptools wheel
 if errorlevel 1 goto error
 
 echo Installing project dependencies from requirements-dev.txt...
-call venv\Scripts\pip install -r ..\backend\requirements-dev.txt
+call "%PROJECT_ROOT%\venv\Scripts\pip.exe" install -r "%PROJECT_ROOT%\backend\requirements-dev.txt"
 if errorlevel 1 goto error
 echo [OK] Python dependencies installed
 
@@ -71,16 +91,13 @@ echo ============================================================
 echo Step 3: Setting up Django Database
 echo ============================================================
 echo Creating Django migrations...
-cd ..\backend
-call ..\venv\Scripts\python.exe manage.py makemigrations --settings=offchat_backend.settings.development
+cd /d "%PROJECT_ROOT%\backend"
+call "%PROJECT_ROOT%\venv\Scripts\python.exe" manage.py makemigrations --settings=offchat_backend.settings.development
 if errorlevel 1 goto error
-cd ..\scripts
 
 echo Running Django migrations...
-cd ..\backend
-call ..\venv\Scripts\python.exe manage.py migrate --settings=offchat_backend.settings.development
+call "%PROJECT_ROOT%\venv\Scripts\python.exe" manage.py migrate --settings=offchat_backend.settings.development
 if errorlevel 1 goto error
-cd ..\scripts
 echo [OK] Database migrations completed
 
 echo.
@@ -88,23 +105,22 @@ echo ============================================================
 echo Step 4: Installing Node.js Dependencies
 echo ============================================================
 echo Installing npm packages...
-cd ..\frontend
+cd /d "%PROJECT_ROOT%\frontend"
 npm ci
 if errorlevel 1 goto error
-cd ..\scripts
 echo [OK] Node.js dependencies installed
 
 echo.
 echo ============================================================
 echo Step 5: Creating Environment Configuration
 echo ============================================================
-if not exist .env.local (
+if not exist "%PROJECT_ROOT%\.env.local" (
     echo Creating .env.local file...
     (
         echo # Development Environment Configuration
         echo VITE_API_URL=http://localhost:8000/api
         echo VITE_DEBUG=true
-    ) > .env.local
+    ) > "%PROJECT_ROOT%\.env.local"
     echo [OK] .env.local created with default settings
 ) else (
     echo [OK] .env.local already exists
@@ -122,25 +138,23 @@ echo   Password: 12341234
 echo.
 echo If you want to use default credentials, just press Enter when prompted.
 echo.
-cd ..\backend
-call ..\venv\Scripts\python.exe manage.py createsuperuser --settings=offchat_backend.settings.development
+cd /d "%PROJECT_ROOT%\backend"
+call "%PROJECT_ROOT%\venv\Scripts\python.exe" manage.py createsuperuser --settings=offchat_backend.settings.development
 if errorlevel 1 (
     echo WARNING: Superuser creation failed or was skipped
     echo You can create it later by running:
     echo   python manage.py createsuperuser --settings=offchat_backend.settings.development
 )
-cd ..\scripts
 
 echo.
 echo ============================================================
 echo Step 7: Collecting Static Files
 echo ============================================================
-cd ..\backend
-call ..\venv\Scripts\python.exe manage.py collectstatic --noinput --settings=offchat_backend.settings.development
+cd /d "%PROJECT_ROOT%\backend"
+call "%PROJECT_ROOT%\venv\Scripts\python.exe" manage.py collectstatic --noinput --settings=offchat_backend.settings.development
 if errorlevel 1 (
     echo WARNING: Static files collection had issues, but continuing...
 )
-cd ..\scripts
 echo [OK] Static files collected
 
 echo.
@@ -173,13 +187,13 @@ echo Starting development servers...
 echo.
 
 echo Starting Django backend on port 8000...
-start "OffChat Backend" cmd /k "cd ..\backend && call ..\venv\Scripts\activate.bat && python manage.py runserver 0.0.0.0:8000 --settings=offchat_backend.settings.development"
+start "OffChat Backend" cmd /k "cd /d \"%PROJECT_ROOT%\backend\" && call \"%PROJECT_ROOT%\venv\Scripts\activate.bat\" && python manage.py runserver 0.0.0.0:8000 --settings=offchat_backend.settings.development"
 
 echo Waiting 3 seconds before starting frontend...
 timeout /t 3 /nobreak
 
 echo Starting React frontend on port 5173...
-start "OffChat Frontend" cmd /k "cd ..\frontend && npm run dev"
+start "OffChat Frontend" cmd /k "cd /d \"%PROJECT_ROOT%\frontend\" && npm run dev"
 
 echo.
 echo ============================================================
