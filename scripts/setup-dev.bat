@@ -62,7 +62,7 @@ call venv\Scripts\python.exe -m pip install --upgrade pip setuptools wheel
 if errorlevel 1 goto error
 
 echo Installing project dependencies from requirements-dev.txt...
-call venv\Scripts\pip install -r requirements-dev.txt
+call venv\Scripts\pip install -r ..\backend\requirements-dev.txt
 if errorlevel 1 goto error
 echo [OK] Python dependencies installed
 
@@ -71,12 +71,16 @@ echo ============================================================
 echo Step 3: Setting up Django Database
 echo ============================================================
 echo Creating Django migrations...
-call venv\Scripts\python.exe manage.py makemigrations --settings=offchat_backend.settings.development
+cd ..\backend
+call ..\venv\Scripts\python.exe manage.py makemigrations --settings=offchat_backend.settings.development
 if errorlevel 1 goto error
+cd ..\scripts
 
 echo Running Django migrations...
-call venv\Scripts\python.exe manage.py migrate --settings=offchat_backend.settings.development
+cd ..\backend
+call ..\venv\Scripts\python.exe manage.py migrate --settings=offchat_backend.settings.development
 if errorlevel 1 goto error
+cd ..\scripts
 echo [OK] Database migrations completed
 
 echo.
@@ -84,8 +88,10 @@ echo ============================================================
 echo Step 4: Installing Node.js Dependencies
 echo ============================================================
 echo Installing npm packages...
+cd ..\frontend
 npm ci
 if errorlevel 1 goto error
+cd ..\scripts
 echo [OK] Node.js dependencies installed
 
 echo.
@@ -116,21 +122,25 @@ echo   Password: 12341234
 echo.
 echo If you want to use default credentials, just press Enter when prompted.
 echo.
-call venv\Scripts\python.exe manage.py createsuperuser --settings=offchat_backend.settings.development
+cd ..\backend
+call ..\venv\Scripts\python.exe manage.py createsuperuser --settings=offchat_backend.settings.development
 if errorlevel 1 (
     echo WARNING: Superuser creation failed or was skipped
     echo You can create it later by running:
     echo   python manage.py createsuperuser --settings=offchat_backend.settings.development
 )
+cd ..\scripts
 
 echo.
 echo ============================================================
 echo Step 7: Collecting Static Files
 echo ============================================================
-call venv\Scripts\python.exe manage.py collectstatic --noinput --settings=offchat_backend.settings.development
+cd ..\backend
+call ..\venv\Scripts\python.exe manage.py collectstatic --noinput --settings=offchat_backend.settings.development
 if errorlevel 1 (
     echo WARNING: Static files collection had issues, but continuing...
 )
+cd ..\scripts
 echo [OK] Static files collected
 
 echo.
@@ -163,13 +173,13 @@ echo Starting development servers...
 echo.
 
 echo Starting Django backend on port 8000...
-start "OffChat Backend" cmd /k "call venv\Scripts\activate.bat && python manage.py runserver 0.0.0.0:8000 --settings=offchat_backend.settings.development"
+start "OffChat Backend" cmd /k "cd ..\backend && call ..\venv\Scripts\activate.bat && python manage.py runserver 0.0.0.0:8000 --settings=offchat_backend.settings.development"
 
 echo Waiting 3 seconds before starting frontend...
 timeout /t 3 /nobreak
 
 echo Starting React frontend on port 5173...
-start "OffChat Frontend" cmd /k "npm run dev"
+start "OffChat Frontend" cmd /k "cd ..\frontend && npm run dev"
 
 echo.
 echo ============================================================
