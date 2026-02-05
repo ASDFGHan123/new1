@@ -18,11 +18,10 @@ for /f "tokens=2 delims=:" %%a in ('ipconfig ^| findstr /R "IPv4 Address"') do (
 echo Your Machine IP: %ip%
 echo.
 echo Starting Django backend on 0.0.0.0:8000...
-start cmd /k "cd ..\backend && python manage.py runserver 0.0.0.0:8000 --settings=offchat_backend.settings.development"
+start cmd /k "cd backend && ..\venv\Scripts\activate && python manage.py runserver 0.0.0.0:8000 --settings=offchat_backend.settings.development"
 
 echo Starting React frontend on 0.0.0.0:5173...
-start cmd /k "cd ..\frontend &&
- npm run dev"
+start cmd /k "cd frontend && npm run dev"
 
 echo.
 echo ========================================
