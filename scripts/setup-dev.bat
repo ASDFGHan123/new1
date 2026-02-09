@@ -108,16 +108,57 @@ echo ============================================================
 echo Installing npm packages...
 cd /d "%PROJECT_ROOT%\frontend"
 
-REM Check if package-lock.json exists, if not use npm install instead of npm ci
-if exist "%PROJECT_ROOT%\frontend\package-lock.json" (
-    echo Using package-lock.json for clean install...
-    npm ci --no-audit --no-fund
-) else (
-    echo No package-lock.json found, performing fresh install...
-    npm install --no-audit --no-fund
+REM Remove node_modules and package-lock if they exist
+if exist "node_modules" (
+    echo Removing old node_modules...
+    rmdir /s /q node_modules
+)
+if exist "package-lock.json" (
+    del /f /q package-lock.json
+)
+if exist "dist" (
+    echo Removing old dist folder...
+    rmdir /s /q dist
+)
+if exist ".vite" (
+    echo Removing Vite cache...
+    rmdir /s /q .vite
 )
 
+echo Performing fresh npm install...
+npm install --no-audit --no-fund
 if errorlevel 1 goto error
+
+echo Clearing Vite cache...
+if exist "node_modules\.vite" rmdir /s /q node_modules\.vite
+
+echo Verifying critical files...
+if not exist "src\lib\api.ts" (
+    echo ERROR: Missing src\lib\api.ts
+    goto error
+)
+if not exist "src\lib\utils.ts" (
+    echo ERROR: Missing src\lib\utils.ts
+    goto error
+)
+if not exist "src\lib\websocket.ts" (
+    echo ERROR: Missing src\lib\websocket.ts
+    goto error
+)
+if not exist "vite.config.ts" (
+    echo ERROR: Missing vite.config.ts
+    goto error
+)
+if not exist "tsconfig.json" (
+    echo ERROR: Missing tsconfig.json
+    goto error
+)
+if not exist "tsconfig.app.json" (
+    echo ERROR: Missing tsconfig.app.json
+    goto error
+)
+echo [OK] All critical files verified
+
 echo [OK] Node.js dependencies installed
 
 echo.
