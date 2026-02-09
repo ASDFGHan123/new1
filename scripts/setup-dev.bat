@@ -77,12 +77,13 @@ echo Activating virtual environment...
 call "%PROJECT_ROOT%\venv\Scripts\activate.bat"
 if errorlevel 1 goto error
 
-echo Upgrading pip, setuptools, and wheel...
-call "%PROJECT_ROOT%\venv\Scripts\python.exe" -m pip install --upgrade pip setuptools wheel
+echo Upgrading pip and installing setuptools...
+call "%PROJECT_ROOT%\venv\Scripts\python.exe" -m pip install --upgrade pip
+call "%PROJECT_ROOT%\venv\Scripts\python.exe" -m pip install setuptools==69.0.0
 if errorlevel 1 goto error
 
-echo Installing project dependencies from requirements-dev.txt...
-call "%PROJECT_ROOT%\venv\Scripts\pip.exe" install -r "%PROJECT_ROOT%\backend\requirements-dev.txt"
+echo Installing project dependencies from requirements.txt...
+call "%PROJECT_ROOT%\venv\Scripts\python.exe" -m pip install -r "%PROJECT_ROOT%\backend\requirements.txt"
 if errorlevel 1 goto error
 echo [OK] Python dependencies installed
 

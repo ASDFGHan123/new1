@@ -11,12 +11,12 @@ redis==5.0.1
 
 # Security & CORS
 django-cors-headers==4.3.1
-django-filter==23.3
+django-filter==24.2
 django-ratelimit==4.1.0
 cryptography==41.0.7
 
 # File Handling
-Pillow==11.0.0
+Pillow>=11.1.0
 django-imagekit==4.1.0
 
 # Background Tasks
