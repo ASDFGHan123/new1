@@ -129,6 +129,10 @@ echo Performing fresh npm install...
 npm install --no-audit --no-fund
 if errorlevel 1 goto error
 
+echo Cleaning compiled files from src directory...
+for /r "src" %%f in (*.js) do del /f /q "%%f" 2>nul
+for /r "src" %%f in (*.jsx) do del /f /q "%%f" 2>nul
+
 echo Clearing Vite cache...
 if exist "node_modules\.vite" rmdir /s /q node_modules\.vite
 

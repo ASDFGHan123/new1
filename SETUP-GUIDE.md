@@ -61,9 +61,17 @@ npm run dev
 
 ### Error: "Failed to resolve import @/lib/api"
 
-**Solution 1:** Clean install
+**Quick Fix:**
+```cmd
+scripts\fix-frontend.bat
+```
+
+**Manual Solution:**
 ```cmd
 cd frontend
+taskkill /F /IM node.exe
+for /r "src" %f in (*.js) do del /f /q "%f"
+for /r "src" %f in (*.jsx) do del /f /q "%f"
 rmdir /s /q node_modules
 rmdir /s /q .vite
 del package-lock.json
@@ -71,28 +79,7 @@ npm install
 npm run dev
 ```
 
-**Solution 2:** Verify files exist
-```cmd
-cd frontend
-dir src\lib\api.ts
-dir src\lib\utils.ts
-dir src\lib\websocket.ts
-```
-
-If files are missing, restore from backup or repository.
-
-**Solution 3:** Check tsconfig.app.json
-Ensure it contains:
-```json
-{
-  "compilerOptions": {
-    "baseUrl": ".",
-    "paths": {
-      "@/*": ["./src/*"]
-    }
-  }
-}
-```
+**Root Cause:** Compiled `.js`/`.jsx` files in `src/` directory interfere with TypeScript path resolution.
 
 ### Error: "ModuleNotFoundError: No module named 'pkg_resources'"
 
