@@ -61,14 +61,34 @@ if exist .vite rmdir /s /q .vite 2>nul
 if exist dist rmdir /s /q dist 2>nul
 del /f /q package-lock.json 2>nul
 
-REM Remove compiled JS files
-for /r src %%f in (*.js) do del /f /q "%%f" 2>nul
-for /r src %%f in (*.jsx) do del /f /q "%%f" 2>nul
+REM Remove ALL compiled JS files from src (this is the critical fix)
+echo Removing compiled JS files...
+for /r src %%f in (*.js) do (
+    echo Deleting %%f
+    del /f /q "%%f" 2>nul
+)
+for /r src %%f in (*.jsx) do (
+    echo Deleting %%f
+    del /f /q "%%f" 2>nul
+)
 
 REM Install
+echo Installing npm packages...
 call npm install --silent
 if errorlevel 1 (
     echo ERROR: npm install failed
+    pause
+    exit /b 1
+)
+
+REM Verify files exist
+if not exist "src\lib\api.ts" (
+    echo ERROR: src\lib\api.ts not found!
+    pause
+    exit /b 1
+)
+if not exist "src\lib\utils.ts" (
+    echo ERROR: src\lib\utils.ts not found!
     pause
     exit /b 1
 )
