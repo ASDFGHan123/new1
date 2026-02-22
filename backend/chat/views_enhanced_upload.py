@@ -205,6 +205,5 @@ class MediaValidationView(APIView):
             'icon': MediaHandler.get_category_icon(category)
         })
 
-
 # Import MediaType for the view
 from .media_handler import MediaType

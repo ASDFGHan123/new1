@@ -139,7 +139,6 @@ class MessageSerializer(serializers.ModelSerializer):
         read_only_fields = ['id', 'sender', 'is_edited', 'edited_at', 'is_deleted',
                             'deleted_at', 'timestamp', 'attachments']
 
-
 class MessageCreateSerializer(serializers.ModelSerializer):
     attachments = serializers.ListField(child=serializers.FileField(), required=False, write_only=True)
     content = serializers.CharField(required=False, allow_blank=True)
